@@ -1,0 +1,54 @@
+# Secrets and machine-specific environment
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+/writers-studio-local-ca.crt
+
+# Dependencies
+node_modules/
+.bun/
+
+# Generated source, build output, and caches
+dist/
+coverage/
+.vite/
+.tanstack/
+.source/
+*.tsbuildinfo
+/public/docs/search.json
+
+# Test and review artifacts
+playwright-report/
+playwright-report-real-stt/
+test-results/
+blob-report/
+artifacts/
+playwright/.auth/
+
+# Local application state and backups
+data/
+tmp/
+/backups/
+*.log
+*.pid
+*.prof
+*.pprof
+*.out
+*.test
+
+# Local tooling metadata and derived handoff packages
+/.soba/
+/deploy/windows/Archive.zip
+
+# OS and editor temporary files
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*.swo
+*~

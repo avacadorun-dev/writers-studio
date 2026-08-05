@@ -1,0 +1,17 @@
+{
+  "title": "Студия автора",
+  "pages": [
+    "index",
+    "projects",
+    "editor",
+    "dictation",
+    "recovery",
+    "assistant",
+    "review",
+    "text-control",
+    "export",
+    "settings",
+    "help",
+    "glossary"
+  ]
+}

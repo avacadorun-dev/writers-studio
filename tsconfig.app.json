@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client", "bun"],
+    "baseUrl": ".",
+    "paths": {
+      "~app/*": ["src/app/*"],
+      "~pages/*": ["src/pages/*"],
+      "~widgets/*": ["src/widgets/*"],
+      "~features/*": ["src/features/*"],
+      "~entities/*": ["src/entities/*"],
+      "~shared/*": ["src/shared/*"]
+    },
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src", "content", "vite.config.ts", "playwright.config.ts", "tests"]
+}

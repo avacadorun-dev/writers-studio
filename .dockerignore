@@ -1,0 +1,14 @@
+.git
+.env
+._*
+**/._*
+node_modules
+dist
+coverage
+playwright-report
+playwright-report-real-stt
+test-results
+artifacts
+data
+tmp
+design.pen

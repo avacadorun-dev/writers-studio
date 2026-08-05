@@ -1,0 +1,105 @@
+name: writers-studio
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  storage:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY:?OBJECT_STORAGE_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_KEY:?OBJECT_STORAGE_SECRET_KEY is required}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - object-data:/data
+
+  app:
+    image: writers-studio-app:${APP_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      HTTP_ADDR: :8080
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      OBJECT_STORAGE_ENDPOINT: storage:9000
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:?OBJECT_STORAGE_ACCESS_KEY is required}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:?OBJECT_STORAGE_SECRET_KEY is required}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-writers-studio}
+      OBJECT_STORAGE_USE_SSL: "false"
+      ALLOW_TEST_ADAPTERS: "false"
+      STT_ADAPTER: ${STT_ADAPTER:-openrouter}
+      LIVE_STT_ADAPTER: ${LIVE_STT_ADAPTER:-deepgram}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_STT_MODEL: ${OPENROUTER_STT_MODEL:-openai/whisper-large-v3}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:?DEEPGRAM_API_KEY is required}
+      DEEPGRAM_STT_MODEL: ${DEEPGRAM_STT_MODEL:-nova-3}
+      LLM_ADAPTER: ${LLM_ADAPTER:-auto}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_DIALECT: ${LLM_DIALECT:-chat_completions}
+      LLM_CREDENTIAL_ENCRYPTION_KEY: ${LLM_CREDENTIAL_ENCRYPTION_KEY:-}
+      LLM_ALLOW_PRIVATE_ENDPOINTS: ${LLM_ALLOW_PRIVATE_ENDPOINTS:-false}
+      LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-10m}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_OAUTH_SECRET: ${MCP_OAUTH_SECRET:-}
+      STATIC_DIR: /app/web
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-studio.example.test}
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+    name: writers-studio-postgres-data
+  object-data:
+    name: writers-studio-object-data
+  caddy-data:
+    name: writers-studio-caddy-data
+  caddy-config:
+    name: writers-studio-caddy-config

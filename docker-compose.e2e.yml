@@ -1,0 +1,14 @@
+services:
+  app:
+    environment:
+      APP_ENV: test
+      ALLOW_TEST_ADAPTERS: "true"
+      STT_ADAPTER: fake
+      LIVE_STT_ADAPTER: fake
+      LLM_ADAPTER: fixture
+      LLM_BASE_URL: ""
+      LLM_API_KEY: ""
+      LLM_MODEL: fixture
+      PUBLIC_BASE_URL: http://127.0.0.1:18080
+    ports: !override
+      - "127.0.0.1:18080:8080"

@@ -1,0 +1,28 @@
+export {
+  createDictation,
+  getDictation,
+  getDictationAudio,
+  getRecoveryItems,
+  getSegmentAudioSource,
+  getSTTCapabilities,
+  retranscribeDictation,
+  retryDictation,
+  saveTranscriptDraft,
+  stopDictation,
+  transferTranscript,
+  transitionDictation,
+  uploadAudioChunk,
+} from "./api/dictation-api";
+export type {
+  CommandEvent,
+  DictationSession,
+  DictationStatus,
+  LiveTranscriptEvent,
+  RecoveryItem,
+  STTCapabilities,
+  TranscriptArtifact,
+  TranscriptDraft,
+  TranscriptDraftRevision,
+  TranscriptSegment,
+  TranscriptWord,
+} from "./model/types";

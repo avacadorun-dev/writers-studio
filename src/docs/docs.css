@@ -1,0 +1,56 @@
+/*
+ * Fumadocs publishes a ready-to-use stylesheet as well as Tailwind sources.
+ * The application owns its Tailwind build already, so importing the compiled
+ * stylesheet here keeps the documentation layout complete and independent of
+ * the application's content scanner.
+ */
+@import "fumadocs-ui/style.css";
+
+.ws-docs {
+  --color-fd-background: var(--surface-app);
+  --color-fd-foreground: var(--ink-primary);
+  --color-fd-muted: var(--surface-subtle);
+  --color-fd-muted-foreground: var(--ink-secondary);
+  --color-fd-popover: var(--surface-raised);
+  --color-fd-popover-foreground: var(--ink-primary);
+  --color-fd-card: var(--surface-panel);
+  --color-fd-card-foreground: var(--ink-primary);
+  --color-fd-border: var(--border-subtle);
+  --color-fd-primary: var(--accent-surface);
+  --color-fd-primary-foreground: var(--ink-on-solid);
+  --color-fd-secondary: var(--surface-subtle);
+  --color-fd-secondary-foreground: var(--ink-primary);
+  --color-fd-accent: var(--accent-soft);
+  --color-fd-accent-foreground: var(--accent-ink);
+  --color-fd-ring: var(--focus);
+  --color-fd-overlay: var(--surface-overlay);
+  min-height: 100vh;
+  background: var(--surface-app);
+  color: var(--ink-primary);
+  font-family: var(--font-ui);
+}
+
+.ws-docs [data-docs-body] {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.ws-docs figure {
+  margin-block: 2rem;
+}
+
+.ws-docs figure img {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 14px 36px var(--shadow-color);
+}
+
+.ws-docs figcaption {
+  margin-top: 0.75rem;
+  color: var(--ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  text-align: center;
+}
