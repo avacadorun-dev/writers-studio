@@ -69,6 +69,7 @@ interface AssistantSessionPageProps {
   projectId: string;
   runId: string;
   embedded?: boolean;
+  targetLabel?: string;
   selectionAttachment?: AssistantSelectionAttachment;
   previewStale?: boolean;
   onClose?: () => void;
@@ -85,6 +86,7 @@ export function AssistantSessionPage({
   projectId,
   runId,
   embedded = false,
+  targetLabel,
   selectionAttachment,
   previewStale = false,
   onClose,
@@ -850,7 +852,7 @@ export function AssistantSessionPage({
               />
             </fieldset>
             <p className="mt-2 truncate text-center text-[10px] text-[var(--ink-tertiary)]">
-              {targetNode ? targetNode.title : "Весь проект"} ·{" "}
+              {targetNode?.title ?? targetLabel ?? "Весь проект"} ·{" "}
               {remoteAgentLabel ?? currentRun.provider.model}
             </p>
             {selectionAttachment ? (

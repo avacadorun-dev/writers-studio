@@ -1178,6 +1178,7 @@ function CanvasBoardInner({
   const fileInput = useRef<HTMLInputElement>(null);
   const board = useRef<HTMLDivElement>(null);
   const initialFocusApplied = useRef(false);
+  const presentationOrigin = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
 
   useEffect(() => {
     const query = window.matchMedia("(min-width: 768px)");
@@ -1262,6 +1263,62 @@ function CanvasBoardInner({
     currentPresentationElement?.kind === "frame"
       ? currentPresentationElement.label || currentPresentationFrame?.label
       : currentPresentationFrame?.label;
+  const presentationNodeIds = useMemo(
+    () =>
+      currentPresentationFrame
+        ? new Set(
+            canvasExportNodeIds(history.present, {
+              scope: "frame",
+              frameId: currentPresentationFrame.id,
+            }),
+          )
+        : undefined,
+    [currentPresentationFrame, history.present],
+  );
+  const renderedNodes = useMemo(
+    () =>
+      presentationNodeIds
+        ? nodes.map((node) => ({ ...node, hidden: !presentationNodeIds.has(node.id) }))
+        : nodes,
+    [nodes, presentationNodeIds],
+  );
+  const renderedEdges = useMemo(
+    () =>
+      presentationNodeIds
+        ? edges.map((edge) => ({
+            ...edge,
+            hidden: !presentationNodeIds.has(edge.source) || !presentationNodeIds.has(edge.target),
+          }))
+        : edges,
+    [edges, presentationNodeIds],
+  );
+
+  useEffect(() => {
+    if (!currentPresentationFrame) return;
+    toolRail.closeMenu();
+    diagnosticsPanel.close();
+    navigatorPanel.close();
+    nodeMenu.close();
+    const animationFrame = window.requestAnimationFrame(() => {
+      void reactFlow.fitBounds(
+        {
+          x: currentPresentationFrame.x,
+          y: currentPresentationFrame.y,
+          width: currentPresentationFrame.width,
+          height: currentPresentationFrame.height,
+        },
+        { padding: 0.06, duration: 350 },
+      );
+    });
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [
+    currentPresentationFrame,
+    diagnosticsPanel.close,
+    navigatorPanel.close,
+    nodeMenu.close,
+    reactFlow,
+    toolRail.closeMenu,
+  ]);
 
   const syncFlow = useCallback(
     (
@@ -1900,15 +1957,19 @@ function CanvasBoardInner({
         return;
       }
       const nextIndex = Math.max(0, Math.min(presentationFrames.length - 1, Math.trunc(index)));
+      if (presentationIndex === undefined) presentationOrigin.current = reactFlow.getViewport();
       setPresentationIndex(nextIndex);
-      const frame = presentationFrames[nextIndex];
-      const flowFrame = frame ? nodesRef.current.find((node) => node.id === frame.id) : undefined;
-      if (flowFrame) {
-        void reactFlow.fitView({ nodes: [flowFrame], padding: 0.08, duration: 350, maxZoom: 1.5 });
-      }
     },
-    [presentationFrames, reactFlow, showToast],
+    [presentationFrames.length, presentationIndex, reactFlow, showToast],
   );
+
+  const exitPresentation = useCallback(() => {
+    setPresentationIndex(undefined);
+    const origin = presentationOrigin.current;
+    presentationOrigin.current = undefined;
+    if (!origin) return;
+    window.requestAnimationFrame(() => void reactFlow.setViewport(origin, { duration: 250 }));
+  }, [reactFlow]);
 
   const startFocusTimer = useCallback(() => {
     void requestSelect({
@@ -2231,6 +2292,24 @@ function CanvasBoardInner({
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (isFormTarget(event.target)) return;
+    if (presentationIndex !== undefined) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        exitPresentation();
+      } else if (
+        event.key === "ArrowRight" ||
+        event.key === "PageDown" ||
+        event.key === "Enter" ||
+        event.code === "Space"
+      ) {
+        event.preventDefault();
+        showPresentationFrame(presentationIndex + 1);
+      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
+        showPresentationFrame(presentationIndex - 1);
+      }
+      return;
+    }
     const command = event.metaKey || event.ctrlKey;
     if (command && event.key.toLowerCase() === "z") {
       event.preventDefault();
@@ -2487,8 +2566,8 @@ function CanvasBoardInner({
         <ReactFlow<CanvasFlowNode, CanvasFlowEdge>
           className="canvas-flow"
           style={canvasFlowStyle}
-          nodes={nodes}
-          edges={edges}
+          nodes={renderedNodes}
+          edges={renderedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onlyRenderVisibleElements
@@ -2712,19 +2791,23 @@ function CanvasBoardInner({
             </ViewportPortal>
           ) : null}
           <Background gap={20} size={1} color="var(--border-subtle)" />
-          <MiniMap
-            pannable
-            zoomable
-            position="bottom-left"
-            className="!border !border-[var(--border-subtle)] !bg-[var(--surface-raised)]"
-            maskColor="color-mix(in srgb, var(--surface-app) 70%, transparent)"
-            nodeColor="var(--accent-soft)"
-          />
-          <Controls
-            showInteractive={false}
-            position="bottom-right"
-            className="!overflow-hidden !rounded-[var(--radius-sm)] !border !border-[var(--border-subtle)]"
-          />
+          {presentationIndex === undefined ? (
+            <>
+              <MiniMap
+                pannable
+                zoomable
+                position="bottom-left"
+                className="!border !border-[var(--border-subtle)] !bg-[var(--surface-raised)]"
+                maskColor="color-mix(in srgb, var(--surface-app) 70%, transparent)"
+                nodeColor="var(--accent-soft)"
+              />
+              <Controls
+                showInteractive={false}
+                position="bottom-right"
+                className="!overflow-hidden !rounded-[var(--radius-sm)] !border !border-[var(--border-subtle)]"
+              />
+            </>
+          ) : null}
           {layoutPreview ? (
             <Panel
               position="top-right"
@@ -2872,7 +2955,7 @@ function CanvasBoardInner({
           {navigatorPanel.isOpen && !layoutPreview ? (
             <Panel
               position="top-left"
-              className="!mx-3 !mb-3 !mt-16 w-80 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-0 shadow-lg"
+              className="!mb-3 !ml-16 !mr-3 !mt-3 w-80 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-0 shadow-lg"
             >
               <div
                 ref={navigatorPanel.panelRef}
@@ -2982,7 +3065,7 @@ function CanvasBoardInner({
                 variant="ghost"
                 size="icon"
                 aria-label="Завершить презентацию"
-                onClick={() => setPresentationIndex(undefined)}
+                onClick={exitPresentation}
               >
                 <X className="size-4" aria-hidden="true" />
               </Button>
@@ -3007,7 +3090,10 @@ function CanvasBoardInner({
               </Button>
             </Panel>
           ) : null}
-          <Panel position="top-left" className="!m-3 !overflow-visible">
+          <Panel
+            position="top-left"
+            className={cn("!m-3 !overflow-visible", presentationIndex !== undefined && "!hidden")}
+          >
             <div
               ref={toolRail.railRef}
               aria-label="Инструменты Canvas"
@@ -3248,11 +3334,14 @@ function CanvasBoardInner({
                           icon={ListTree}
                           label="Объекты и поиск"
                           active={navigatorPanel.isOpen}
-                          onClick={() =>
-                            navigatorPanel.isOpen
-                              ? navigatorPanel.close()
-                              : navigatorPanel.open(true)
-                          }
+                          onClick={() => {
+                            if (navigatorPanel.isOpen) {
+                              navigatorPanel.close();
+                              return;
+                            }
+                            navigatorPanel.open(true);
+                            toolRail.closeMenu();
+                          }}
                         />
                       </span>
                       <ToolButton
@@ -3263,7 +3352,7 @@ function CanvasBoardInner({
                         onClick={() =>
                           presentationIndex === undefined
                             ? showPresentationFrame(0)
-                            : setPresentationIndex(undefined)
+                            : exitPresentation()
                         }
                       />
                       <ToolButton

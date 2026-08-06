@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Bot, Copy, Pencil, Tags, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { listAssistantRuns } from "~entities/assistant";
 import {
   type CanvasDocument,
   type CanvasDocumentPreview,
@@ -19,13 +20,16 @@ import {
 import { getProjectOutline } from "~entities/project";
 import { useCanvasAutosave } from "~features/canvas-autosave";
 import { CanvasSchemaEditor } from "~features/canvas-schema-editor";
+import { AssistantSessionPage } from "~pages/assistant-session";
 import { getCanvasSnapshot } from "~shared/lib";
 import { Banner, Button, Spinner, useActionDialog, useToast } from "~shared/ui";
-import { AssistantLauncher } from "~widgets/assistant-launcher";
+import { AssistantNewChatPanel, AssistantThreadSwitcher } from "~widgets/assistant-threads";
 import { CanvasBoard } from "~widgets/canvas-board";
 import { ProjectTree } from "~widgets/project-tree";
 import { RequireSession } from "~widgets/require-session";
 import { StudioHeader } from "~widgets/studio-header";
+
+type AssistantPanelView = "session" | "threads" | "new";
 
 export function CanvasPage({
   projectId,
@@ -124,7 +128,9 @@ function LoadedCanvasPage({
   const [initialContent, setInitialContent] = useState<CanvasDocument>(workspace.revision.content);
   const restoredSnapshotKey = useRef<string | undefined>(undefined);
   const [schemaEditorOpen, setSchemaEditorOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
+  const [assistantPanelView, setAssistantPanelView] = useState<AssistantPanelView>("new");
+  const [activeAssistantRunId, setActiveAssistantRunId] = useState<string>();
   const [assistantContext, setAssistantContext] = useState({
     selectionIds: [] as string[],
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -138,6 +144,23 @@ function LoadedCanvasPage({
       setRevision(nextRevision);
     },
   });
+  const assistantRuns = useQuery({
+    queryKey: ["assistant-runs", projectId],
+    queryFn: () => listAssistantRuns(projectId),
+    refetchInterval: ({ state }) =>
+      state.data?.runs.some((run) => run.status === "working") ? 1_200 : 10_000,
+  });
+
+  const openAssistantPanel = () => {
+    setAssistantPanelOpen(true);
+    setAssistantPanelView(
+      activeAssistantRunId
+        ? "session"
+        : (assistantRuns.data?.runs.length ?? 0) > 0
+          ? "threads"
+          : "new",
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -330,7 +353,7 @@ function LoadedCanvasPage({
           project={project.project}
           nodeTitle={title}
           saveState={autosave.saveState}
-          onAssistant={() => setAssistantOpen(true)}
+          onAssistant={openAssistantPanel}
         />
         {autosave.conflictCanvasId ? (
           <Banner
@@ -375,7 +398,7 @@ function LoadedCanvasPage({
                 className="size-8"
                 aria-label="Открыть Ассистента для этой доски"
                 title="Ассистент Canvas"
-                onClick={() => setAssistantOpen(true)}
+                onClick={openAssistantPanel}
               >
                 <Bot className="size-3.5" aria-hidden="true" />
               </Button>
@@ -479,13 +502,54 @@ function LoadedCanvasPage({
               onOpenChange={setSchemaEditorOpen}
               onSave={(schema) => saveTypeSchema.mutate(schema)}
             />
-            <AssistantLauncher
-              open={assistantOpen}
-              onOpenChange={setAssistantOpen}
-              project={project.project}
-              canvas={{ id: canvasId, title }}
-              canvasContext={assistantContext}
-            />
+            {assistantPanelOpen ? (
+              <div
+                data-testid="canvas-assistant-panel"
+                className="absolute bottom-3 right-3 top-[4.5rem] z-30 w-[min(380px,calc(100%-24px))] overflow-hidden rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-panel)] shadow-[-12px_14px_42px_var(--shadow-color)]"
+              >
+                {assistantPanelView === "session" && activeAssistantRunId ? (
+                  <AssistantSessionPage
+                    key={activeAssistantRunId}
+                    embedded
+                    projectId={projectId}
+                    runId={activeAssistantRunId}
+                    targetLabel={title}
+                    onOpenThreads={() => setAssistantPanelView("threads")}
+                    onNewThread={() => setAssistantPanelView("new")}
+                    onClose={() => setAssistantPanelOpen(false)}
+                  />
+                ) : assistantPanelView === "threads" ? (
+                  <AssistantThreadSwitcher
+                    projectId={projectId}
+                    activeRunId={activeAssistantRunId}
+                    nodes={project.nodes}
+                    onSelect={(runId) => {
+                      setActiveAssistantRunId(runId);
+                      setAssistantPanelView("session");
+                    }}
+                    onNew={() => setAssistantPanelView("new")}
+                    onClose={() => setAssistantPanelOpen(false)}
+                  />
+                ) : (
+                  <AssistantNewChatPanel
+                    project={project.project}
+                    canvas={{ id: canvasId, title }}
+                    canvasContext={assistantContext}
+                    hasThreads={(assistantRuns.data?.runs.length ?? 0) > 0}
+                    backgroundWorkingCount={
+                      assistantRuns.data?.runs.filter((run) => run.status === "working").length ?? 0
+                    }
+                    onStarted={(runId) => {
+                      setActiveAssistantRunId(runId);
+                      setAssistantPanelView("session");
+                      setAssistantPanelOpen(true);
+                    }}
+                    onBack={() => setAssistantPanelView("threads")}
+                    onClose={() => setAssistantPanelOpen(false)}
+                  />
+                )}
+              </div>
+            ) : null}
           </main>
         </div>
       </div>

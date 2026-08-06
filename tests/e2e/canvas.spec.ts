@@ -287,6 +287,144 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   expect(pageErrors).toEqual([]);
 });
 
+test("Canvas presentation focuses frames and the board keeps floating panels in place", async ({
+  page,
+}, testInfo) => {
+  test.skip((page.viewportSize()?.width ?? 0) < 1_024, "Desktop Canvas presentation");
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const suffix = `canvas-presentation-${testInfo.project.name}-${Date.now()}`;
+  const { projectId } = await registerAndCreateProject(page, suffix);
+  const canvasId = await createCanvasThroughAPI(page, projectId);
+  const seeded = await page.request.put(`/api/canvases/${canvasId}/revisions`, {
+    data: {
+      baseRevision: 1,
+      source: "e2e_presentation_seed",
+      content: {
+        nodes: [
+          {
+            id: "frame-opening",
+            type: "group",
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 500,
+            "x-writers-studio": {
+              element: { kind: "frame", order: 1, label: "Завязка" },
+            },
+          },
+          {
+            id: "note-opening",
+            type: "text",
+            x: 80,
+            y: 100,
+            width: 280,
+            height: 180,
+            text: "# Завязка\n\nГерой получает сигнал.",
+          },
+          {
+            id: "frame-finale",
+            type: "group",
+            x: 1_000,
+            y: 0,
+            width: 800,
+            height: 500,
+            "x-writers-studio": {
+              element: { kind: "frame", order: 2, label: "Финал" },
+            },
+          },
+          {
+            id: "note-finale",
+            type: "text",
+            x: 1_080,
+            y: 100,
+            width: 280,
+            height: 180,
+            text: "# Финал\n\nСигнал получает ответ.",
+          },
+          {
+            id: "note-outside",
+            type: "text",
+            x: 2_000,
+            y: 700,
+            width: 280,
+            height: 180,
+            text: "# Черновик за рамками",
+          },
+        ],
+        edges: [],
+        "x-writers-studio": { schemaVersion: 2 },
+      },
+    },
+  });
+  expect(seeded.status()).toBe(201);
+
+  await page.goto(`/projects/${projectId}/canvases/${canvasId}`);
+  const board = page.getByTestId("canvas-board");
+  const toolRail = page.getByRole("toolbar", { name: "Инструменты Canvas" });
+  await expect(board).toBeVisible();
+  await expect(toolRail).toBeVisible();
+
+  await toolRail.getByRole("button", { name: "Режимы и анализ" }).click();
+  await page.getByRole("button", { name: "Объекты и поиск" }).click();
+  const navigator = page.getByRole("dialog", { name: "Объекты доски" });
+  await expect(navigator).toBeVisible();
+  await expect(page.getByRole("group", { name: "Режимы, поиск и анализ" })).toBeHidden();
+  const railBox = await toolRail.boundingBox();
+  const navigatorBox = await navigator.boundingBox();
+  if (!railBox || !navigatorBox) throw new Error("Canvas navigation panels are not measurable");
+  expect(navigatorBox.x).toBeGreaterThanOrEqual(railBox.x + railBox.width + 4);
+  await navigator.getByRole("button", { name: "Закрыть" }).click();
+
+  await toolRail.getByRole("button", { name: "Режимы и анализ" }).click();
+  await page.getByRole("button", { name: "Презентация" }).click();
+  await expect(toolRail).toBeHidden();
+  await expect(page.getByText(/1\/2 · Завязка/)).toBeVisible();
+  await expect(page.getByTestId("canvas-frame-frame-opening")).toBeVisible();
+  await expect(page.getByTestId("canvas-text-note-opening")).toBeVisible();
+  await expect(page.getByTestId("canvas-frame-frame-finale")).toBeHidden();
+  await expect(page.getByTestId("canvas-text-note-finale")).toBeHidden();
+  await expect(page.getByTestId("canvas-text-note-outside")).toBeHidden();
+  await expect(page.locator(".react-flow__minimap")).toHaveCount(0);
+  await expect(page.locator(".react-flow__controls")).toHaveCount(0);
+  const boardBox = await board.boundingBox();
+  if (!boardBox) throw new Error("Presentation board is not measurable");
+  await expect
+    .poll(
+      async () => (await page.getByTestId("canvas-frame-frame-opening").boundingBox())?.width ?? 0,
+    )
+    .toBeGreaterThan(boardBox.width * 0.55);
+
+  await page.getByRole("button", { name: "Следующий фрейм" }).click();
+  await expect(page.getByText(/2\/2 · Финал/)).toBeVisible();
+  await expect(page.getByTestId("canvas-frame-frame-opening")).toBeHidden();
+  await expect(page.getByTestId("canvas-frame-frame-finale")).toBeVisible();
+  await page.getByRole("button", { name: "Завершить презентацию" }).click();
+  await expect(toolRail).toBeVisible();
+  await expect(page.getByTestId("canvas-text-note-outside")).toBeVisible();
+
+  const boardBeforeAssistant = await board.boundingBox();
+  await page
+    .getByRole("group", { name: "Действия с доской" })
+    .getByRole("button", { name: "Открыть Ассистента для этой доски" })
+    .click();
+  const assistantPanel = page.getByTestId("canvas-assistant-panel");
+  await expect(assistantPanel).toBeVisible();
+  await expect(page.getByTestId("assistant-new-chat-panel")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Сюжетная доска/ })).toBeVisible();
+  await expect(board).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/canvases/${canvasId}$`));
+  const boardAfterAssistant = await board.boundingBox();
+  if (!boardBeforeAssistant || !boardAfterAssistant) {
+    throw new Error("Canvas board is not measurable with Assistant open");
+  }
+  expect(Math.abs(boardBeforeAssistant.width - boardAfterAssistant.width)).toBeLessThan(1);
+  expect(Math.abs(boardBeforeAssistant.height - boardAfterAssistant.height)).toBeLessThan(1);
+  await assistantPanel.getByRole("button", { name: "Скрыть панель" }).click();
+  await expect(assistantPanel).toBeHidden();
+  expect(pageErrors).toEqual([]);
+});
+
 async function createNoteFromToolRail(page: Page, toolRail: Locator) {
   await toolRail.getByRole("button", { name: "Добавить" }).click();
   const createFlyout = page.getByRole("group", { name: "Добавить на доску" });
