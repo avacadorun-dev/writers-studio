@@ -46,6 +46,7 @@ import {
   listAssistantTurns,
   markAssistantChangeSetStale,
   markAssistantRunViewed,
+  refreshAssistantChangedDocuments,
   stopAssistantRun,
   undoAssistantChangeSet,
 } from "~entities/assistant";
@@ -248,6 +249,12 @@ export function AssistantSessionPage({
           void queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] });
           void queryClient.invalidateQueries({ queryKey: ["assistant-turns", runId] });
           void queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] });
+          if (
+            parsed.type === "writers.change_set.applied" ||
+            parsed.type === "writers.change_set.undone"
+          ) {
+            void refreshAssistantChangedDocuments(queryClient, projectId);
+          }
         }
       } catch {
         // Ignore a malformed event and keep the durable stream alive.
@@ -296,13 +303,13 @@ export function AssistantSessionPage({
   const undoAppliedChange = useMutation({
     mutationFn: (changeSetId: string) => undoAssistantChangeSet(runId, changeSetId),
     onSuccess: async ({ changeSet }) => {
+      await refreshAssistantChangedDocuments(queryClient, projectId, changeSet);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] }),
         queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] }),
         queryClient.invalidateQueries({
           queryKey: ["assistant-change-set", runId, changeSet.id],
         }),
-        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
       ]);
       showToast({ title: "Изменение отменено" });
     },
@@ -318,13 +325,13 @@ export function AssistantSessionPage({
       selectedGroups: string[];
     }) => applyAssistantChangeSet(runId, changeSetId, selectedGroups),
     onSuccess: async ({ changeSet }) => {
+      await refreshAssistantChangedDocuments(queryClient, projectId, changeSet);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] }),
         queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] }),
         queryClient.invalidateQueries({
           queryKey: ["assistant-change-set", runId, changeSet.id],
         }),
-        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
       ]);
       showToast({
         title: "Изменение применено",

@@ -185,8 +185,6 @@ interface BoardContextValue {
   typeSchema: CanvasTypeSchema;
   updateNode: (nodeId: string, update: (node: CanvasNode) => CanvasNode) => void;
   editEdgeLabel: (edgeId: string, label: string) => void;
-  openDocument: (nodeId: string) => void;
-  openCanvas?: (canvasId: string) => void;
 }
 
 type CanvasTool =
@@ -213,6 +211,12 @@ interface CanvasClipboard {
   nodeIds: string[];
   edgeIds: string[];
   pasteCount: number;
+}
+
+interface CanvasNodeMenu {
+  nodeId: string;
+  x: number;
+  y: number;
 }
 
 const BoardContext = createContext<BoardContextValue | null>(null);
@@ -424,7 +428,7 @@ function CanvasTextCard({ data, selected }: NodeProps<CanvasFlowNode>) {
 }
 
 function CanvasDocumentCard({ data, selected }: NodeProps<CanvasFlowNode>) {
-  const { editable, openDocument } = useBoardContext();
+  const { editable } = useBoardContext();
   const item = data.canvasNode;
   if (item.type !== "file" || item["x-writers-studio"]?.resource?.kind !== "document") return null;
   const document = data.document;
@@ -439,7 +443,6 @@ function CanvasDocumentCard({ data, selected }: NodeProps<CanvasFlowNode>) {
           : "border-[var(--border-strong)]",
       )}
       style={{ background: canvasColor(item.color) }}
-      onDoubleClick={() => document && openDocument(document.id)}
     >
       <CardResizer selected={selected} />
       <CardHandles interactive={editable} />
@@ -585,7 +588,6 @@ function CanvasPDFCard({ data, selected }: NodeProps<CanvasFlowNode>) {
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20"
           : "border-[var(--border-strong)]",
       )}
-      onDoubleClick={() => window.open(media.contentUrl, "_blank", "noopener,noreferrer")}
     >
       <CardResizer selected={selected} />
       <CardHandles interactive={editable} />
@@ -858,13 +860,10 @@ function CanvasLinkCard({ data, selected }: NodeProps<CanvasFlowNode>) {
     // Backend validation remains authoritative; keep the raw URL visible meanwhile.
   }
   return (
-    <a
+    <article
       data-testid={`canvas-link-${item.id}`}
-      href={item.url}
-      target="_blank"
-      rel="noreferrer"
       className={cn(
-        "nodrag block size-full overflow-hidden rounded-[12px] border bg-[var(--surface-raised)] p-4 shadow-[0_5px_18px_var(--shadow-color)]",
+        "block size-full overflow-hidden rounded-[12px] border bg-[var(--surface-raised)] p-4 shadow-[0_5px_18px_var(--shadow-color)]",
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20"
           : "border-[var(--border-strong)]",
@@ -882,22 +881,20 @@ function CanvasLinkCard({ data, selected }: NodeProps<CanvasFlowNode>) {
           {preview.description}
         </p>
       ) : null}
-    </a>
+    </article>
   );
 }
 
 function CanvasNestedCard({ data, selected }: NodeProps<CanvasFlowNode>) {
-  const { editable, openCanvas } = useBoardContext();
+  const { editable } = useBoardContext();
   const item = data.canvasNode;
   if (item.type !== "file" || item["x-writers-studio"]?.resource?.kind !== "canvas") return null;
-  const resource = item["x-writers-studio"].resource;
   const title =
     typeof item["x-writers-studio"].nestedTitle === "string"
       ? item["x-writers-studio"].nestedTitle
       : item.file.split("/").at(-1);
   return (
-    <button
-      type="button"
+    <article
       data-testid={`canvas-nested-${item.id}`}
       className={cn(
         "size-full rounded-[12px] border bg-[var(--surface-raised)] p-4 text-left shadow-[0_5px_18px_var(--shadow-color)]",
@@ -905,8 +902,6 @@ function CanvasNestedCard({ data, selected }: NodeProps<CanvasFlowNode>) {
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20"
           : "border-[var(--border-strong)]",
       )}
-      onDoubleClick={() => openCanvas?.(resource.id)}
-      onClick={() => !editable && openCanvas?.(resource.id)}
     >
       <CardResizer selected={selected} />
       <CardHandles interactive={editable} />
@@ -918,7 +913,7 @@ function CanvasNestedCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <p className="mt-2 text-xs text-[var(--ink-secondary)]">
         Дважды нажмите, чтобы перейти без рекурсивного embed.
       </p>
-    </button>
+    </article>
   );
 }
 
@@ -1165,6 +1160,7 @@ function CanvasBoardInner({
   const diagnosticsPanel = useDismissiblePanel<CanvasGraphDiagnostic[]>();
   const diagnostics = diagnosticsPanel.value;
   const navigatorPanel = useDismissiblePanel<true>();
+  const nodeMenu = useDismissiblePanel<CanvasNodeMenu>();
   const [navigatorQuery, setNavigatorQuery] = useState("");
   const navigatorInput = useRef<HTMLInputElement>(null);
   const navigatorItems = useRef<Array<HTMLButtonElement | null>>([]);
@@ -2337,10 +2333,8 @@ function CanvasBoardInner({
       typeSchema,
       updateNode,
       editEdgeLabel,
-      openDocument: onOpenDocument,
-      openCanvas: onOpenCanvas,
     }),
-    [canEdit, editEdgeLabel, onOpenCanvas, onOpenDocument, typeSchema, updateNode],
+    [canEdit, editEdgeLabel, typeSchema, updateNode],
   );
   const handleSelectionChange = useCallback(
     ({
@@ -2513,6 +2507,7 @@ function CanvasBoardInner({
             presentationIndex === undefined && (tool === "select" || tool === "connector")
           }
           selectionOnDrag={canEdit && tool === "select"}
+          elevateNodesOnSelect={false}
           panOnDrag={tool === "hand" || !canEdit ? true : [1, 2]}
           deleteKeyCode={null}
           onNodesChange={(changes: NodeChange<CanvasFlowNode>[]) => {
@@ -2643,17 +2638,61 @@ function CanvasBoardInner({
               viewport: reactFlow.getViewport(),
             })
           }
-          onNodeClick={(_event: MouseEvent, node) => {
-            if (canEdit) return;
+          onNodeClick={(_, node) => {
+            // A phone has no practical double-click gesture and remains a
+            // read-only viewer. Tablet and desktop always reserve one click
+            // for selection and open resources only on double-click.
+            if (tablet) return;
             const item = node.data.canvasNode;
             if (item.type === "file" && item["x-writers-studio"]?.resource?.kind === "document") {
               onOpenDocument(item["x-writers-studio"].resource.id);
+            } else if (
+              item.type === "file" &&
+              item["x-writers-studio"]?.resource?.kind === "canvas"
+            ) {
+              onOpenCanvas?.(item["x-writers-studio"].resource.id);
+            } else if (item.type === "link") {
+              window.open(item.url, "_blank", "noopener,noreferrer");
+            } else if (item.type === "file" && node.data.media?.mediaType === "application/pdf") {
+              window.open(node.data.media.contentUrl, "_blank", "noopener,noreferrer");
             }
           }}
-          onNodeDoubleClick={(_event: MouseEvent, node) => {
+          onNodeContextMenu={(event, node) => {
+            if (!canEdit) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const nextNodes = nodesRef.current.map((item) => ({
+              ...item,
+              selected: item.id === node.id,
+            }));
+            const nextEdges = edgesRef.current.map((item) => ({ ...item, selected: false }));
+            nodesRef.current = nextNodes;
+            edgesRef.current = nextEdges;
+            setNodes(nextNodes);
+            setEdges(nextEdges);
+            setSelectedNodeIds([node.id]);
+            setSelectedEdgeIds([]);
+            nodeMenu.open({
+              nodeId: node.id,
+              x: Math.max(8, Math.min(event.clientX, window.innerWidth - 232)),
+              y: Math.max(8, Math.min(event.clientY, window.innerHeight - 204)),
+            });
+          }}
+          onNodeDoubleClick={(event: MouseEvent, node) => {
+            event.preventDefault();
+            event.stopPropagation();
             const item = node.data.canvasNode;
             if (item.type === "file" && item["x-writers-studio"]?.resource?.kind === "document") {
               onOpenDocument(item["x-writers-studio"].resource.id);
+            } else if (
+              item.type === "file" &&
+              item["x-writers-studio"]?.resource?.kind === "canvas"
+            ) {
+              onOpenCanvas?.(item["x-writers-studio"].resource.id);
+            } else if (item.type === "link") {
+              window.open(item.url, "_blank", "noopener,noreferrer");
+            } else if (item.type === "file" && node.data.media?.mediaType === "application/pdf") {
+              window.open(node.data.media.contentUrl, "_blank", "noopener,noreferrer");
             }
           }}
         >
@@ -2973,7 +3012,7 @@ function CanvasBoardInner({
               ref={toolRail.railRef}
               aria-label="Инструменты Canvas"
               aria-orientation="vertical"
-              className="relative flex max-h-[calc(100vh-104px)] flex-col items-center gap-1 overflow-visible rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg"
+              className="relative flex max-h-[calc(100vh-104px)] w-11 flex-col items-center gap-1 overflow-visible rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg"
               role="toolbar"
             >
               {canEdit ? (
@@ -3296,13 +3335,19 @@ function CanvasBoardInner({
                       <ToolButton
                         icon={ArrowUpToLine}
                         label="На передний план"
-                        onClick={() => changeZOrder(true)}
+                        onClick={() => {
+                          changeZOrder(true);
+                          toolRail.closeMenu();
+                        }}
                         disabled={selectedNodeIds.length === 0}
                       />
                       <ToolButton
                         icon={ArrowDownToLine}
                         label="На задний план"
-                        onClick={() => changeZOrder(false)}
+                        onClick={() => {
+                          changeZOrder(false);
+                          toolRail.closeMenu();
+                        }}
                         disabled={selectedNodeIds.length === 0}
                       />
                       {(selectedNodeIds.length > 0 || selectedEdgeIds.length > 0) && (
@@ -3378,6 +3423,73 @@ function CanvasBoardInner({
             </div>
           </Panel>
         </ReactFlow>
+        {nodeMenu.value ? (
+          <div
+            ref={nodeMenu.panelRef}
+            role="menu"
+            aria-label="Действия с карточкой"
+            className="fixed z-[120] grid w-56 gap-1 rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-1.5 shadow-[0_16px_36px_var(--shadow-color)]"
+            style={{ left: nodeMenu.value.x, top: nodeMenu.value.y }}
+          >
+            <Button
+              type="button"
+              role="menuitem"
+              variant="ghost"
+              size="compact"
+              className="w-full justify-start"
+              onClick={() => {
+                duplicateSelection();
+                nodeMenu.close();
+              }}
+            >
+              <Copy className="size-4" aria-hidden="true" />
+              Дублировать
+            </Button>
+            <Button
+              type="button"
+              role="menuitem"
+              variant="ghost"
+              size="compact"
+              className="w-full justify-start"
+              onClick={() => {
+                changeZOrder(true);
+                nodeMenu.close();
+              }}
+            >
+              <ArrowUpToLine className="size-4" aria-hidden="true" />
+              На передний план
+            </Button>
+            <Button
+              type="button"
+              role="menuitem"
+              variant="ghost"
+              size="compact"
+              className="w-full justify-start"
+              onClick={() => {
+                changeZOrder(false);
+                nodeMenu.close();
+              }}
+            >
+              <ArrowDownToLine className="size-4" aria-hidden="true" />
+              На задний план
+            </Button>
+            <div className="my-0.5 h-px bg-[var(--border-subtle)]" aria-hidden="true" />
+            <Button
+              type="button"
+              role="menuitem"
+              variant="ghost"
+              size="compact"
+              className="w-full justify-start text-[var(--danger)]"
+              onClick={() => {
+                removeSelection();
+                nodeMenu.close();
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Удалить
+            </Button>
+          </div>
+        ) : null}
         <input
           ref={fileInput}
           type="file"
@@ -3413,7 +3525,7 @@ function ToolButton({
       variant="ghost"
       size="compact"
       className={cn(
-        "min-h-8 shrink-0 px-2",
+        "size-8 min-h-8 shrink-0 px-0",
         active && "bg-[var(--accent-soft)] text-[var(--accent-ink)]",
       )}
       title={label}
@@ -3425,7 +3537,7 @@ function ToolButton({
       onClick={onClick}
     >
       <Icon className="size-4" aria-hidden="true" />
-      <span data-tool-label className="hidden 2xl:inline">
+      <span data-tool-label className="hidden min-w-0 flex-1 truncate text-left">
         {label}
       </span>
     </Button>
@@ -3476,7 +3588,7 @@ function ToolRailGroupButton({
 
 function ToolFlyout({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <fieldset className="absolute left-[calc(100%+8px)] top-0 z-30 flex max-h-[calc(100vh-104px)] w-64 flex-col gap-1 overflow-y-auto rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2 shadow-xl [&_[data-tool-label]]:inline [&_button]:w-full [&_button]:justify-start">
+    <fieldset className="absolute left-[calc(100%+8px)] top-0 z-30 flex max-h-[calc(100vh-104px)] w-64 min-w-0 flex-col gap-1 overflow-x-hidden overflow-y-auto rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2 shadow-xl [&_[data-tool-label]]:block [&_button]:w-full [&_button]:min-w-0 [&_button]:justify-start">
       <legend className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-tertiary)]">
         {label}
       </legend>

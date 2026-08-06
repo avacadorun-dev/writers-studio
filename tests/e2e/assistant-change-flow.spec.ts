@@ -134,10 +134,13 @@ test("assistant stages an exact diff, applies it, and undoes the grouped change"
   await expect
     .poll(() => nodePlainText(page, nodeId))
     .toBe(original.replace("слабое голубое сияние", "ровное янтарное свечение"));
+  await expect(manuscript).toContainText("ровное янтарное свечение");
+  await expect(manuscript).not.toContainText("слабое голубое сияние");
 
   await review.getByRole("button", { name: "Мгновенно отменить весь набор" }).click();
   await expect(review.getByText("Отменено", { exact: true })).toBeVisible();
   await expect.poll(() => nodePlainText(page, nodeId)).toBe(original);
+  await expect(manuscript).toContainText("слабое голубое сияние");
 
   await review.getByRole("button", { name: "Вернуться в Studio" }).click();
   await expect(review).toBeHidden();
@@ -158,6 +161,7 @@ test("assistant stages an exact diff, applies it, and undoes the grouped change"
   await expect
     .poll(() => nodePlainText(page, nodeId))
     .toBe(original.replace("слабое голубое сияние", "ровное янтарное свечение"));
+  await expect(manuscript).toContainText("ровное янтарное свечение");
   await page
     .getByRole("region", { name: "Notifications (F8)" })
     .getByRole("button", { name: "Отменить", exact: true })

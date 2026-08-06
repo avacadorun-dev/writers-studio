@@ -4,6 +4,8 @@ import { type ButtonHTMLAttributes, forwardRef } from "react";
 
 import { cn } from "~shared/lib/cn";
 
+import { UiTooltip } from "./tooltip";
+
 const buttonVariants = cva(
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50",
   {
@@ -61,15 +63,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 ? accessibleLabel
                 : undefined
             : undefined));
-    return (
+    const control = (
       <Component
         ref={ref}
-        className={cn(buttonVariants({ variant, size }), tooltipLabel && "ui-tooltip", className)}
+        className={cn(buttonVariants({ variant, size }), className)}
         data-ui-tooltip={tooltipLabel}
         data-ui-tooltip-side={tooltipLabel ? tooltipSide : undefined}
         title={tooltipLabel ? undefined : title}
         {...props}
       />
+    );
+    return tooltipLabel ? (
+      <UiTooltip content={tooltipLabel} side={tooltipSide}>
+        {control}
+      </UiTooltip>
+    ) : (
+      control
     );
   },
 );

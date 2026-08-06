@@ -30,6 +30,36 @@ test("P-01 creates, dictates, reviews, transfers, and durably saves a manuscript
   const projectId = match?.[1] ?? "";
   const nodeId = match?.[2] ?? "";
 
+  const initialViewport = page.viewportSize();
+  await page.setViewportSize({ width: 2_560, height: 1_440 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        documentHeight: document.documentElement.scrollHeight,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportHeight: document.documentElement.clientHeight,
+        viewportWidth: document.documentElement.clientWidth,
+        sidebarHasHorizontalOverflow: Array.from(
+          document.querySelectorAll('[aria-label="Структура проекта"], [role="tree"]'),
+        ).some((element) => element.scrollWidth > element.clientWidth),
+      })),
+    )
+    .toEqual({
+      documentHeight: 1_440,
+      documentWidth: 2_560,
+      viewportHeight: 1_440,
+      viewportWidth: 2_560,
+      sidebarHasHorizontalOverflow: false,
+    });
+  if (initialViewport) await page.setViewportSize(initialViewport);
+
+  const existingSceneText = "Существующее начало сцены остаётся на месте.";
+  await page.locator(".tiptap").click();
+  await page.keyboard.type(existingSceneText);
+  await expect(page.locator('[data-save-state="saved"]:visible')).toBeVisible({
+    timeout: 10_000,
+  });
+
   await page.getByRole("banner").getByRole("button", { name: "Диктовать" }).click();
   await expect(page.getByRole("dialog", { name: "Подготовка диктовки" })).toBeVisible();
   const checkMicrophone = page.getByRole("button", { name: "Проверить" });
@@ -103,6 +133,7 @@ test("P-01 creates, dictates, reviews, transfers, and durably saves a manuscript
   await page.getByLabel("Документ", { exact: true }).selectOption(nodeId);
   await page.getByRole("button", { name: "Подтвердить вставку" }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/studio/${nodeId}`));
+  await expect(page.locator(".tiptap")).toContainText(existingSceneText);
   await expect(page.locator(".tiptap")).toContainText("Дом стоял у самой воды");
 
   await page.locator(".tiptap").click();

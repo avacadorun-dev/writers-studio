@@ -78,6 +78,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  UiTooltip,
   useActionDialog,
   useToast,
 } from "~shared/ui";
@@ -602,36 +603,39 @@ export function ProjectTree({
           paddingLeft={Math.min(depth, 5) * 14 + 2}
         >
           {children.length > 0 ? (
-            <button
-              type="button"
-              className="ui-tooltip grid size-6 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)]"
-              aria-label={
+            <UiTooltip
+              content={
                 collapsedNodeIds.has(node.id)
                   ? `Развернуть «${node.title}»`
                   : `Свернуть «${node.title}»`
               }
-              aria-expanded={!collapsedNodeIds.has(node.id)}
-              data-ui-tooltip={
-                collapsedNodeIds.has(node.id)
-                  ? `Развернуть «${node.title}»`
-                  : `Свернуть «${node.title}»`
-              }
-              data-ui-tooltip-side="right"
-              onClick={() =>
-                setCollapsedNodeIds((current) => {
-                  const next = new Set(current);
-                  if (next.has(node.id)) next.delete(node.id);
-                  else next.add(node.id);
-                  return next;
-                })
-              }
+              side="right"
             >
-              {collapsedNodeIds.has(node.id) ? (
-                <ChevronRight className="size-3.5" aria-hidden="true" />
-              ) : (
-                <ChevronDown className="size-3.5" aria-hidden="true" />
-              )}
-            </button>
+              <button
+                type="button"
+                className="grid size-6 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)]"
+                aria-label={
+                  collapsedNodeIds.has(node.id)
+                    ? `Развернуть «${node.title}»`
+                    : `Свернуть «${node.title}»`
+                }
+                aria-expanded={!collapsedNodeIds.has(node.id)}
+                onClick={() =>
+                  setCollapsedNodeIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(node.id)) next.delete(node.id);
+                    else next.add(node.id);
+                    return next;
+                  })
+                }
+              >
+                {collapsedNodeIds.has(node.id) ? (
+                  <ChevronRight className="size-3.5" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                )}
+              </button>
+            </UiTooltip>
           ) : (
             <span className="block size-6 shrink-0" />
           )}
@@ -652,16 +656,16 @@ export function ProjectTree({
             <span className="truncate">{node.title}</span>
           </Link>
           {(nodeType?.allowedChildren?.length ?? 0) > 0 ? (
-            <button
-              type="button"
-              className="ui-tooltip mr-1 grid size-7 place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] group-hover/tree-row:opacity-100 focus:opacity-100"
-              aria-label={`Добавить внутрь «${node.title}»`}
-              data-ui-tooltip={`Добавить внутрь «${node.title}»`}
-              data-ui-tooltip-side="right"
-              onClick={() => chooseNodeType(node.id)}
-            >
-              <Plus className="size-3.5" aria-hidden="true" />
-            </button>
+            <UiTooltip content={`Добавить внутрь «${node.title}»`} side="right">
+              <button
+                type="button"
+                className="mr-1 grid size-7 shrink-0 place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] group-hover/tree-row:opacity-100 focus:opacity-100"
+                aria-label={`Добавить внутрь «${node.title}»`}
+                onClick={() => chooseNodeType(node.id)}
+              >
+                <Plus className="size-3.5" aria-hidden="true" />
+              </button>
+            </UiTooltip>
           ) : (
             <span className="mr-1 block size-7 shrink-0" aria-hidden="true" />
           )}
@@ -675,7 +679,7 @@ export function ProjectTree({
     return (
       <nav
         className={cn(
-          "hidden w-16 shrink-0 flex-col items-center border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex",
+          "hidden min-w-0 w-16 shrink-0 flex-col items-center overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex",
           !integratedWorkspace && "py-1",
         )}
         aria-label="Структура проекта свёрнута"
@@ -727,7 +731,7 @@ export function ProjectTree({
   return (
     <TooltipPrimitive.Provider delayDuration={350} skipDelayDuration={150}>
       <nav
-        className="hidden w-[280px] shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex"
+        className="hidden min-w-0 w-[280px] shrink-0 flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex"
         aria-label="Структура проекта"
       >
         <div
@@ -848,7 +852,7 @@ export function ProjectTree({
             </DropdownMenu>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pb-4">
           <div className="mb-2 border-b border-[var(--border-subtle)] pb-2">
             <div className="flex min-h-9 items-center gap-2 pr-2 pl-[26px] text-xs font-medium text-[var(--ink-secondary)]">
               <GalleryVerticalEnd className="size-4" aria-hidden="true" />
@@ -942,7 +946,7 @@ export function ProjectTree({
                 ref={treeViewportRef}
                 role="tree"
                 aria-label={structure.rootLabel}
-                className="overflow-y-auto"
+                className="min-w-0 overflow-x-hidden overflow-y-auto"
                 data-testid="virtualized-project-tree"
                 style={{
                   height: Math.min(
@@ -1043,7 +1047,7 @@ function SortableTreeRow({
       data-tree-node-kind={kind}
       data-drop-target={canAcceptDrop ? "available" : undefined}
       className={cn(
-        "group/tree-row relative flex min-h-9 items-center rounded-[var(--radius-sm)] text-[13px] text-[var(--ink-secondary)]",
+        "group/tree-row relative flex min-h-9 min-w-0 max-w-full items-center overflow-hidden rounded-[var(--radius-sm)] text-[13px] text-[var(--ink-secondary)]",
         isDragging && "z-10 opacity-60",
         className,
       )}

@@ -21,3 +21,4 @@ export { SaveStatus } from "./save-status";
 export { Spinner } from "./spinner";
 export { Switch } from "./switch";
 export { ToastProvider, useToast } from "./toast-provider";
+export { UiTooltip } from "./tooltip";

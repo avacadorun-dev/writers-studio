@@ -325,7 +325,7 @@ function LoadedCanvasPage({
 
   return (
     <RequireSession>
-      <div className="flex h-full min-h-0 flex-col bg-[var(--surface-app)]">
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--surface-app)]">
         <StudioHeader
           project={project.project}
           nodeTitle={title}

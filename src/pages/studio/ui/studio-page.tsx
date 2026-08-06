@@ -460,7 +460,13 @@ export function StudioPage({
   }
   const nodeSummary = project.data.nodes.find((item) => item.id === nodeId && !item.trashedAt);
   const node = nodeSummary
-    ? { ...activeDocument.data.node, ...nodeSummary, content: activeDocument.data.node.content }
+    ? {
+        ...activeDocument.data.node,
+        ...nodeSummary,
+        content: activeDocument.data.node.content,
+        currentRevision: activeDocument.data.node.currentRevision,
+        updatedAt: activeDocument.data.node.updatedAt,
+      }
     : activeDocument.data.node;
   if (!nodeSummary || node.trashedAt || node.projectId !== projectId) {
     return (
@@ -492,7 +498,7 @@ export function StudioPage({
 
   return (
     <RequireSession>
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         <StudioHeader
           project={project.data.project}
           nodeId={nodeId}

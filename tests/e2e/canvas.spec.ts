@@ -10,6 +10,7 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   const viewportWidth = page.viewportSize()?.width ?? 0;
   const desktop = viewportWidth >= 1024;
   const editable = viewportWidth >= 768;
+  const localDocsURL = new URL("/docs", page.url()).toString();
   const canvasId = desktop
     ? await createCanvasFromProjectTree(page)
     : await createCanvasThroughAPI(page, projectId);
@@ -49,6 +50,23 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
             file: `writers-studio://documents/${nodeId}`,
             "x-writers-studio": { resource: { kind: "document", id: nodeId } },
           },
+          {
+            id: "link-docs",
+            type: "link",
+            x: 700,
+            y: 0,
+            width: 280,
+            height: 180,
+            url: localDocsURL,
+            "x-writers-studio": {
+              preview: {
+                url: localDocsURL,
+                title: "Документация Writers Studio",
+                description: "Справочник по возможностям продукта.",
+                siteName: "Writers Studio",
+              },
+            },
+          },
         ],
         edges: [
           {
@@ -73,6 +91,9 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   await expect(page.getByTestId("canvas-board")).toBeVisible();
   await expect(page.getByTestId("canvas-text-note-premise")).toContainText("Герой получает письмо");
   await expect(page.getByTestId("canvas-document-document-opening")).toBeVisible();
+  await expect(page.getByTestId("canvas-link-link-docs")).toContainText(
+    "Документация Writers Studio",
+  );
   await expect(page.getByTestId("canvas-group-group-story")).toContainText("Сюжет");
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 
@@ -89,10 +110,33 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   const toolRail = page.getByRole("toolbar", { name: "Инструменты Canvas" });
   const selectTool = toolRail.getByRole("button", { name: "Выбор (V)" });
   await expect(selectTool).toHaveAttribute("data-ui-tooltip", "Выбор (V)");
+  if (desktop) {
+    const initialViewport = page.viewportSize();
+    await page.setViewportSize({ width: 2_560, height: 1_440 });
+    await expect(selectTool.locator("[data-tool-label]")).toBeHidden();
+    await expect
+      .poll(async () => (await toolRail.boundingBox())?.width ?? Number.POSITIVE_INFINITY)
+      .toBeLessThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth === document.documentElement.clientWidth &&
+          document.documentElement.scrollHeight === document.documentElement.clientHeight,
+      ),
+    ).toBe(true);
+    if (initialViewport) await page.setViewportSize(initialViewport);
+  }
   await selectTool.hover();
-  await expect
-    .poll(() => selectTool.evaluate((element) => getComputedStyle(element, "::after").content))
-    .toContain("Выбор (V)");
+  await expect(page.getByRole("tooltip")).toContainText("Выбор (V)");
+  if (desktop) {
+    await toolRail.getByRole("button", { name: "Рисование" }).click();
+    const drawingMenu = page.getByRole("group", { name: "Рисование и фигуры" });
+    await expect(drawingMenu).toBeVisible();
+    expect(
+      await drawingMenu.evaluate((element) => element.scrollWidth === element.clientWidth),
+    ).toBe(true);
+    await toolRail.getByRole("button", { name: "Рисование" }).click();
+  }
   if (!desktop) {
     await createNoteFromToolRail(page, toolRail);
     await expect(page.locator('[data-testid^="canvas-text-"]')).toHaveCount(2);
@@ -102,6 +146,35 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
 
   const legacyNote = page.getByTestId("canvas-text-note-premise");
   const canvasDocument = page.getByTestId("canvas-document-document-opening");
+  const canvasLink = page.getByTestId("canvas-link-link-docs");
+  const canvasURL = page.url();
+  const pagesBeforeSingleClick = page.context().pages().length;
+  await canvasDocument.click();
+  await expect(page).toHaveURL(canvasURL);
+  await canvasLink.click();
+  await expect(page).toHaveURL(canvasURL);
+  expect(page.context().pages()).toHaveLength(pagesBeforeSingleClick);
+
+  await canvasDocument.click({ button: "right" });
+  const nodeMenu = page.getByRole("menu", { name: "Действия с карточкой" });
+  await expect(nodeMenu).toBeVisible();
+  await nodeMenu.getByRole("menuitem", { name: "На передний план" }).click();
+  await expect(nodeMenu).toBeHidden();
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__node")
+        .evaluateAll((items) => items.at(-1)?.getAttribute("data-id")),
+    )
+    .toBe("document-opening");
+
+  const popupPromise = page.waitForEvent("popup");
+  await canvasLink.dblclick();
+  const docsPopup = await popupPromise;
+  await docsPopup.waitForLoadState("domcontentloaded");
+  await expect(docsPopup).toHaveURL(localDocsURL);
+  await docsPopup.close();
+
   const legacyNoteBox = await legacyNote.boundingBox();
   const initialDocumentBox = await canvasDocument.boundingBox();
   if (!legacyNoteBox || !initialDocumentBox) {

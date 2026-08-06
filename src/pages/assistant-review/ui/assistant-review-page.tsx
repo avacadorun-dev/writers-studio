@@ -20,6 +20,7 @@ import {
   getAssistantChangeSet,
   getAssistantRun,
   listAssistantTurns,
+  refreshAssistantChangedDocuments,
   rejectAssistantChangeSet,
   undoAssistantChangeSet,
 } from "~entities/assistant";
@@ -139,13 +140,13 @@ export function AssistantReviewPage({
         ),
       );
     },
-    onSuccess: async () => {
+    onSuccess: async ({ changeSet: appliedChangeSet }) => {
+      await refreshAssistantChangedDocuments(queryClient, projectId, appliedChangeSet);
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["assistant-change-set", runId, changeSetId],
         }),
         queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] }),
-        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
       ]);
       showToast({
         title:
@@ -187,12 +188,12 @@ export function AssistantReviewPage({
   });
   const undo = useMutation({
     mutationFn: () => undoAssistantChangeSet(runId, changeSetId),
-    onSuccess: async () => {
+    onSuccess: async ({ changeSet: undoneChangeSet }) => {
+      await refreshAssistantChangedDocuments(queryClient, projectId, undoneChangeSet);
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["assistant-change-set", runId, changeSetId],
         }),
-        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
       ]);
       showToast({ title: "Набор изменений отменён" });
     },

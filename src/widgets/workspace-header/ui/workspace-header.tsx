@@ -4,7 +4,7 @@ import { BookOpen, LifeBuoy, LogOut, Settings } from "lucide-react";
 
 import { useSession } from "~entities/session";
 import { useLogout } from "~features/auth";
-import { BrandMark, Button } from "~shared/ui";
+import { BrandMark, Button, UiTooltip } from "~shared/ui";
 
 export function WorkspaceHeader() {
   const session = useSession();
@@ -45,17 +45,17 @@ export function WorkspaceHeader() {
           </Link>
         </Button>
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button
-              type="button"
-              className="ui-tooltip ml-1 grid size-11 place-items-center rounded-full bg-[var(--surface-selected)] text-xs font-semibold text-[var(--accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
-              aria-label="Меню профиля"
-              data-ui-tooltip="Меню профиля"
-              data-ui-tooltip-side="bottom"
-            >
-              {initials}
-            </button>
-          </DropdownMenu.Trigger>
+          <UiTooltip content="Меню профиля">
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                className="ml-1 grid size-11 place-items-center rounded-full bg-[var(--surface-selected)] text-xs font-semibold text-[var(--accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                aria-label="Меню профиля"
+              >
+                {initials}
+              </button>
+            </DropdownMenu.Trigger>
+          </UiTooltip>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
               align="end"
