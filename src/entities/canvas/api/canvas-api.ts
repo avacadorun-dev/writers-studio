@@ -2,10 +2,58 @@ import { apiRequest } from "~shared/api";
 
 import type {
   CanvasDocument,
+  CanvasPromotion,
+  CanvasResolvedLinkPreview,
   CanvasRevision,
   CanvasSummary,
+  CanvasTypeSchema,
   CanvasWorkspace,
 } from "../model/types";
+
+export function getCanvasTypeSchema(projectId: string): Promise<{ schema: CanvasTypeSchema }> {
+  return apiRequest(`/api/projects/${projectId}/canvas-schema`);
+}
+
+export function saveCanvasTypeSchema(
+  projectId: string,
+  schema: CanvasTypeSchema,
+): Promise<{ schema: CanvasTypeSchema }> {
+  return apiRequest(`/api/projects/${projectId}/canvas-schema`, {
+    method: "PUT",
+    body: JSON.stringify({
+      baseRevision: schema.revision,
+      cardTypes: schema.cardTypes,
+      relationTypes: schema.relationTypes,
+      source: "manual",
+    }),
+  });
+}
+
+export function promoteCanvasNode(
+  canvasId: string,
+  input: {
+    baseRevision: number;
+    nodeId: string;
+    title: string;
+    kind: string;
+    parentId?: string;
+  },
+): Promise<CanvasPromotion> {
+  return apiRequest(`/api/canvases/${canvasId}/promotions`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchCanvasLinkPreviews(
+  projectId: string,
+  urls: string[],
+): Promise<{ previews: CanvasResolvedLinkPreview[] }> {
+  return apiRequest(`/api/projects/${projectId}/link-previews`, {
+    method: "POST",
+    body: JSON.stringify({ urls }),
+  });
+}
 
 export function listCanvases(
   projectId: string,
@@ -19,6 +67,21 @@ export function createCanvas(projectId: string, title: string): Promise<{ canvas
     method: "POST",
     body: JSON.stringify({ title }),
   });
+}
+
+export function importCanvas(
+  projectId: string,
+  file: Blob,
+  title = "Импортированная доска",
+): Promise<{ canvas: CanvasSummary }> {
+  return apiRequest(
+    `/api/projects/${projectId}/canvases/import?title=${encodeURIComponent(title)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: file,
+    },
+  );
 }
 
 export function getCanvas(canvasId: string): Promise<CanvasWorkspace> {

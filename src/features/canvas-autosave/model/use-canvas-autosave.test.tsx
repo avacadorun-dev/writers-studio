@@ -35,6 +35,24 @@ function revisionResponse(revision = 2) {
 }
 
 describe("canvas autosave", () => {
+  test("keeps queue stable when a parent recreates the revision callback", () => {
+    let queue: ((value: CanvasDocument) => void) | undefined;
+    function Harness({ tick }: { tick: number }) {
+      const autosave = useCanvasAutosave({
+        canvasId: "canvas-stable-callback",
+        projectId: "project",
+        revision: 1,
+        onRevision: () => tick,
+      });
+      queue = autosave.queue;
+      return <output>{tick}</output>;
+    }
+    const view = render(<Harness tick={1} />);
+    const firstQueue = queue;
+    view.rerender(<Harness tick={2} />);
+    expect(queue).toBe(firstQueue);
+  });
+
   test("persists locally and reports success after the server revision", async () => {
     let body: Record<string, unknown> | undefined;
     globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {

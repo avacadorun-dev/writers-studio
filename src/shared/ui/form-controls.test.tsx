@@ -29,4 +29,29 @@ describe("shared form controls", () => {
     expect(activations).toBe(1);
     cleanup();
   });
+
+  test("adds a themed tooltip to icon-only buttons", () => {
+    render(
+      <Button size="icon" aria-label="Открыть настройки">
+        ⚙
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Открыть настройки" });
+    expect(button.dataset.uiTooltip).toBe("Открыть настройки");
+    expect(button.dataset.uiTooltipSide).toBe("bottom");
+    expect(button.getAttribute("title")).toBeNull();
+    cleanup();
+  });
+
+  test("supports an explicit tooltip for compact icon controls", () => {
+    render(
+      <Button size="compact" aria-label="Перо" tooltip="Перо (P)" tooltipSide="right">
+        ✎
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Перо" });
+    expect(button.dataset.uiTooltip).toBe("Перо (P)");
+    expect(button.dataset.uiTooltipSide).toBe("right");
+    cleanup();
+  });
 });

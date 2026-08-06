@@ -82,8 +82,10 @@ type ProjectMedia struct {
 	SourcePath   *string   `json:"sourcePath,omitempty"`
 	SHA256       string    `json:"sha256"`
 	ByteSize     int64     `json:"byteSize"`
-	Width        int       `json:"width"`
-	Height       int       `json:"height"`
+	Width        *int      `json:"width"`
+	Height       *int      `json:"height"`
+	PageCount    *int      `json:"pageCount"`
+	DurationMS   *int64    `json:"durationMs"`
 	ContentURL   string    `json:"contentUrl"`
 	StorageKey   string    `json:"-"`
 	CreatedAt    time.Time `json:"createdAt"`
@@ -285,13 +287,15 @@ type TranscriptDraftRevision struct {
 }
 
 type SearchResult struct {
-	NodeID      string `json:"nodeId"`
-	NodeKind    string `json:"nodeKind"`
-	Breadcrumb  string `json:"breadcrumb"`
-	Snippet     string `json:"snippet"`
-	MatchCount  int    `json:"matchCount"`
-	Revision    int    `json:"revision"`
-	SourceScope string `json:"sourceScope"`
+	NodeID       string `json:"nodeId"`
+	NodeKind     string `json:"nodeKind"`
+	Breadcrumb   string `json:"breadcrumb"`
+	Snippet      string `json:"snippet"`
+	MatchCount   int    `json:"matchCount"`
+	Revision     int    `json:"revision"`
+	SourceScope  string `json:"sourceScope"`
+	CanvasID     string `json:"canvasId,omitempty"`
+	CanvasNodeID string `json:"canvasNodeId,omitempty"`
 }
 
 type RecoveryItem struct {

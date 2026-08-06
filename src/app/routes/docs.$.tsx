@@ -3,7 +3,7 @@ import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import docsStylesHref from "../../docs/docs.css?url";
 import { DocsSearchDialog } from "../../docs/docs-search";
@@ -17,15 +17,23 @@ export const Route = createFileRoute("/docs/$")({
 function DocsRoute() {
   const { _splat = "" } = Route.useParams();
   const page = docsSource.getPage(_splat ? _splat.split("/").filter(Boolean) : []);
+  const [stylesReady, setStylesReady] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = docsStylesHref;
     link.dataset.writersStudioDocsStyles = "true";
+    const revealDocs = () => mounted && setStylesReady(true);
+    link.addEventListener("load", revealDocs);
+    link.addEventListener("error", revealDocs);
     document.head.append(link);
 
     return () => {
+      mounted = false;
+      link.removeEventListener("load", revealDocs);
+      link.removeEventListener("error", revealDocs);
       link.remove();
     };
   }, []);
@@ -39,6 +47,18 @@ function DocsRoute() {
       document.title = previous;
     };
   }, [page]);
+
+  if (!stylesReady) {
+    return (
+      <main
+        aria-busy="true"
+        aria-label="Загрузка документации"
+        className="grid min-h-dvh place-items-center bg-[var(--surface-app)] text-sm text-[var(--ink-secondary)]"
+      >
+        Открываем документацию…
+      </main>
+    );
+  }
 
   return (
     <div className="ws-docs">

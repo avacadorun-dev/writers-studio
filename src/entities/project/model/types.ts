@@ -71,12 +71,24 @@ export interface DocumentNode {
 export interface ProjectMedia {
   id: string;
   projectId: string;
-  mediaType: "image/png" | "image/jpeg" | "image/gif";
+  mediaType:
+    | "image/png"
+    | "image/jpeg"
+    | "image/gif"
+    | "application/pdf"
+    | "audio/mpeg"
+    | "audio/mp4"
+    | "audio/ogg"
+    | "audio/wav"
+    | "video/mp4"
+    | "video/webm";
   originalName: string;
   sourcePath?: string;
   byteSize: number;
-  width: number;
-  height: number;
+  width: number | null;
+  height: number | null;
+  pageCount?: number | null;
+  durationMs?: number | null;
   sha256: string;
   contentUrl: string;
   createdAt: string;
@@ -183,6 +195,8 @@ export interface SearchResult {
   matchCount: number;
   revision: number;
   sourceScope: string;
+  canvasId?: string;
+  canvasNodeId?: string;
 }
 
 export interface ProjectReplaceDocument {

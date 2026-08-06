@@ -56,6 +56,13 @@ func Catalog() []ToolSpec {
 		"tags": arraySchema(stringSchema()), "active": booleanSchema(),
 		"alwaysRelevant": booleanSchema(),
 	})
+	canvasID := strictSchema(map[string]any{"canvasId": stringSchema()})
+	canvasPatchOperation := strictSchema(map[string]any{
+		"op":        enumSchema("add", "update", "delete"),
+		"kind":      enumSchema("node", "edge"),
+		"id":        stringSchema(),
+		"valueJson": stringSchema(),
+	})
 	return []ToolSpec{
 		spec(
 			"assistant.begin_turn",
@@ -78,6 +85,21 @@ func Catalog() []ToolSpec {
 		spec("project.list_recent", "List recently changed project artifacts.", strictSchema(map[string]any{"limit": integerSchema()})),
 		spec("project.search", "Search documents, notes, drafts and transcripts in this project.", projectQuery),
 		spec("project.get_activity", "Read recent native and assistant project activity.", strictSchema(map[string]any{"limit": integerSchema()})),
+		spec("canvas.list", "List active Canvas boards in this project.", noArgs),
+		spec("canvas.get", "Read one Canvas snapshot with its current revision and resolved project resources.", canvasID),
+		spec("canvas.search", "Search standalone Canvas text, typed fields and linked metadata in this project.", projectQuery),
+		spec("canvas.analyze_graph", "Analyze one Canvas graph for components, orphans, roots, leaves and cycles without changing it.", canvasID),
+		spec("canvas.propose_patch", "Stage typed add, update and delete operations for one Canvas revision. valueJson must contain one complete JSON Canvas node or edge for add/update and be an empty string for delete. Canonical Canvas stays unchanged until Apply.", strictSchema(map[string]any{
+			"canvasId": stringSchema(), "baseRevision": integerSchema(),
+			"operations": boundedArraySchema(canvasPatchOperation, 1, 500),
+		})),
+		spec("canvas.promote_cards", "Stage atomic promotion of selected Canvas text cards into project documents. Canonical Canvas and project tree stay unchanged until Apply.", strictSchema(map[string]any{
+			"canvasId": stringSchema(), "baseRevision": integerSchema(),
+			"items": boundedArraySchema(strictSchema(map[string]any{
+				"nodeId": stringSchema(), "title": stringSchema(), "kind": stringSchema(),
+				"parentId": nullableStringSchema(),
+			}), 1, 50),
+		})),
 		spec("tree.list", "List the complete project tree without document bodies.", noArgs),
 		spec("tree.get_node", "Read node metadata and revision.", nodeID),
 		spec("tree.create_node", "Stage creation of a project node.", strictSchema(map[string]any{

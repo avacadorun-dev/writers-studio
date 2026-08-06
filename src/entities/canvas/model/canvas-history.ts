@@ -6,6 +6,9 @@ export interface CanvasHistory {
   future: CanvasDocument[];
 }
 
+export const canvasHistoryLimit = 200;
+export const canvasHistoryMemoryLimit = 32 * 1024 * 1024;
+
 export function createCanvasHistory(document: CanvasDocument): CanvasHistory {
   return { past: [], present: document, future: [] };
 }
@@ -13,7 +16,8 @@ export function createCanvasHistory(document: CanvasDocument): CanvasHistory {
 export function commitCanvasHistory(
   history: CanvasHistory,
   document: CanvasDocument,
-  limit = 100,
+  limit = canvasHistoryLimit,
+  memoryLimit = canvasHistoryMemoryLimit,
 ): CanvasHistory {
   if (
     history.present === document ||
@@ -21,11 +25,21 @@ export function commitCanvasHistory(
   ) {
     return history;
   }
+  const past = [...history.past, history.present].slice(-Math.max(1, limit));
+  let weight = past.reduce((total, item) => total + canvasDocumentWeight(item), 0);
+  while (past.length > 1 && weight > memoryLimit) {
+    const removed = past.shift();
+    if (removed) weight -= canvasDocumentWeight(removed);
+  }
   return {
-    past: [...history.past, history.present].slice(-limit),
+    past,
     present: document,
     future: [],
   };
+}
+
+export function canvasDocumentWeight(document: CanvasDocument): number {
+  return new TextEncoder().encode(JSON.stringify(document)).byteLength;
 }
 
 export function undoCanvasHistory(history: CanvasHistory): CanvasHistory {
@@ -42,7 +56,7 @@ export function redoCanvasHistory(history: CanvasHistory): CanvasHistory {
   const next = history.future[0];
   if (!next) return history;
   return {
-    past: [...history.past, history.present],
+    past: [...history.past, history.present].slice(-canvasHistoryLimit),
     present: next,
     future: history.future.slice(1),
   };

@@ -25,6 +25,19 @@ test.describe("public documentation", () => {
     await expect(page.getByRole("dialog")).toContainText("Диктовка");
 
     await page.keyboard.press("Escape");
+    await page.goto("/docs/example-project");
+    await expect(
+      page.getByRole("heading", { name: "Демонстрационный проект «Эхо Предела»" }),
+    ).toBeVisible();
+    const demoDownload = page.getByRole("link", { name: /Скачать «Эхо Предела»/ });
+    await expect(demoDownload).toHaveAttribute(
+      "href",
+      "/docs/examples/echo-frontier-canvas-demo.wstudio",
+    );
+    const archive = await page.request.get("/docs/examples/echo-frontier-canvas-demo.wstudio");
+    expect(archive.status()).toBe(200);
+    expect((await archive.body()).byteLength).toBeGreaterThan(1_000_000);
+
     if (isMobile) await page.locator('button[aria-label="Открыть оглавление"]:visible').click();
     const returnToStudio = page.getByRole("link", { name: "Вернуться в Студию" });
     await expect(returnToStudio).toHaveAttribute("href", "/projects");

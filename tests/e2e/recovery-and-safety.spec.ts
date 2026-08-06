@@ -349,7 +349,7 @@ async function uploadedLocalChunkCount(page: Page): Promise<number> {
 function countLocalChunks(page: Page, uploadedOnly: boolean): Promise<number> {
   return page.evaluate((onlyUploaded) => {
     return new Promise<number>((resolve, reject) => {
-      const open = indexedDB.open("writers-studio-recovery", 1);
+      const open = indexedDB.open("writers-studio-recovery");
       open.onerror = () => reject(open.error);
       open.onsuccess = () => {
         const request = open.result.transaction("audioChunks").objectStore("audioChunks").getAll();

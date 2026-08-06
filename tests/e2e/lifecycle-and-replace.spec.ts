@@ -85,7 +85,9 @@ test("document and project lifecycle actions are reversible until confirmed purg
       has: page.getByRole("link", { name: "Глава 1", exact: true }),
     });
     await expect(draftRow).toBeVisible();
-    await draftRow.dragTo(chapterRow);
+    await draftRow
+      .getByRole("button", { name: "Переместить «Черновик для переноса»" })
+      .dragTo(chapterRow);
     await expect(page.getByText("Материал перемещён", { exact: true })).toBeVisible();
     await expect.poll(async () => (await getNode(page, draft.node.id)).parentId).toBe(nodeId);
     await page.reload();

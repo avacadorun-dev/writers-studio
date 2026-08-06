@@ -3,10 +3,15 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import {
   createCanvas,
   duplicateCanvas,
+  fetchCanvasLinkPreviews,
   getCanvas,
+  getCanvasTypeSchema,
+  importCanvas,
   listCanvases,
+  promoteCanvasNode,
   restoreCanvas,
   saveCanvasRevision,
+  saveCanvasTypeSchema,
   trashCanvas,
   updateCanvas,
 } from "./canvas-api";
@@ -20,14 +25,19 @@ describe("canvas API", () => {
       requests.push({
         url: String(input),
         method: init?.method ?? "GET",
-        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        body: init?.body
+          ? init.body instanceof Blob
+            ? "blob"
+            : JSON.parse(String(init.body))
+          : undefined,
       });
-      return Response.json({ canvases: [], canvas: {}, revision: {} });
+      return Response.json({ canvases: [], canvas: {}, revision: {}, schema: {} });
     }) as unknown as typeof fetch;
 
     await listCanvases("project", false);
     await listCanvases("project");
     await createCanvas("project", "Сюжет");
+    await importCanvas("project", new Blob(["{}"], { type: "application/json" }), "Mood Board");
     await getCanvas("canvas");
     await updateCanvas("canvas", { title: "Персонажи", position: 2_000 });
     await duplicateCanvas("canvas");
@@ -38,6 +48,20 @@ describe("canvas API", () => {
       content: { nodes: [], edges: [] },
       source: "manual",
     });
+    await fetchCanvasLinkPreviews("project", ["https://example.com/article"]);
+    await getCanvasTypeSchema("project");
+    await saveCanvasTypeSchema("project", {
+      revision: 2,
+      cardTypes: [],
+      relationTypes: [],
+    });
+    await promoteCanvasNode("canvas", {
+      baseRevision: 4,
+      nodeId: "idea",
+      title: "Сигнал маяка",
+      kind: "scene",
+      parentId: "chapter",
+    });
 
     expect(requests).toEqual([
       { url: "/api/projects/project/canvases?includeTrashed=false", method: "GET" },
@@ -46,6 +70,11 @@ describe("canvas API", () => {
         url: "/api/projects/project/canvases",
         method: "POST",
         body: { title: "Сюжет" },
+      },
+      {
+        url: "/api/projects/project/canvases/import?title=Mood%20Board",
+        method: "POST",
+        body: "blob",
       },
       { url: "/api/canvases/canvas", method: "GET" },
       {
@@ -60,6 +89,33 @@ describe("canvas API", () => {
         url: "/api/canvases/canvas/revisions",
         method: "PUT",
         body: { baseRevision: 3, content: { nodes: [], edges: [] }, source: "manual" },
+      },
+      {
+        url: "/api/projects/project/link-previews",
+        method: "POST",
+        body: { urls: ["https://example.com/article"] },
+      },
+      { url: "/api/projects/project/canvas-schema", method: "GET" },
+      {
+        url: "/api/projects/project/canvas-schema",
+        method: "PUT",
+        body: {
+          baseRevision: 2,
+          cardTypes: [],
+          relationTypes: [],
+          source: "manual",
+        },
+      },
+      {
+        url: "/api/canvases/canvas/promotions",
+        method: "POST",
+        body: {
+          baseRevision: 4,
+          nodeId: "idea",
+          title: "Сигнал маяка",
+          kind: "scene",
+          parentId: "chapter",
+        },
       },
     ]);
   });

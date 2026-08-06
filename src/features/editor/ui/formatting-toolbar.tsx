@@ -498,8 +498,8 @@ export function FormattingToolbar({
                     assetId: media.id,
                     alt: media.originalName.replace(/\.[^.]+$/u, ""),
                     caption: "",
-                    width: media.width,
-                    height: media.height,
+                    width: media.width ?? 1,
+                    height: media.height ?? 1,
                   },
                 })
                 .run();

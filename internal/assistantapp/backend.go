@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/editor"
 	"writers.studio/internal/projectmcp"
@@ -1144,6 +1145,19 @@ func validateMutationScope(
 	execution projectmcp.ExecutionContext,
 	operations []assistant.ChangeOperation,
 ) error {
+	if execution.TargetCanvasID != nil {
+		for _, operation := range operations {
+			if operation.TargetKind != "canvas" || operation.TargetID == nil ||
+				*operation.TargetID != *execution.TargetCanvasID {
+				return fmt.Errorf(
+					"%w: canvas-scoped run may only change target canvas %s",
+					assistant.ErrMutationOutsideScope,
+					*execution.TargetCanvasID,
+				)
+			}
+		}
+		return nil
+	}
 	if execution.TargetNodeID == nil {
 		return nil
 	}
@@ -1590,6 +1604,43 @@ func (b *ProjectBackend) callRead(
 			execution,
 			boundedInt(arguments["limit"], 30, 1, 100),
 		)
+	case "canvas.list":
+		items, err := b.store.ListCanvases(
+			ctx, execution.OwnerUserID, execution.ProjectID, false,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"canvases": items}, nil
+	case "canvas.get":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return nil, err
+		}
+		return toMap("canvas", workspace)
+	case "canvas.search":
+		results, err := b.store.SearchProject(
+			ctx, execution.OwnerUserID, execution.ProjectID,
+			stringArg(arguments, "query"), "canvas",
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"results": results}, nil
+	case "canvas.analyze_graph":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return nil, err
+		}
+		analysis, err := canvasdocument.AnalyzeGraph(workspace.Revision.Content)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"canvasId": workspace.Canvas.ID,
+			"revision": workspace.Revision.Revision,
+			"analysis": analysis,
+		}, nil
 	case "tree.list":
 		nodes, err := b.store.ListDocumentNodes(
 			ctx, execution.OwnerUserID, execution.ProjectID, false,
@@ -2165,6 +2216,98 @@ func (b *ProjectBackend) buildMutation(
 		ToolName: name, Arguments: mustJSON(arguments), RiskLevel: policy.RiskLevel,
 	}
 	switch name {
+	case "canvas.propose_patch":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return operation, err
+		}
+		baseRevision := intArg(arguments, "baseRevision")
+		if workspace.Revision.Revision != baseRevision {
+			return operation, assistant.ErrStaleChangeSet
+		}
+		operations, err := canvasPatchOperationsArg(arguments["operations"])
+		if err != nil {
+			return operation, err
+		}
+		proposed, err := canvasdocument.ApplyPatch(workspace.Revision.Content, operations)
+		if err != nil {
+			return operation, err
+		}
+		references, err := canvasdocument.Validate(proposed)
+		if err != nil {
+			return operation, err
+		}
+		if err := b.store.ValidateCanvasResources(
+			ctx, execution.OwnerUserID, execution.ProjectID, references,
+		); err != nil {
+			return operation, err
+		}
+		operation.TargetKind = "canvas"
+		operation.TargetID = &workspace.Canvas.ID
+		operation.BaseRevision = &baseRevision
+		operation.BeforeSnapshot = append(json.RawMessage(nil), workspace.Revision.Content...)
+		operation.ProposedSnapshot = proposed
+		operation.Trace = mustJSON(map[string]any{
+			"canvasTitle":    workspace.Canvas.Title,
+			"operationCount": len(operations),
+		})
+	case "canvas.promote_cards":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return operation, err
+		}
+		baseRevision := intArg(arguments, "baseRevision")
+		if workspace.Revision.Revision != baseRevision {
+			return operation, assistant.ErrStaleChangeSet
+		}
+		items, err := objectSliceArg(arguments, "items")
+		if err != nil || len(items) == 0 || len(items) > 50 {
+			return operation, errors.New("canvas promotion items are invalid")
+		}
+		content := append(json.RawMessage(nil), workspace.Revision.Content...)
+		traceItems := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			title := stringArg(item, "title")
+			kind := stringArg(item, "kind")
+			parentID := nullableStringArg(item, "parentId")
+			if title == "" || len([]rune(title)) > 200 || kind == "" {
+				return operation, errors.New("canvas promotion document metadata is invalid")
+			}
+			if err := b.store.ValidateNodePlacement(
+				ctx, execution.OwnerUserID, execution.ProjectID, kind, parentID,
+			); err != nil {
+				return operation, err
+			}
+			documentID := uuid.NewString()
+			promoted, err := canvasdocument.PromoteNode(
+				content, stringArg(item, "nodeId"), workspace.Canvas.ID, documentID,
+			)
+			if err != nil {
+				return operation, err
+			}
+			content = promoted.Content
+			traceItems = append(traceItems, map[string]any{
+				"nodeId": stringArg(item, "nodeId"), "documentId": documentID,
+				"title": title, "kind": kind, "parentId": parentID,
+			})
+		}
+		references, err := canvasdocument.Validate(content)
+		if err != nil {
+			return operation, err
+		}
+		if err := b.store.ValidateCanvasResources(
+			ctx, execution.OwnerUserID, execution.ProjectID, references,
+		); err != nil {
+			return operation, err
+		}
+		operation.TargetKind = "canvas"
+		operation.TargetID = &workspace.Canvas.ID
+		operation.BaseRevision = &baseRevision
+		operation.BeforeSnapshot = append(json.RawMessage(nil), workspace.Revision.Content...)
+		operation.ProposedSnapshot = content
+		operation.Trace = mustJSON(map[string]any{
+			"canvasTitle": workspace.Canvas.Title, "items": traceItems,
+		})
 	case "document.insert", "document.replace_range", "document.append", "document.append_chunk",
 		"document.apply_marks", "note.update":
 		node, err := b.ownedNode(ctx, execution, stringArg(arguments, "nodeId"))
@@ -2530,6 +2673,21 @@ func (b *ProjectBackend) ownedNode(
 		return domain.DocumentNode{}, pgx.ErrNoRows
 	}
 	return node, nil
+}
+
+func (b *ProjectBackend) ownedCanvas(
+	ctx context.Context,
+	execution projectmcp.ExecutionContext,
+	canvasID string,
+) (domain.CanvasWorkspace, error) {
+	workspace, err := b.store.GetCanvasWorkspace(ctx, execution.OwnerUserID, canvasID)
+	if err != nil {
+		return domain.CanvasWorkspace{}, err
+	}
+	if workspace.Canvas.ProjectID != execution.ProjectID || workspace.Canvas.TrashedAt != nil {
+		return domain.CanvasWorkspace{}, pgx.ErrNoRows
+	}
+	return workspace, nil
 }
 
 func (b *ProjectBackend) documentAtRevision(
@@ -3619,6 +3777,8 @@ func groupKeyForTool(name string) string {
 	switch domain {
 	case "document", "tree", "note", "draft":
 		return "document"
+	case "canvas":
+		return "canvas"
 	case "dictionary":
 		return "dictionary"
 	case "project_memory":
@@ -3781,6 +3941,30 @@ func objectSliceArg(arguments map[string]any, name string) ([]map[string]any, er
 	default:
 		return nil, errors.New("value is not an object array")
 	}
+}
+
+func canvasPatchOperationsArg(value any) ([]canvasdocument.PatchOperation, error) {
+	items, err := objectSliceArg(map[string]any{"operations": value}, "operations")
+	if err != nil {
+		return nil, errors.New("canvas patch operations are invalid")
+	}
+	operations := make([]canvasdocument.PatchOperation, 0, len(items))
+	for _, item := range items {
+		operation := canvasdocument.PatchOperation{
+			Op: stringArg(item, "op"), Kind: stringArg(item, "kind"), ID: stringArg(item, "id"),
+		}
+		value := stringArg(item, "valueJson")
+		if operation.Op != "delete" {
+			if !json.Valid([]byte(value)) {
+				return nil, errors.New("canvas patch valueJson is invalid")
+			}
+			operation.Value = json.RawMessage(value)
+		} else if value != "" {
+			return nil, errors.New("canvas delete patch valueJson must be empty")
+		}
+		operations = append(operations, operation)
+	}
+	return operations, nil
 }
 
 func sliceContainsFold(values []string, query string) bool {

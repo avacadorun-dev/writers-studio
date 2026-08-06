@@ -4,6 +4,7 @@ import type { AssistantChangeOperation } from "~entities/assistant";
 
 import {
   annotationFixes,
+  canvasGhostPreview,
   changeGroupLabel,
   exactTextEdits,
   operationLabel,
@@ -43,6 +44,7 @@ describe("assistant review presentation", () => {
     expect(operationLabel("project_memory.unknown")).toBe("Изменение памяти проекта");
     expect(operationLabel("assistant_guide.unknown")).toBe("Изменение руководства");
     expect(operationLabel("private.unknown")).toBe("Предложенное изменение");
+    expect(operationLabel("canvas.propose_patch")).toBe("Предложение для доски");
 
     expect(changeGroupLabel([operation({ groupKey: "dictionary" })], "dictionary")).toBe("Словарь");
     expect(
@@ -53,6 +55,30 @@ describe("assistant review presentation", () => {
     ).toBe("Текст · Финал");
     expect(changeGroupLabel([operation()], "document:node")).toBe("Отдельный документ");
     expect(changeGroupLabel([operation()], "custom")).toBe("Связанное изменение");
+  });
+
+  test("builds a Canvas ghost preview from immutable snapshots", () => {
+    const preview = canvasGhostPreview(
+      {
+        nodes: [
+          { id: "moved", type: "text", text: "До", x: 0, y: 0, width: 100, height: 80 },
+          { id: "deleted", type: "text", text: "Удалить", x: 0, y: 100, width: 100, height: 80 },
+        ],
+        edges: [{ id: "old" }],
+      },
+      {
+        nodes: [
+          { id: "moved", type: "text", text: "До", x: 20, y: 0, width: 100, height: 80 },
+          { id: "added", type: "text", text: "Новое", x: 150, y: 0, width: 100, height: 80 },
+        ],
+        edges: [{ id: "new" }],
+      },
+    );
+    expect(preview?.changedNodes).toBe(3);
+    expect(preview?.addedEdges).toBe(1);
+    expect(preview?.deletedEdges).toBe(1);
+    expect(preview?.nodes.map((node) => node.state)).toEqual(["moved", "added", "deleted"]);
+    expect(canvasGhostPreview({}, {})).toBeUndefined();
   });
 
   test("shows note intent and resolution state for annotation fixes", () => {

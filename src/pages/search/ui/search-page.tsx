@@ -132,6 +132,7 @@ export function SearchPage({
             ["manuscript", "Рукопись"],
             ["drafts", "Черновики"],
             ["notes", "Заметки"],
+            ["canvas", "Доски"],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -275,19 +276,41 @@ export function SearchPage({
           </div>
         ) : (
           <div className="mt-7 grid gap-3">
-            {results.data?.results.map((result) => (
-              <Link
-                key={`${result.nodeId}-${result.revision}`}
-                to="/projects/$projectId/studio/$nodeId"
-                params={{ projectId, nodeId: result.nodeId }}
-                search={{ highlight: initialQuery }}
-                className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4 hover:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
-              >
-                <p className="text-xs text-[var(--ink-tertiary)]">{result.breadcrumb}</p>
-                <p className="font-manuscript mt-2 text-lg leading-7">{result.snippet}</p>
-                <p className="mt-2 text-xs text-[var(--accent)]">{result.matchCount} совпадений</p>
-              </Link>
-            ))}
+            {results.data?.results.map((result) => {
+              const className =
+                "rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4 hover:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
+              const content = (
+                <>
+                  <p className="text-xs text-[var(--ink-tertiary)]">{result.breadcrumb}</p>
+                  <p className="font-manuscript mt-2 text-lg leading-7">{result.snippet}</p>
+                  <p className="mt-2 text-xs text-[var(--accent)]">
+                    {result.sourceScope === "canvas" ? "Canvas · " : ""}
+                    {result.matchCount} совпадений
+                  </p>
+                </>
+              );
+              return result.sourceScope === "canvas" && result.canvasId ? (
+                <Link
+                  key={`${result.canvasId}-${result.canvasNodeId}-${result.revision}`}
+                  to="/projects/$projectId/canvases/$canvasId"
+                  params={{ projectId, canvasId: result.canvasId }}
+                  search={{ focus: result.canvasNodeId }}
+                  className={className}
+                >
+                  {content}
+                </Link>
+              ) : (
+                <Link
+                  key={`${result.nodeId}-${result.revision}`}
+                  to="/projects/$projectId/studio/$nodeId"
+                  params={{ projectId, nodeId: result.nodeId }}
+                  search={{ highlight: initialQuery }}
+                  className={className}
+                >
+                  {content}
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>

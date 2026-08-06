@@ -54,11 +54,12 @@ import {
   SpellCheck2,
   StickyNote,
   Trash2,
+  Upload,
   Workflow,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { createCanvas, listCanvases, restoreCanvas } from "~entities/canvas";
+import { createCanvas, importCanvas, listCanvases, restoreCanvas } from "~entities/canvas";
 import {
   createNode,
   type DocumentNode,
@@ -237,6 +238,7 @@ export function ProjectTree({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [draggedNodeId, setDraggedNodeId] = useState<string>();
   const [dropTargetId, setDropTargetId] = useState<string>();
+  const canvasImportInput = useRef<HTMLInputElement>(null);
   const contentNodes = useMemo(() => nodes.filter((node) => !node.trashedAt), [nodes]);
   const trashedNodes = useMemo(() => nodes.filter((node) => node.trashedAt), [nodes]);
   const activeNode = activeCanvasId
@@ -323,6 +325,20 @@ export function ProjectTree({
   const restoreCanvasMutation = useMutation({
     mutationFn: restoreCanvas,
     onSuccess: invalidateCanvases,
+  });
+  const importCanvasMutation = useMutation({
+    mutationFn: (file: File) =>
+      importCanvas(projectId, file, file.name.replace(/\.canvas$/i, "") || "Импортированная доска"),
+    onSuccess: async ({ canvas }) => {
+      await invalidateCanvases();
+      showToast({ title: "Доска импортирована" });
+      void navigate({
+        to: "/projects/$projectId/canvases/$canvasId",
+        params: { projectId, canvasId: canvas.id },
+      });
+    },
+    onError: (error) =>
+      showToast({ title: "Не удалось импортировать доску", description: error.message }),
   });
 
   const requestCanvas = () => {
@@ -588,13 +604,19 @@ export function ProjectTree({
           {children.length > 0 ? (
             <button
               type="button"
-              className="grid size-6 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)]"
+              className="ui-tooltip grid size-6 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)]"
               aria-label={
                 collapsedNodeIds.has(node.id)
                   ? `Развернуть «${node.title}»`
                   : `Свернуть «${node.title}»`
               }
               aria-expanded={!collapsedNodeIds.has(node.id)}
+              data-ui-tooltip={
+                collapsedNodeIds.has(node.id)
+                  ? `Развернуть «${node.title}»`
+                  : `Свернуть «${node.title}»`
+              }
+              data-ui-tooltip-side="right"
               onClick={() =>
                 setCollapsedNodeIds((current) => {
                   const next = new Set(current);
@@ -632,8 +654,10 @@ export function ProjectTree({
           {(nodeType?.allowedChildren?.length ?? 0) > 0 ? (
             <button
               type="button"
-              className="mr-1 grid size-7 place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] group-hover/tree-row:opacity-100 focus:opacity-100"
+              className="ui-tooltip mr-1 grid size-7 place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] group-hover/tree-row:opacity-100 focus:opacity-100"
               aria-label={`Добавить внутрь «${node.title}»`}
+              data-ui-tooltip={`Добавить внутрь «${node.title}»`}
+              data-ui-tooltip-side="right"
               onClick={() => chooseNodeType(node.id)}
             >
               <Plus className="size-3.5" aria-hidden="true" />
@@ -682,7 +706,7 @@ export function ProjectTree({
           label={structure.rootLabel}
         />
         {activeCanvases[0] ? (
-          <Button asChild variant="ghost" size="icon" className="size-10">
+          <Button asChild variant="ghost" size="icon" className="size-10" tooltip="Доски">
             <Link
               to="/projects/$projectId/canvases/$canvasId"
               params={{ projectId, canvasId: activeCanvasId ?? activeCanvases[0].id }}
@@ -839,6 +863,18 @@ export function ProjectTree({
               >
                 <Plus className="size-3.5" aria-hidden="true" />
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="Импортировать JSON Canvas"
+                title="Импортировать .canvas"
+                disabled={importCanvasMutation.isPending}
+                onClick={() => canvasImportInput.current?.click()}
+              >
+                <Upload className="size-3.5" aria-hidden="true" />
+              </Button>
             </div>
             {activeCanvases.length > 0 ? (
               activeCanvases.map((canvas) => (
@@ -866,6 +902,17 @@ export function ProjectTree({
               </button>
             )}
           </div>
+          <input
+            ref={canvasImportInput}
+            type="file"
+            accept=".canvas,application/json"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) importCanvasMutation.mutate(file);
+              event.target.value = "";
+            }}
+          />
           <div className="flex min-h-9 items-center gap-2 pr-2 pl-[26px] text-xs font-medium text-[var(--ink-secondary)]">
             <ListTree className="size-4" aria-hidden="true" />
             <span>{structure.rootLabel}</span>
@@ -1106,7 +1153,7 @@ function CompactStudioLink({
 }) {
   if (!node) return null;
   return (
-    <Button asChild variant="ghost" size="icon" className="size-10">
+    <Button asChild variant="ghost" size="icon" className="size-10" tooltip={label}>
       <Link
         to="/projects/$projectId/studio/$nodeId"
         params={{ projectId, nodeId: node.id }}

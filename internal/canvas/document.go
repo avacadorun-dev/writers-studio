@@ -11,10 +11,14 @@ import (
 )
 
 const (
-	SchemaVersion = 1
-	MaxNodes      = 2_000
-	MaxEdges      = 4_000
-	MaxTextRunes  = 100_000
+	MinimumSchemaVersion = 1
+	SchemaVersion        = 2
+	MaxNodes             = 5_000
+	MaxEdges             = 10_000
+	MaxTextRunes         = 100_000
+	MaxSnapshotBytes     = 12 << 20
+	MaxStrokePoints      = 4_096
+	MaxTotalStrokePoints = 200_000
 )
 
 var (
@@ -28,13 +32,16 @@ type ResourceRef struct {
 }
 
 type References struct {
-	DocumentIDs []string
-	MediaIDs    []string
+	DocumentIDs   []string
+	MediaIDs      []string
+	CanvasIDs     []string
+	SchemaVersion int
 }
 
 type document struct {
-	Nodes []node `json:"nodes"`
-	Edges []edge `json:"edges"`
+	Nodes     []node          `json:"nodes"`
+	Edges     []edge          `json:"edges"`
+	Extension json.RawMessage `json:"x-writers-studio"`
 }
 
 type node struct {
@@ -47,6 +54,7 @@ type node struct {
 	Color     string          `json:"color"`
 	Text      *string         `json:"text"`
 	File      *string         `json:"file"`
+	URL       *string         `json:"url"`
 	Label     *string         `json:"label"`
 	Extension json.RawMessage `json:"x-writers-studio"`
 }
@@ -64,15 +72,35 @@ type edge struct {
 }
 
 type resourceExtension struct {
-	Resource *ResourceRef `json:"resource"`
+	Resource *ResourceRef   `json:"resource"`
+	Element  *canvasElement `json:"element"`
+}
+
+type documentExtension struct {
+	SchemaVersion int `json:"schemaVersion"`
+}
+
+type canvasElement struct {
+	Kind     string      `json:"kind"`
+	Shape    string      `json:"shape"`
+	Points   [][]float64 `json:"points"`
+	Brush    string      `json:"brush"`
+	Color    string      `json:"color"`
+	Fill     string      `json:"fill"`
+	Dash     string      `json:"dash"`
+	Size     float64     `json:"size"`
+	Opacity  float64     `json:"opacity"`
+	Rotation float64     `json:"rotation"`
+	Label    string      `json:"label"`
+	Order    int         `json:"order"`
 }
 
 func EmptyDocument() json.RawMessage {
-	return json.RawMessage(`{"nodes":[],"edges":[],"x-writers-studio":{"schemaVersion":1}}`)
+	return json.RawMessage(`{"nodes":[],"edges":[],"x-writers-studio":{"schemaVersion":2}}`)
 }
 
 func Validate(raw json.RawMessage) (References, error) {
-	if len(raw) == 0 || !json.Valid(raw) {
+	if len(raw) == 0 || len(raw) > MaxSnapshotBytes || !json.Valid(raw) {
 		return References{}, invalid("content is not valid JSON")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -95,10 +123,23 @@ func Validate(raw json.RawMessage) (References, error) {
 	if len(value.Nodes) > MaxNodes || len(value.Edges) > MaxEdges {
 		return References{}, invalid("canvas is too large")
 	}
+	var extension documentExtension
+	if len(value.Extension) > 0 && json.Unmarshal(value.Extension, &extension) != nil {
+		return References{}, invalid("canvas extension is invalid")
+	}
+	if extension.SchemaVersion == 0 {
+		extension.SchemaVersion = MinimumSchemaVersion
+	}
+	if extension.SchemaVersion < MinimumSchemaVersion || extension.SchemaVersion > SchemaVersion {
+		return References{}, invalid("canvas schema version is unsupported")
+	}
 
 	nodeIDs := make(map[string]struct{}, len(value.Nodes))
+	strokeNodeIDs := make(map[string]struct{})
 	documentIDs := map[string]struct{}{}
 	mediaIDs := map[string]struct{}{}
+	canvasIDs := map[string]struct{}{}
+	totalStrokePoints := 0
 	for _, item := range value.Nodes {
 		if !validID(item.ID) {
 			return References{}, invalid("node id is missing or too long")
@@ -126,8 +167,13 @@ func Validate(raw json.RawMessage) (References, error) {
 				return References{}, invalid("file node is invalid")
 			}
 			var extension resourceExtension
-			if len(item.Extension) == 0 || json.Unmarshal(item.Extension, &extension) != nil ||
-				extension.Resource == nil || !validID(extension.Resource.ID) {
+			if len(item.Extension) > 0 && json.Unmarshal(item.Extension, &extension) != nil {
+				return References{}, invalid("file node resource is invalid")
+			}
+			if extension.Resource == nil {
+				break
+			}
+			if !validID(extension.Resource.ID) {
 				return References{}, invalid("file node resource is invalid")
 			}
 			switch extension.Resource.Kind {
@@ -135,12 +181,37 @@ func Validate(raw json.RawMessage) (References, error) {
 				documentIDs[extension.Resource.ID] = struct{}{}
 			case "media":
 				mediaIDs[extension.Resource.ID] = struct{}{}
+			case "canvas":
+				canvasIDs[extension.Resource.ID] = struct{}{}
 			default:
 				return References{}, invalid("file node resource kind is invalid")
+			}
+		case "link":
+			if item.URL == nil || !validLinkURL(*item.URL) {
+				return References{}, invalid("link node is invalid")
 			}
 		case "group":
 			if item.Label != nil && len([]rune(*item.Label)) > 500 {
 				return References{}, invalid("group label is too long")
+			}
+			if len(item.Extension) > 0 {
+				var extension resourceExtension
+				if json.Unmarshal(item.Extension, &extension) != nil {
+					return References{}, invalid("group extension is invalid")
+				}
+				if extension.Element != nil {
+					points, err := validateElement(*extension.Element, item.Width, item.Height)
+					if err != nil {
+						return References{}, err
+					}
+					totalStrokePoints += points
+					if totalStrokePoints > MaxTotalStrokePoints {
+						return References{}, invalid("canvas has too many stroke points")
+					}
+					if extension.Element.Kind == "stroke" {
+						strokeNodeIDs[item.ID] = struct{}{}
+					}
+				}
 			}
 		default:
 			return References{}, invalid("unsupported node type")
@@ -162,6 +233,12 @@ func Validate(raw json.RawMessage) (References, error) {
 		if _, exists := nodeIDs[item.ToNode]; !exists {
 			return References{}, invalid("edge target does not exist")
 		}
+		if _, exists := strokeNodeIDs[item.FromNode]; exists {
+			return References{}, invalid("stroke nodes cannot have edges")
+		}
+		if _, exists := strokeNodeIDs[item.ToNode]; exists {
+			return References{}, invalid("stroke nodes cannot have edges")
+		}
 		if !validSide(item.FromSide) || !validSide(item.ToSide) ||
 			!validEnd(item.FromEnd, "none") || !validEnd(item.ToEnd, "arrow") ||
 			(item.Color != "" && !colorPattern.MatchString(item.Color)) || len([]rune(item.Label)) > 500 {
@@ -170,9 +247,72 @@ func Validate(raw json.RawMessage) (References, error) {
 	}
 
 	return References{
-		DocumentIDs: sortedKeys(documentIDs),
-		MediaIDs:    sortedKeys(mediaIDs),
+		DocumentIDs:   sortedKeys(documentIDs),
+		MediaIDs:      sortedKeys(mediaIDs),
+		CanvasIDs:     sortedKeys(canvasIDs),
+		SchemaVersion: extension.SchemaVersion,
 	}, nil
+}
+
+func validateElement(element canvasElement, width, height float64) (int, error) {
+	switch element.Kind {
+	case "stroke":
+		if len(element.Points) < 2 || len(element.Points) > MaxStrokePoints ||
+			(element.Brush != "pen" && element.Brush != "highlighter") ||
+			!numberInRange(element.Size, 1, 128) || !numberInRange(element.Opacity, 0.01, 1) ||
+			!validElementColor(element.Color, false) {
+			return 0, invalid("stroke element is invalid")
+		}
+		for _, point := range element.Points {
+			if len(point) < 2 || len(point) > 3 || !numberInRange(point[0], -128, width+128) ||
+				!numberInRange(point[1], -128, height+128) ||
+				(len(point) == 3 && !numberInRange(point[2], 0, 1)) {
+				return 0, invalid("stroke point is invalid")
+			}
+		}
+		return len(element.Points), nil
+	case "shape":
+		if !oneOf(element.Shape, "rectangle", "ellipse", "diamond", "line", "arrow") ||
+			!numberInRange(element.Size, 1, 32) || !numberInRange(element.Opacity, 0.01, 1) ||
+			!numberInRange(element.Rotation, -360, 360) ||
+			!validElementColor(element.Color, false) || !validElementColor(element.Fill, true) ||
+			!oneOf(element.Dash, "", "solid", "dashed", "dotted") || len([]rune(element.Label)) > 500 {
+			return 0, invalid("shape element is invalid")
+		}
+		return 0, nil
+	case "frame":
+		if element.Order < 0 || element.Order > MaxNodes || len([]rune(element.Label)) > 500 {
+			return 0, invalid("frame element is invalid")
+		}
+		return 0, nil
+	default:
+		return 0, invalid("drawing element kind is invalid")
+	}
+}
+
+func validLinkURL(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) == 0 || len(value) > 2_048 {
+		return false
+	}
+	return strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://")
+}
+
+func validElementColor(value string, transparent bool) bool {
+	return (transparent && value == "transparent") || colorPattern.MatchString(value)
+}
+
+func numberInRange(value, minimum, maximum float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= minimum && value <= maximum
+}
+
+func oneOf(value string, values ...string) bool {
+	for _, candidate := range values {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func invalid(message string) error {

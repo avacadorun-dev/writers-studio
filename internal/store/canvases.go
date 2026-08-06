@@ -43,6 +43,13 @@ type SaveCanvasRevisionInput struct {
 	References    canvasdocument.References
 }
 
+type ImportCanvasInput struct {
+	Title         string
+	SchemaVersion int
+	Content       json.RawMessage
+	References    canvasdocument.References
+}
+
 func (s *Store) ListCanvases(
 	ctx context.Context,
 	ownerID, projectID string,
@@ -109,6 +116,49 @@ func (s *Store) CreateCanvas(
 				id, canvas_id, revision, base_revision, schema_version, content, source
 			) VALUES($1, $2, 1, 0, $3, $4, 'canvas_create')
 		`, uuid.NewString(), canvasID, canvasdocument.SchemaVersion, content)
+		return err
+	})
+	return result, err
+}
+
+func (s *Store) ImportCanvas(
+	ctx context.Context,
+	ownerID, projectID string,
+	input ImportCanvasInput,
+) (domain.CanvasSummary, error) {
+	var result domain.CanvasSummary
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if err := validateCanvasResourcesTx(ctx, tx, ownerID, projectID, input.References); err != nil {
+			return err
+		}
+		var position float64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(MAX(c.position), 0)::float8 + 1000
+			FROM projects p
+			LEFT JOIN canvases c ON c.project_id=p.id
+			WHERE p.id=$1 AND p.owner_user_id=$2 AND p.status <> 'trash'
+		`, projectID, ownerID).Scan(&position); err != nil {
+			return err
+		}
+		canvasID := uuid.NewString()
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO canvases(id, project_id, title, position, current_revision)
+			SELECT $1, p.id, $3, $4, 1
+			FROM projects p
+			WHERE p.id=$2 AND p.owner_user_id=$5 AND p.status <> 'trash'
+			RETURNING id::text, project_id::text, title, position::float8,
+				current_revision, trashed_at, created_at, updated_at
+		`, canvasID, projectID, input.Title, position, ownerID).Scan(
+			&result.ID, &result.ProjectID, &result.Title, &result.Position,
+			&result.CurrentRevision, &result.TrashedAt, &result.CreatedAt, &result.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `
+			INSERT INTO canvas_revisions(
+				id, canvas_id, revision, base_revision, schema_version, content, source
+			) VALUES($1, $2, 1, 0, $3, $4, 'canvas_import')
+		`, uuid.NewString(), canvasID, input.SchemaVersion, input.Content)
 		return err
 	})
 	return result, err
@@ -186,14 +236,15 @@ func (s *Store) DuplicateCanvas(
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		var projectID, title string
 		var content json.RawMessage
+		var schemaVersion int
 		if err := tx.QueryRow(ctx, `
-			SELECT c.project_id::text, c.title, r.content
+			SELECT c.project_id::text, c.title, r.schema_version, r.content
 			FROM canvases c
 			JOIN projects p ON p.id=c.project_id
 			JOIN canvas_revisions r ON r.canvas_id=c.id AND r.revision=c.current_revision
 			WHERE c.id=$1 AND p.owner_user_id=$2 AND c.trashed_at IS NULL
 			FOR UPDATE OF c
-		`, canvasID, ownerID).Scan(&projectID, &title, &content); err != nil {
+		`, canvasID, ownerID).Scan(&projectID, &title, &schemaVersion, &content); err != nil {
 			return err
 		}
 		var position float64
@@ -218,7 +269,7 @@ func (s *Store) DuplicateCanvas(
 			INSERT INTO canvas_revisions(
 				id, canvas_id, revision, base_revision, schema_version, content, source
 			) VALUES($1, $2, 1, 0, $3, $4, 'canvas_duplicate')
-		`, uuid.NewString(), newID, canvasdocument.SchemaVersion, content)
+		`, uuid.NewString(), newID, schemaVersion, content)
 		return err
 	})
 	return result, err
@@ -366,7 +417,35 @@ func validateCanvasResourcesTx(
 			return fmt.Errorf("%w: media resource is outside the project", canvasdocument.ErrInvalidDocument)
 		}
 	}
+	if len(references.CanvasIDs) > 0 {
+		var count int
+		if err := tx.QueryRow(ctx, `
+			SELECT COUNT(*)
+			FROM canvases c
+			JOIN projects p ON p.id=c.project_id
+			WHERE c.project_id=$1 AND p.owner_user_id=$2 AND c.id::text=ANY($3::text[])
+		`, projectID, ownerID, references.CanvasIDs).Scan(&count); err != nil {
+			return err
+		}
+		if count != len(references.CanvasIDs) {
+			return fmt.Errorf("%w: canvas resource is outside the project", canvasdocument.ErrInvalidDocument)
+		}
+	}
 	return nil
+}
+
+// ValidateCanvasResources checks that every resource referenced by a proposed
+// Canvas snapshot belongs to the same project and owner. Assistant proposals
+// use it before creating a reviewable change set; Apply repeats the check in
+// the committing transaction.
+func (s *Store) ValidateCanvasResources(
+	ctx context.Context,
+	ownerID, projectID string,
+	references canvasdocument.References,
+) error {
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		return validateCanvasResourcesTx(ctx, tx, ownerID, projectID, references)
+	})
 }
 
 func (s *Store) canvasDocumentPreviews(
@@ -414,7 +493,8 @@ func (s *Store) canvasMediaPreviews(
 	}
 	rows, err := s.Pool.Query(ctx, `
 		SELECT m.id::text, m.project_id::text, m.media_type, m.original_name, m.sha256,
-			m.byte_size, m.width, m.height, m.source_path, m.storage_key, m.created_at
+			m.byte_size, m.width, m.height, m.page_count, m.duration_ms,
+			m.source_path, m.storage_key, m.created_at
 		FROM project_media m
 		JOIN projects p ON p.id=m.project_id
 		WHERE m.project_id=$1 AND p.owner_user_id=$2 AND m.id::text=ANY($3::text[])
@@ -427,7 +507,8 @@ func (s *Store) canvasMediaPreviews(
 		var item domain.ProjectMedia
 		if err := rows.Scan(
 			&item.ID, &item.ProjectID, &item.MediaType, &item.OriginalName, &item.SHA256,
-			&item.ByteSize, &item.Width, &item.Height, &item.SourcePath, &item.StorageKey,
+			&item.ByteSize, &item.Width, &item.Height, &item.PageCount, &item.DurationMS,
+			&item.SourcePath, &item.StorageKey,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, err

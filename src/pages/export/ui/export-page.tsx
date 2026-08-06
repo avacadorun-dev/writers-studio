@@ -217,7 +217,8 @@ export function ExportPage({
     Math.ceil((queueScrollTop + exportViewportHeight) / exportRowHeight) + 8,
   );
   const virtualQueue = visibleQueue.slice(virtualStart, virtualEnd);
-  const cover = media.data?.media.find((item) => item.id === profile.metadata.coverAssetId);
+  const imageMedia = media.data?.media.filter((item) => item.mediaType.startsWith("image/")) ?? [];
+  const cover = imageMedia.find((item) => item.id === profile.metadata.coverAssetId);
   const previewDocuments = orderedSelectedIds
     .map((id) => project.data.nodes.find((node) => node.id === id))
     .filter((node): node is NonNullable<typeof node> => Boolean(node));
@@ -682,7 +683,7 @@ export function ExportPage({
                     }
                   >
                     <option value="">Без обложки</option>
-                    {media.data?.media.map((item) => (
+                    {imageMedia.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.originalName}
                       </option>
@@ -778,8 +779,10 @@ function SortableExportRow({
       <button
         ref={setActivatorNodeRef}
         type="button"
-        className="grid size-8 touch-none place-items-center rounded text-[var(--ink-tertiary)] hover:bg-[var(--surface-raised)]"
+        className="ui-tooltip grid size-8 touch-none place-items-center rounded text-[var(--ink-tertiary)] hover:bg-[var(--surface-raised)]"
         aria-label={`Изменить порядок «${item.title}»`}
+        data-ui-tooltip={`Изменить порядок «${item.title}»`}
+        data-ui-tooltip-side="right"
         {...attributes}
         {...listeners}
       >

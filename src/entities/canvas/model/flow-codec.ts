@@ -13,7 +13,15 @@ export type CanvasFlowNodeType =
   | "canvas-text"
   | "canvas-document"
   | "canvas-image"
-  | "canvas-group";
+  | "canvas-external-file"
+  | "canvas-pdf"
+  | "canvas-media"
+  | "canvas-nested"
+  | "canvas-link"
+  | "canvas-group"
+  | "canvas-stroke"
+  | "canvas-shape"
+  | "canvas-frame";
 
 export interface CanvasFlowNodeData extends Record<string, unknown> {
   canvasNode: CanvasNode;
@@ -49,15 +57,19 @@ export function canvasToFlow(
   const mediaById = new Map(media.map((item) => [item.id, item]));
   return {
     nodes: content.nodes.map((item, index) => {
-      const resource = item.type === "file" ? item["x-writers-studio"].resource : undefined;
+      const resource = item.type === "file" ? item["x-writers-studio"]?.resource : undefined;
       return {
         id: item.id,
-        type: flowNodeType(item),
+        type: flowNodeType(item, mediaById),
         position: { x: item.x, y: item.y },
         initialWidth: item.width,
         initialHeight: item.height,
         style: { width: item.width, height: item.height },
-        zIndex: item.type === "group" ? 0 : index + 1,
+        zIndex: isBackgroundNode(item) ? 0 : index + 1,
+        draggable: item["x-writers-studio"]?.locked !== true,
+        connectable: !(
+          item.type === "group" && item["x-writers-studio"]?.element?.kind === "stroke"
+        ),
         data: {
           canvasNode: item,
           document: resource?.kind === "document" ? documentById.get(resource.id) : undefined,
@@ -89,20 +101,13 @@ export function flowToCanvas(
 ): CanvasDocument {
   const orderedNodes = [...nodes].sort((left, right) => {
     const groupOrder =
-      Number(left.data.canvasNode.type !== "group") -
-      Number(right.data.canvasNode.type !== "group");
+      Number(!isBackgroundNode(left.data.canvasNode)) -
+      Number(!isBackgroundNode(right.data.canvasNode));
     return groupOrder || (left.zIndex ?? 0) - (right.zIndex ?? 0);
   });
   return {
     ...base,
-    nodes: orderedNodes.map((item) => ({
-      ...item.data.canvasNode,
-      id: item.id,
-      x: Math.round(item.position.x),
-      y: Math.round(item.position.y),
-      width: Math.round(item.measured?.width ?? item.width ?? item.data.canvasNode.width),
-      height: Math.round(item.measured?.height ?? item.height ?? item.data.canvasNode.height),
-    })) as CanvasNode[],
+    nodes: orderedNodes.map((item) => resizedCanvasNode(item)) as CanvasNode[],
     edges: edges.map((item) => ({
       ...(item.data?.canvasEdge ?? {
         id: item.id,
@@ -118,14 +123,83 @@ export function flowToCanvas(
   };
 }
 
+function resizedCanvasNode(item: CanvasFlowNode): CanvasNode {
+  const source = item.data.canvasNode;
+  const width = Math.round(item.measured?.width ?? item.width ?? source.width);
+  const height = Math.round(item.measured?.height ?? item.height ?? source.height);
+  const extension = source["x-writers-studio"];
+  const element = extension?.element;
+  if (source.type === "group" && element?.kind === "stroke") {
+    const scaleX = width / source.width;
+    const scaleY = height / source.height;
+    return {
+      ...source,
+      id: item.id,
+      x: Math.round(item.position.x),
+      y: Math.round(item.position.y),
+      width,
+      height,
+      "x-writers-studio": {
+        ...extension,
+        element: {
+          ...element,
+          points: element.points.map((point) =>
+            point[2] === undefined
+              ? [
+                  Math.round(point[0] * scaleX * 100) / 100,
+                  Math.round(point[1] * scaleY * 100) / 100,
+                ]
+              : [
+                  Math.round(point[0] * scaleX * 100) / 100,
+                  Math.round(point[1] * scaleY * 100) / 100,
+                  point[2],
+                ],
+          ),
+        },
+      },
+    };
+  }
+  return {
+    ...source,
+    id: item.id,
+    x: Math.round(item.position.x),
+    y: Math.round(item.position.y),
+    width,
+    height,
+  } as CanvasNode;
+}
+
 export function sideToPosition(side: CanvasSide): Position {
   return sidePosition[side];
 }
 
-function flowNodeType(item: CanvasNode): CanvasFlowNodeType {
+function flowNodeType(item: CanvasNode, media: Map<string, ProjectMedia>): CanvasFlowNodeType {
   if (item.type === "text") return "canvas-text";
-  if (item.type === "group") return "canvas-group";
-  return item["x-writers-studio"].resource.kind === "media" ? "canvas-image" : "canvas-document";
+  if (item.type === "link") return "canvas-link";
+  if (item.type === "group") {
+    const element = item["x-writers-studio"]?.element;
+    if (element?.kind === "stroke") return "canvas-stroke";
+    if (element?.kind === "shape") return "canvas-shape";
+    if (element?.kind === "frame") return "canvas-frame";
+    return "canvas-group";
+  }
+  const resource = item["x-writers-studio"]?.resource;
+  if (!resource) return "canvas-external-file";
+  if (resource.kind === "document") return "canvas-document";
+  if (resource.kind === "canvas") return "canvas-nested";
+  const mediaType =
+    (resource.kind === "media" ? media.get(resource.id)?.mediaType : undefined) ??
+    (item["x-writers-studio"]?.mediaType as string | undefined) ??
+    "";
+  if (mediaType === "application/pdf") return "canvas-pdf";
+  if (mediaType.startsWith("audio/") || mediaType.startsWith("video/")) return "canvas-media";
+  return "canvas-image";
+}
+
+function isBackgroundNode(item: CanvasNode): boolean {
+  if (item.type !== "group") return false;
+  const kind = item["x-writers-studio"]?.element?.kind;
+  return kind === undefined || kind === "frame";
 }
 
 function canvasNodeAriaLabel(
@@ -134,12 +208,24 @@ function canvasNodeAriaLabel(
   media: Map<string, ProjectMedia>,
 ): string {
   if (item.type === "text") return item.text.trim().slice(0, 120) || "Пустая заметка";
-  if (item.type === "group") return `Группа ${item.label || "без названия"}`;
-  const resource = item["x-writers-studio"].resource;
+  if (item.type === "link") {
+    return `Ссылка ${item["x-writers-studio"]?.preview?.title ?? item.url}`;
+  }
+  if (item.type === "group") {
+    const element = item["x-writers-studio"]?.element;
+    if (element?.kind === "stroke") return `${element.brush === "pen" ? "Штрих" : "Маркер"}`;
+    if (element?.kind === "shape") return `Фигура ${element.label || element.shape}`;
+    if (element?.kind === "frame") return `Фрейм ${element.label || item.label || element.order}`;
+    return `Группа ${item.label || "без названия"}`;
+  }
+  const resource = item["x-writers-studio"]?.resource;
+  if (!resource) return `Файл ${item.file}`;
   if (resource.kind === "document") {
     return `Документ ${documents.get(resource.id)?.title ?? "недоступен"}`;
   }
-  return `Изображение ${media.get(resource.id)?.originalName ?? "недоступно"}`;
+  if (resource.kind === "canvas") return "Вложенная доска";
+  const asset = media.get(resource.id);
+  return `${asset?.mediaType === "application/pdf" ? "PDF" : "Изображение"} ${asset?.originalName ?? "недоступно"}`;
 }
 
 function normalizeSide(value: string | null | undefined): CanvasSide | undefined {
@@ -149,5 +235,5 @@ function normalizeSide(value: string | null | undefined): CanvasSide | undefined
 }
 
 export function canvasFileResource(item: CanvasFileNode) {
-  return item["x-writers-studio"].resource;
+  return item["x-writers-studio"]?.resource;
 }

@@ -26,6 +26,9 @@ export function createAssistantRun(
     title?: string;
     targetKind: AssistantTargetKind;
     targetNodeId?: string;
+    targetCanvasId?: string;
+    canvasSelectionIds?: string[];
+    canvasViewport?: { x: number; y: number; zoom: number };
     inputMode: AssistantInputMode;
     silenceCheckpointMs: number;
     providerConnectionId?: string;

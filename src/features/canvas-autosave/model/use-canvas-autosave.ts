@@ -28,6 +28,7 @@ export function useCanvasAutosave({
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [conflictCanvasId, setConflictCanvasId] = useState<string>();
   const baseRevision = useRef(revision);
+  const onRevisionRef = useRef(onRevision);
   const latestContent = useRef<CanvasDocument | undefined>(undefined);
   const dirty = useRef(false);
   const inFlight = useRef(false);
@@ -39,6 +40,10 @@ export function useCanvasAutosave({
   useEffect(() => {
     baseRevision.current = revision;
   }, [revision]);
+
+  useEffect(() => {
+    onRevisionRef.current = onRevision;
+  }, [onRevision]);
 
   const persistLocal = useCallback(async () => {
     if (!latestContent.current) return;
@@ -77,7 +82,7 @@ export function useCanvasAutosave({
         source: "manual",
       });
       baseRevision.current = response.revision.revision;
-      onRevision(response.revision.revision);
+      onRevisionRef.current(response.revision.revision);
       conflict.current = false;
       setConflictCanvasId(undefined);
       if (dirty.current) {
@@ -110,7 +115,7 @@ export function useCanvasAutosave({
         serverTimer.current = window.setTimeout(() => void flush(), 1_500);
       }
     }
-  }, [canvasId, onRevision, persistLocal, projectId]);
+  }, [canvasId, persistLocal, projectId]);
 
   const queue = useCallback(
     (content: CanvasDocument) => {

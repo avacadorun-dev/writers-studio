@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -13,12 +14,21 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/documentannotation"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/editor"
+	"writers.studio/internal/markdowntree"
 )
 
 type assistantChangeSetTxGuard func(context.Context, pgx.Tx) error
+
+func jsonEqual(left, right json.RawMessage) bool {
+	var leftValue, rightValue any
+	return json.Unmarshal(left, &leftValue) == nil &&
+		json.Unmarshal(right, &rightValue) == nil &&
+		reflect.DeepEqual(leftValue, rightValue)
+}
 
 func (s *Store) ApplyAssistantChangeSet(
 	ctx context.Context,
@@ -527,6 +537,14 @@ func applyAssistantOperation(
 		)
 	case "version.create_snapshot":
 		return applyAssistantVersion(ctx, tx, ownerID, projectID, operation)
+	case "canvas.propose_patch":
+		return applyAssistantCanvas(
+			ctx, tx, ownerID, projectID, runID, changeSetID, operationID, operation,
+		)
+	case "canvas.promote_cards":
+		return applyAssistantCanvasPromotion(
+			ctx, tx, ownerID, projectID, runID, changeSetID, operationID, operation,
+		)
 	case "tree.archive":
 		if operation.TargetID == nil {
 			return errors.New("archive target is missing")
@@ -547,6 +565,200 @@ func applyAssistantOperation(
 	default:
 		return fmt.Errorf("tool %q cannot be committed by Assistant", operation.ToolName)
 	}
+}
+
+func applyAssistantCanvas(
+	ctx context.Context,
+	tx pgx.Tx,
+	ownerID string,
+	projectID string,
+	runID string,
+	changeSetID string,
+	operationID string,
+	operation assistant.ChangeOperation,
+) error {
+	if operation.TargetID == nil || operation.BaseRevision == nil {
+		return errors.New("canvas target and base revision are required")
+	}
+	references, err := canvasdocument.Validate(operation.ProposedSnapshot)
+	if err != nil {
+		return err
+	}
+	if err := validateCanvasResourcesTx(ctx, tx, ownerID, projectID, references); err != nil {
+		return err
+	}
+	var current int
+	if err := tx.QueryRow(ctx, `
+		SELECT c.current_revision
+		FROM canvases c
+		JOIN projects p ON p.id=c.project_id
+		WHERE c.id=$1 AND c.project_id=$2 AND p.owner_user_id=$3 AND c.trashed_at IS NULL
+		FOR UPDATE OF c
+	`, *operation.TargetID, projectID, ownerID).Scan(&current); err != nil {
+		return err
+	}
+	if current != *operation.BaseRevision {
+		return assistant.ErrStaleChangeSet
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO canvas_revisions(
+			id, canvas_id, revision, base_revision, schema_version, content, source
+		) VALUES($1,$2,$3,$4,$5,$6,'assistant')
+	`, uuid.NewString(), *operation.TargetID, current+1, current,
+		canvasdocument.SchemaVersion, operation.ProposedSnapshot); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE canvases SET current_revision=$2, updated_at=now() WHERE id=$1
+	`, *operation.TargetID, current+1)
+	_ = runID
+	_ = changeSetID
+	_ = operationID
+	return err
+}
+
+type assistantCanvasPromotionTrace struct {
+	Items []struct {
+		NodeID     string  `json:"nodeId"`
+		DocumentID string  `json:"documentId"`
+		Title      string  `json:"title"`
+		Kind       string  `json:"kind"`
+		ParentID   *string `json:"parentId"`
+	} `json:"items"`
+}
+
+func applyAssistantCanvasPromotion(
+	ctx context.Context,
+	tx pgx.Tx,
+	ownerID string,
+	projectID string,
+	runID string,
+	changeSetID string,
+	operationID string,
+	operation assistant.ChangeOperation,
+) error {
+	if operation.TargetID == nil || operation.BaseRevision == nil {
+		return errors.New("canvas promotion target and base revision are required")
+	}
+	var trace assistantCanvasPromotionTrace
+	if err := json.Unmarshal(operation.Trace, &trace); err != nil || len(trace.Items) == 0 || len(trace.Items) > 50 {
+		return errors.New("canvas promotion trace is invalid")
+	}
+	var current int
+	var currentContent, structureJSON json.RawMessage
+	if err := tx.QueryRow(ctx, `
+		SELECT c.current_revision, r.content, p.structure_schema
+		FROM canvases c
+		JOIN canvas_revisions r ON r.canvas_id=c.id AND r.revision=c.current_revision
+		JOIN projects p ON p.id=c.project_id
+		WHERE c.id=$1 AND c.project_id=$2 AND p.owner_user_id=$3
+			AND c.trashed_at IS NULL AND p.status <> 'trash'
+		FOR UPDATE OF c, p
+	`, *operation.TargetID, projectID, ownerID).Scan(&current, &currentContent, &structureJSON); err != nil {
+		return err
+	}
+	if current != *operation.BaseRevision {
+		return assistant.ErrStaleChangeSet
+	}
+	var structure domain.ProjectStructure
+	if err := json.Unmarshal(structureJSON, &structure); err != nil {
+		return err
+	}
+	content := append(json.RawMessage(nil), currentContent...)
+	for _, item := range trace.Items {
+		if strings.TrimSpace(item.Title) == "" || len([]rune(item.Title)) > 200 ||
+			strings.TrimSpace(item.Kind) == "" {
+			return errors.New("canvas promotion metadata is invalid")
+		}
+		var parentKind *string
+		if item.ParentID != nil {
+			var value string
+			if err := tx.QueryRow(ctx, `
+				SELECT kind FROM document_nodes
+				WHERE id=$1 AND project_id=$2 AND trashed_at IS NULL
+				FOR UPDATE
+			`, *item.ParentID, projectID).Scan(&value); err != nil {
+				return err
+			}
+			parentKind = &value
+		}
+		if err := validateNodePlacement(structure, item.Kind, parentKind); err != nil {
+			return err
+		}
+		contentBearing := false
+		for _, nodeType := range structure.NodeTypes {
+			if nodeType.Key == item.Kind {
+				contentBearing = nodeType.ContentBearing
+				break
+			}
+		}
+		if !contentBearing {
+			return ErrInvalidParentType
+		}
+		promotion, err := canvasdocument.PromoteNode(
+			content, item.NodeID, *operation.TargetID, item.DocumentID,
+		)
+		if err != nil {
+			return err
+		}
+		content = promotion.Content
+		parsed, err := markdowntree.ParseMarkdown(
+			"canvas-assistant-promotion.md", []byte(promotion.SourceText), nil,
+		)
+		if err != nil {
+			return err
+		}
+		var position float64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(MAX(position), 0)::float8 + 1000
+			FROM document_nodes
+			WHERE project_id=$1 AND parent_id IS NOT DISTINCT FROM $2
+		`, projectID, item.ParentID).Scan(&position); err != nil {
+			return err
+		}
+		frontmatter := fmt.Sprintf(
+			"---\nwriters_studio_canvas_id: %s\nwriters_studio_canvas_node_id: %s\n---\n",
+			*operation.TargetID, item.NodeID,
+		)
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO document_nodes(
+				id, project_id, parent_id, kind, title, position, current_revision, source_frontmatter
+			) VALUES($1,$2,$3,$4,$5,$6,1,$7)
+		`, item.DocumentID, projectID, item.ParentID, item.Kind, item.Title, position, frontmatter); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO document_revisions(
+				id, node_id, revision, base_revision, schema_version, content, plain_text,
+				source, operation_id, assistant_run_id, assistant_change_set_id
+			) VALUES($1,$2,1,0,3,$3,$4,'assistant',$5,$6,$7)
+		`, uuid.NewString(), item.DocumentID, parsed.Content, parsed.PlainText,
+			operationID, runID, changeSetID); err != nil {
+			return err
+		}
+	}
+	if !jsonEqual(content, operation.ProposedSnapshot) {
+		return errors.New("canvas promotion proposal does not match typed operations")
+	}
+	references, err := canvasdocument.Validate(content)
+	if err != nil {
+		return err
+	}
+	if err := validateCanvasResourcesTx(ctx, tx, ownerID, projectID, references); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO canvas_revisions(
+			id, canvas_id, revision, base_revision, schema_version, content, source
+		) VALUES($1,$2,$3,$4,$5,$6,'assistant_promotion')
+	`, uuid.NewString(), *operation.TargetID, current+1, current,
+		references.SchemaVersion, content); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE canvases SET current_revision=$2, updated_at=now() WHERE id=$1
+	`, *operation.TargetID, current+1)
+	return err
 }
 
 func applyAssistantDocument(
@@ -1337,6 +1549,53 @@ func undoAssistantOperation(
 			WHERE v.id=$1 AND n.id=v.node_id AND n.project_id=$2
 		`, proposal.ID, projectID)
 		return err
+	case "canvas.propose_patch", "canvas.promote_cards":
+		if operation.TargetID == nil {
+			return errors.New("canvas undo target is missing")
+		}
+		references, err := canvasdocument.Validate(operation.BeforeSnapshot)
+		if err != nil {
+			return err
+		}
+		if err := validateCanvasResourcesTx(ctx, tx, ownerID, projectID, references); err != nil {
+			return err
+		}
+		var current int
+		if err := tx.QueryRow(ctx, `
+			SELECT current_revision FROM canvases
+			WHERE id=$1 AND project_id=$2 AND trashed_at IS NULL
+			FOR UPDATE
+		`, *operation.TargetID, projectID).Scan(&current); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO canvas_revisions(
+				id, canvas_id, revision, base_revision, schema_version, content, source
+			) VALUES($1,$2,$3,$4,$5,$6,'assistant_undo')
+		`, uuid.NewString(), *operation.TargetID, current+1, current,
+			canvasdocument.SchemaVersion, operation.BeforeSnapshot); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `
+			UPDATE canvases SET current_revision=$2, updated_at=now() WHERE id=$1
+		`, *operation.TargetID, current+1); err != nil {
+			return err
+		}
+		if operation.ToolName == "canvas.promote_cards" {
+			var trace assistantCanvasPromotionTrace
+			if err := json.Unmarshal(operation.Trace, &trace); err != nil {
+				return err
+			}
+			for _, item := range trace.Items {
+				if _, err := tx.Exec(ctx, `
+					UPDATE document_nodes SET trashed_at=now(), updated_at=now()
+					WHERE id=$1 AND project_id=$2 AND trashed_at IS NULL
+				`, item.DocumentID, projectID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	case "tree.archive":
 		if operation.TargetID == nil {
 			return errors.New("archive undo target is missing")

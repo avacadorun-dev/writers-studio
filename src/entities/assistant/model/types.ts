@@ -1,5 +1,5 @@
 export type AssistantInputMode = "voice" | "chat" | "mcp";
-export type AssistantTargetKind = "project" | "node";
+export type AssistantTargetKind = "project" | "node" | "canvas";
 
 export interface AssistantWriterPreferences {
   language: "ru" | "en";
@@ -172,6 +172,7 @@ export interface AssistantRun {
   title: string;
   targetKind: AssistantTargetKind;
   targetNodeId?: string;
+  targetCanvasId?: string;
   inputMode: AssistantInputMode;
   status: AssistantRunStatus;
   silenceCheckpointMs: number;

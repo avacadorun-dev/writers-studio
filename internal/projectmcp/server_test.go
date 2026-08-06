@@ -116,8 +116,8 @@ func TestMCPServerValidatesStrictArgumentsAndErrors(t *testing.T) {
 func TestCatalogMatchesPolicyAndStrictSchema(t *testing.T) {
 	t.Parallel()
 	catalog := PublicCatalog()
-	if len(catalog) != 69 {
-		t.Fatalf("public Assistant MCP baseline changed: got %d tools, want 69", len(catalog))
+	if len(catalog) != 75 {
+		t.Fatalf("public Assistant MCP baseline changed: got %d tools, want 75", len(catalog))
 	}
 	allowed := assistant.AllowedToolNames()
 	if len(catalog) != len(allowed) {
@@ -157,7 +157,7 @@ func TestRemoteCatalogIsStrictSupersetOfInternalCatalog(t *testing.T) {
 	t.Parallel()
 	internal := PublicCatalog()
 	remote := RemoteCatalog()
-	if len(internal) != 69 {
+	if len(internal) != 75 {
 		t.Fatalf("internal tool baseline changed: got %d", len(internal))
 	}
 	if len(remote) <= len(internal) {

@@ -29,17 +29,17 @@ export function WorkspaceHeader() {
       </Link>
 
       <div className="flex items-center gap-1">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" tooltip="Открыть документацию">
           <a href="/docs" aria-label="Открыть документацию">
             <BookOpen className="size-4" aria-hidden="true" />
           </a>
         </Button>
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" tooltip="Открыть центр восстановления">
           <Link to="/recovery" aria-label="Открыть центр восстановления">
             <LifeBuoy className="size-4" aria-hidden="true" />
           </Link>
         </Button>
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" tooltip="Открыть настройки">
           <Link to="/settings" aria-label="Открыть настройки">
             <Settings className="size-4" aria-hidden="true" />
           </Link>
@@ -48,8 +48,10 @@ export function WorkspaceHeader() {
           <DropdownMenu.Trigger asChild>
             <button
               type="button"
-              className="ml-1 grid size-11 place-items-center rounded-full bg-[var(--surface-selected)] text-xs font-semibold text-[var(--accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+              className="ui-tooltip ml-1 grid size-11 place-items-center rounded-full bg-[var(--surface-selected)] text-xs font-semibold text-[var(--accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
               aria-label="Меню профиля"
+              data-ui-tooltip="Меню профиля"
+              data-ui-tooltip-side="bottom"
             >
               {initials}
             </button>

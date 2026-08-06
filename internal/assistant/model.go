@@ -134,6 +134,7 @@ type TargetKind string
 const (
 	TargetProject TargetKind = "project"
 	TargetNode    TargetKind = "node"
+	TargetCanvas  TargetKind = "canvas"
 )
 
 type RunStatus string
@@ -210,6 +211,7 @@ type Run struct {
 	Title               string              `json:"title"`
 	TargetKind          TargetKind          `json:"targetKind"`
 	TargetNodeID        *string             `json:"targetNodeId,omitempty"`
+	TargetCanvasID      *string             `json:"targetCanvasId,omitempty"`
 	InputMode           InputMode           `json:"inputMode"`
 	Status              RunStatus           `json:"status"`
 	SilenceCheckpointMS int                 `json:"silenceCheckpointMs"`
@@ -242,11 +244,15 @@ func (r Run) Validate() error {
 		return ErrInvalidRun
 	}
 	if r.TargetKind == TargetProject {
-		if r.TargetNodeID != nil {
+		if r.TargetNodeID != nil || r.TargetCanvasID != nil {
 			return ErrInvalidRun
 		}
 	} else if r.TargetKind == TargetNode {
-		if r.TargetNodeID == nil || strings.TrimSpace(*r.TargetNodeID) == "" {
+		if r.TargetNodeID == nil || strings.TrimSpace(*r.TargetNodeID) == "" || r.TargetCanvasID != nil {
+			return ErrInvalidRun
+		}
+	} else if r.TargetKind == TargetCanvas {
+		if r.TargetCanvasID == nil || strings.TrimSpace(*r.TargetCanvasID) == "" || r.TargetNodeID != nil {
 			return ErrInvalidRun
 		}
 	} else {

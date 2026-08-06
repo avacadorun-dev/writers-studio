@@ -53,6 +53,25 @@ describe("JSON Canvas codec", () => {
           file: "image",
           "x-writers-studio": { resource: { kind: "media", id: "media" } },
         },
+        {
+          id: "external",
+          type: "file",
+          x: 560,
+          y: 0,
+          width: 200,
+          height: 120,
+          file: "research/map.pdf",
+        },
+        {
+          id: "pdf",
+          type: "file",
+          x: 780,
+          y: 0,
+          width: 200,
+          height: 260,
+          file: "pdf",
+          "x-writers-studio": { resource: { kind: "media", id: "pdf" } },
+        },
       ],
       edges: [
         {
@@ -88,18 +107,30 @@ describe("JSON Canvas codec", () => {
       contentUrl: "/image",
       createdAt: "now",
     };
-    const flow = canvasToFlow(source, [document], [media]);
+    const pdf = {
+      ...media,
+      id: "pdf",
+      mediaType: "application/pdf" as const,
+      originalName: "rules.pdf",
+      width: null,
+      height: null,
+    };
+    const flow = canvasToFlow(source, [document], [media, pdf]);
     expect(flow.nodes.map((item) => item.type)).toEqual([
       "canvas-text",
       "canvas-group",
       "canvas-document",
       "canvas-image",
+      "canvas-external-file",
+      "canvas-pdf",
     ]);
     expect(flow.nodes.map((item) => item.ariaLabel)).toEqual([
       "Пустая заметка",
       "Группа без названия",
       "Документ Chapter",
       "Изображение map.png",
+      "Файл research/map.pdf",
+      "PDF rules.pdf",
     ]);
     expect(flow.edges[0]).toMatchObject({
       markerStart: { type: MarkerType.ArrowClosed },
@@ -115,6 +146,11 @@ describe("JSON Canvas codec", () => {
       kind: "document",
       id: "doc",
     });
+    expect(
+      canvasFileResource(
+        source.nodes[4] as Extract<(typeof source.nodes)[number], { type: "file" }>,
+      ),
+    ).toBeUndefined();
     expect(
       ["top", "right", "bottom", "left"].map((side) =>
         sideToPosition(side as "top" | "right" | "bottom" | "left"),

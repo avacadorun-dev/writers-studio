@@ -3,6 +3,8 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -16,6 +18,73 @@ import (
 
 type createCanvasRequest struct {
 	Title string `json:"title"`
+}
+
+func (s *Server) handleImportCanvas(response http.ResponseWriter, request *http.Request) {
+	request.Body = http.MaxBytesReader(response, request.Body, canvasdocument.MaxSnapshotBytes)
+	content, err := io.ReadAll(request.Body)
+	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			writeError(response, http.StatusRequestEntityTooLarge, "canvas_file_too_large", "Файл доски больше 12 МБ")
+			return
+		}
+		writeError(response, http.StatusBadRequest, "canvas_file_unreadable", "Не удалось прочитать файл доски")
+		return
+	}
+	references, err := canvasdocument.Validate(content)
+	if err != nil {
+		writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_file", err.Error())
+		return
+	}
+	title := strings.TrimSpace(request.URL.Query().Get("title"))
+	if title == "" {
+		title = strings.TrimSpace(request.Header.Get("X-Canvas-Title"))
+	}
+	if title == "" {
+		title = "Импортированная доска"
+	}
+	if len([]rune(title)) > 160 {
+		writeError(response, http.StatusUnprocessableEntity, "invalid_canvas", "Проверьте название доски")
+		return
+	}
+	canvas, err := s.store.ImportCanvas(
+		request.Context(), currentUser(request.Context()).ID, chi.URLParam(request, "projectID"),
+		store.ImportCanvasInput{
+			Title: title, SchemaVersion: references.SchemaVersion,
+			Content: content, References: references,
+		},
+	)
+	if errors.Is(err, canvasdocument.ErrInvalidDocument) {
+		writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_file", err.Error())
+		return
+	}
+	if err != nil {
+		handleStoreError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusCreated, map[string]any{"canvas": canvas})
+}
+
+func (s *Server) handleExportCanvas(response http.ResponseWriter, request *http.Request) {
+	format := request.URL.Query().Get("format")
+	if format != "" && format != "canvas" {
+		writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_export", "Поддерживается только формат canvas")
+		return
+	}
+	workspace, err := s.store.GetCanvasWorkspace(
+		request.Context(), currentUser(request.Context()).ID, chi.URLParam(request, "canvasID"),
+	)
+	if err != nil {
+		handleStoreError(response, err)
+		return
+	}
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.Header().Set(
+		"Content-Disposition", fmt.Sprintf(`attachment; filename="canvas-%s.canvas"`, workspace.Canvas.ID),
+	)
+	response.WriteHeader(http.StatusOK)
+	_, _ = response.Write(workspace.Revision.Content)
 }
 
 func (s *Server) handleListCanvases(response http.ResponseWriter, request *http.Request) {
@@ -169,7 +238,7 @@ func (s *Server) handleSaveCanvasRevision(response http.ResponseWriter, request 
 	revision, err := s.store.SaveCanvasRevision(
 		request.Context(), currentUser(request.Context()).ID, chi.URLParam(request, "canvasID"),
 		store.SaveCanvasRevisionInput{
-			BaseRevision: input.BaseRevision, SchemaVersion: canvasdocument.SchemaVersion,
+			BaseRevision: input.BaseRevision, SchemaVersion: references.SchemaVersion,
 			Content: input.Content, Source: input.Source, References: references,
 		},
 	)

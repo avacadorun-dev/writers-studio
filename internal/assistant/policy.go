@@ -83,6 +83,7 @@ func isReadTool(name string) bool {
 		"project.get_overview", "project.get_structure",
 		"project.list_recent", "project.search",
 		"project.get_activity", "tree.list", "tree.get_node", "document.get",
+		"canvas.list", "canvas.get", "canvas.search", "canvas.analyze_graph",
 		"document.find_exact", "document.find_exact_batch", "document.get_range",
 		"document.list_references", "dictionary.list",
 		"dictionary.find", "mentions.find", "annotation.list", "annotation.get", "assistant_guide.get",
@@ -100,6 +101,7 @@ func isReadTool(name string) bool {
 func isStagedMutation(name string) bool {
 	switch name {
 	case "tree.create_node", "tree.create_nodes_batch", "tree.rename_node", "tree.move_node", "tree.set_status",
+		"canvas.propose_patch", "canvas.promote_cards",
 		"tree.duplicate_node", "document.insert", "document.replace_range",
 		"document.append", "document.append_chunk", "document.set_title", "document.apply_marks",
 		"document.create_draft", "note.create", "note.update", "dictionary.add",
@@ -121,6 +123,8 @@ func AllowedToolNames() []string {
 		"assistant.begin_turn", "assistant.get_recent_change_set",
 		"project.get_overview", "project.get_structure", "project.list_recent",
 		"project.search", "project.get_activity",
+		"canvas.list", "canvas.get", "canvas.search", "canvas.analyze_graph",
+		"canvas.propose_patch", "canvas.promote_cards",
 		"tree.list", "tree.get_node", "tree.create_node", "tree.create_nodes_batch",
 		"tree.rename_node", "tree.move_node",
 		"tree.set_status", "tree.duplicate_node", "tree.prepare_archive",

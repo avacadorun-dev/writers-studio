@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Copy, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Bot, Copy, Pencil, Tags, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type CanvasDocument,
@@ -9,19 +9,33 @@ import {
   type CanvasWorkspace,
   duplicateCanvas,
   getCanvas,
+  getCanvasTypeSchema,
+  promoteCanvasNode,
+  resolveCanvasTypeSchema,
+  saveCanvasTypeSchema,
   trashCanvas,
   updateCanvas,
 } from "~entities/canvas";
 import { getProjectOutline } from "~entities/project";
 import { useCanvasAutosave } from "~features/canvas-autosave";
+import { CanvasSchemaEditor } from "~features/canvas-schema-editor";
 import { getCanvasSnapshot } from "~shared/lib";
 import { Banner, Button, Spinner, useActionDialog, useToast } from "~shared/ui";
+import { AssistantLauncher } from "~widgets/assistant-launcher";
 import { CanvasBoard } from "~widgets/canvas-board";
 import { ProjectTree } from "~widgets/project-tree";
 import { RequireSession } from "~widgets/require-session";
 import { StudioHeader } from "~widgets/studio-header";
 
-export function CanvasPage({ projectId, canvasId }: { projectId: string; canvasId: string }) {
+export function CanvasPage({
+  projectId,
+  canvasId,
+  focusNodeId,
+}: {
+  projectId: string;
+  canvasId: string;
+  focusNodeId?: string;
+}) {
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProjectOutline(projectId),
@@ -30,9 +44,21 @@ export function CanvasPage({ projectId, canvasId }: { projectId: string; canvasI
     queryKey: ["canvas", canvasId],
     queryFn: () => getCanvas(canvasId),
   });
+  const typeSchema = useQuery({
+    queryKey: ["canvas-schema", projectId],
+    queryFn: () => getCanvasTypeSchema(projectId),
+  });
 
-  if (project.isPending || canvas.isPending) return <Spinner label="Открываем доску…" />;
-  if (project.isError || canvas.isError || !project.data || !canvas.data) {
+  if (project.isPending || canvas.isPending || typeSchema.isPending)
+    return <Spinner label="Открываем доску…" />;
+  if (
+    project.isError ||
+    canvas.isError ||
+    typeSchema.isError ||
+    !project.data ||
+    !canvas.data ||
+    !typeSchema.data
+  ) {
     return (
       <main className="mx-auto max-w-xl p-6">
         <Banner
@@ -62,6 +88,8 @@ export function CanvasPage({ projectId, canvasId }: { projectId: string; canvasI
       canvasId={canvasId}
       workspace={canvas.data}
       project={project.data}
+      typeSchema={resolveCanvasTypeSchema(typeSchema.data.schema)}
+      focusNodeId={focusNodeId}
     />
   );
 }
@@ -71,25 +99,45 @@ function LoadedCanvasPage({
   canvasId,
   workspace,
   project,
+  typeSchema,
+  focusNodeId,
 }: {
   projectId: string;
   canvasId: string;
   workspace: CanvasWorkspace;
   project: Awaited<ReturnType<typeof getProjectOutline>>;
+  typeSchema: ReturnType<typeof resolveCanvasTypeSchema>;
+  focusNodeId?: string;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { requestConfirmation, requestInput } = useActionDialog();
+  const { requestConfirmation, requestInput, requestSelect } = useActionDialog();
   const { showToast } = useToast();
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     const saved = localStorage.getItem("writers-studio-tree-collapsed");
     return saved === null ? window.innerWidth < 1280 : saved === "true";
   });
   const [revision, setRevision] = useState(workspace.revision.revision);
+  const revisionRef = useRef(workspace.revision.revision);
   const [title, setTitle] = useState(workspace.canvas.title);
   const [recoveryReady, setRecoveryReady] = useState(false);
   const [initialContent, setInitialContent] = useState<CanvasDocument>(workspace.revision.content);
-  const autosave = useCanvasAutosave({ canvasId, projectId, revision, onRevision: setRevision });
+  const restoredSnapshotKey = useRef<string | undefined>(undefined);
+  const [schemaEditorOpen, setSchemaEditorOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantContext, setAssistantContext] = useState({
+    selectionIds: [] as string[],
+    viewport: { x: 0, y: 0, zoom: 1 },
+  });
+  const autosave = useCanvasAutosave({
+    canvasId,
+    projectId,
+    revision,
+    onRevision: (nextRevision) => {
+      revisionRef.current = nextRevision;
+      setRevision(nextRevision);
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +146,9 @@ function LoadedCanvasPage({
         if (cancelled || !snapshot || snapshot.synced || snapshot.projectId !== projectId) return;
         const content = snapshot.content as unknown as CanvasDocument;
         if (!Array.isArray(content.nodes) || !Array.isArray(content.edges)) return;
+        const snapshotKey = `${canvasId}:${snapshot.baseRevision}:${snapshot.savedAt}`;
+        if (restoredSnapshotKey.current === snapshotKey) return;
+        restoredSnapshotKey.current = snapshotKey;
         setInitialContent(content);
         autosave.queue(content);
         showToast({
@@ -160,6 +211,17 @@ function LoadedCanvasPage({
     onError: (error) =>
       showToast({ title: "Не удалось удалить доску", description: error.message }),
   });
+  const saveTypeSchema = useMutation({
+    mutationFn: (schema: ReturnType<typeof resolveCanvasTypeSchema>) =>
+      saveCanvasTypeSchema(projectId, schema),
+    onSuccess: ({ schema }) => {
+      queryClient.setQueryData(["canvas-schema", projectId], { schema });
+      setSchemaEditorOpen(false);
+      showToast({ title: "Каталог Canvas сохранён" });
+    },
+    onError: (error) =>
+      showToast({ title: "Не удалось сохранить каталог", description: error.message }),
+  });
 
   const documentTypeKeys = useMemo(
     () =>
@@ -191,10 +253,85 @@ function LoadedCanvasPage({
   }, [projectDocuments, workspace.documents]);
   const firstNode = project.nodes.find((node) => !node.trashedAt);
 
+  const promoteNode = async (nodeId: string, suggestedTitle: string) => {
+    const titleValue = await requestInput({
+      title: "Превратить идею в документ",
+      label: "Название документа",
+      defaultValue: suggestedTitle,
+      confirmLabel: "Дальше",
+    });
+    const nextTitle = titleValue?.trim();
+    if (!nextTitle) return undefined;
+    const contentTypes = project.project.structure.nodeTypes.filter((item) => item.contentBearing);
+    const kind = await requestSelect({
+      title: "Тип документа",
+      label: "Куда превратить карточку",
+      options: contentTypes.map((item) => ({ value: item.key, label: item.label })),
+      confirmLabel: "Дальше",
+    });
+    if (!kind) return undefined;
+    const selectedType = contentTypes.find((item) => item.key === kind);
+    const parentOptions = project.nodes
+      .filter((node) => {
+        if (node.trashedAt) return false;
+        const parentType = project.project.structure.nodeTypes.find(
+          (item) => item.key === node.kind,
+        );
+        return parentType?.allowedChildren.includes(kind);
+      })
+      .map((node) => ({ value: node.id, label: node.title }));
+    if (selectedType?.canBeRoot) parentOptions.unshift({ value: "root", label: "В корне проекта" });
+    if (parentOptions.length === 0) {
+      showToast({
+        title: "Некуда поместить документ",
+        description: "Добавьте подходящий раздел в структуру проекта.",
+      });
+      return undefined;
+    }
+    const parent =
+      parentOptions.length === 1
+        ? parentOptions[0]?.value
+        : await requestSelect({
+            title: "Расположение документа",
+            label: "Раздел проекта",
+            options: parentOptions,
+            confirmLabel: "Создать документ",
+          });
+    if (!parent) return undefined;
+    try {
+      const result = await promoteCanvasNode(canvasId, {
+        baseRevision: revisionRef.current,
+        nodeId,
+        title: nextTitle,
+        kind,
+        parentId: parent === "root" ? undefined : parent,
+      });
+      revisionRef.current = result.revision.revision;
+      setRevision(result.revision.revision);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["canvas", canvasId] }),
+      ]);
+      showToast({ title: "Идея стала документом", description: `Создан «${nextTitle}»` });
+      return result;
+    } catch (error) {
+      showToast({
+        title: "Не удалось создать документ",
+        description: error instanceof Error ? error.message : undefined,
+      });
+      return undefined;
+    }
+  };
+
   return (
     <RequireSession>
       <div className="flex h-full min-h-0 flex-col bg-[var(--surface-app)]">
-        <StudioHeader project={project.project} nodeTitle={title} saveState={autosave.saveState} />
+        <StudioHeader
+          project={project.project}
+          nodeTitle={title}
+          saveState={autosave.saveState}
+          onAssistant={() => setAssistantOpen(true)}
+        />
         {autosave.conflictCanvasId ? (
           <Banner
             className="m-3 mb-0 shrink-0"
@@ -231,6 +368,28 @@ function LoadedCanvasPage({
           <main className="relative min-h-0 min-w-0 flex-1">
             <fieldset className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg lg:top-3">
               <legend className="sr-only">Действия с доской</legend>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="Открыть Ассистента для этой доски"
+                title="Ассистент Canvas"
+                onClick={() => setAssistantOpen(true)}
+              >
+                <Bot className="size-3.5" aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="Настроить типы карточек и связей"
+                title="Каталог Canvas"
+                onClick={() => setSchemaEditorOpen(true)}
+              >
+                <Tags className="size-3.5" aria-hidden="true" />
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -286,21 +445,47 @@ function LoadedCanvasPage({
             {recoveryReady ? (
               <CanvasBoard
                 projectId={projectId}
+                title={title}
                 content={initialContent}
                 documents={previews}
                 media={workspace.media}
                 projectDocuments={projectDocuments}
+                typeSchema={typeSchema}
+                promotionEnabled={autosave.saveState === "saved"}
+                onPromoteNode={promoteNode}
+                initialFocusNodeId={focusNodeId}
                 onChange={(content) => autosave.queue(content)}
+                onAssistantContextChange={setAssistantContext}
                 onOpenDocument={(nodeId) => {
                   void navigate({
                     to: "/projects/$projectId/studio/$nodeId",
                     params: { projectId, nodeId },
                   });
                 }}
+                onOpenCanvas={(nextCanvasId) => {
+                  void navigate({
+                    to: "/projects/$projectId/canvases/$canvasId",
+                    params: { projectId, canvasId: nextCanvasId },
+                  });
+                }}
               />
             ) : (
               <Spinner label="Проверяем локальные изменения…" />
             )}
+            <CanvasSchemaEditor
+              open={schemaEditorOpen}
+              schema={typeSchema}
+              pending={saveTypeSchema.isPending}
+              onOpenChange={setSchemaEditorOpen}
+              onSave={(schema) => saveTypeSchema.mutate(schema)}
+            />
+            <AssistantLauncher
+              open={assistantOpen}
+              onOpenChange={setAssistantOpen}
+              project={project.project}
+              canvas={{ id: canvasId, title }}
+              canvasContext={assistantContext}
+            />
           </main>
         </div>
       </div>

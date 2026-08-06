@@ -7,7 +7,9 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const suffix = `canvas-${testInfo.project.name}-${Date.now()}`;
   const { projectId, nodeId } = await registerAndCreateProject(page, suffix);
-  const desktop = (page.viewportSize()?.width ?? 0) >= 1024;
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+  const desktop = viewportWidth >= 1024;
+  const editable = viewportWidth >= 768;
   const canvasId = desktop
     ? await createCanvasFromProjectTree(page)
     : await createCanvasThroughAPI(page, projectId);
@@ -74,9 +76,9 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   await expect(page.getByTestId("canvas-group-group-story")).toContainText("Сюжет");
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 
-  if (!desktop) {
-    await expect(page.getByText("На мобильном доступен просмотр доски")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Заметка" })).toHaveCount(0);
+  if (!editable) {
+    await expect(page.getByText("На телефоне доступен просмотр доски")).toBeAttached();
+    await expect(page.getByRole("button", { name: "Добавить" })).toHaveCount(0);
     await page.getByTestId("canvas-document-document-opening").click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/studio/${nodeId}$`));
     expect(pageErrors).toEqual([]);
@@ -84,6 +86,20 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   }
 
   await expect(page.getByRole("group", { name: "Действия с доской" })).toBeVisible();
+  const toolRail = page.getByRole("toolbar", { name: "Инструменты Canvas" });
+  const selectTool = toolRail.getByRole("button", { name: "Выбор (V)" });
+  await expect(selectTool).toHaveAttribute("data-ui-tooltip", "Выбор (V)");
+  await selectTool.hover();
+  await expect
+    .poll(() => selectTool.evaluate((element) => getComputedStyle(element, "::after").content))
+    .toContain("Выбор (V)");
+  if (!desktop) {
+    await createNoteFromToolRail(page, toolRail);
+    await expect(page.locator('[data-testid^="canvas-text-"]')).toHaveCount(2);
+    expect(pageErrors).toEqual([]);
+    return;
+  }
+
   const legacyNote = page.getByTestId("canvas-text-note-premise");
   const canvasDocument = page.getByTestId("canvas-document-document-opening");
   const legacyNoteBox = await legacyNote.boundingBox();
@@ -143,13 +159,15 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   );
 
   const toastViewportBox = await page.getByTestId("toast-viewport").boundingBox();
-  const viewportWidth = page.viewportSize()?.width;
-  if (!toastViewportBox || !viewportWidth) throw new Error("Toast viewport is not measurable");
+  const toastViewportWidth = page.viewportSize()?.width;
+  if (!toastViewportBox || !toastViewportWidth) {
+    throw new Error("Toast viewport is not measurable");
+  }
   expect(
-    Math.abs(toastViewportBox.x + toastViewportBox.width / 2 - viewportWidth / 2),
+    Math.abs(toastViewportBox.x + toastViewportBox.width / 2 - toastViewportWidth / 2),
   ).toBeLessThan(1);
 
-  await page.getByRole("button", { name: "Заметка" }).click();
+  await createNoteFromToolRail(page, toolRail);
   const notes = page.locator('[data-testid^="canvas-text-"]');
   await expect(notes).toHaveCount(2);
   const newNote = notes.filter({ hasText: "Новая заметка" });
@@ -195,6 +213,28 @@ test("Canvas board creates, renders, autosaves, and stays read-only on mobile", 
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/studio/${nodeId}$`));
   expect(pageErrors).toEqual([]);
 });
+
+async function createNoteFromToolRail(page: Page, toolRail: Locator) {
+  await toolRail.getByRole("button", { name: "Добавить" }).click();
+  const createFlyout = page.getByRole("group", { name: "Добавить на доску" });
+  await expect(createFlyout).toBeVisible();
+  const noteTool = createFlyout.getByRole("button", { name: "Заметка (N)" });
+  await expect(noteTool).toHaveAttribute("data-ui-tooltip", "Заметка (N)");
+  await noteTool.click();
+  const pane = page.locator(".react-flow__pane");
+  const box = await pane.boundingBox();
+  if (!box) throw new Error("Canvas pane is not measurable");
+  await pane.dispatchEvent("pointerdown", {
+    bubbles: true,
+    button: 0,
+    buttons: 1,
+    clientX: box.x + box.width * 0.72,
+    clientY: box.y + box.height * 0.75,
+    isPrimary: true,
+    pointerId: 1,
+    pointerType: "mouse",
+  });
+}
 
 async function registerAndCreateProject(
   page: Page,

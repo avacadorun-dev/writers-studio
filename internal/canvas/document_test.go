@@ -1,8 +1,10 @@
 package canvas
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -48,6 +50,101 @@ func TestEmptyDocumentIsValid(t *testing.T) {
 	}
 }
 
+func TestValidateStandardJSONCanvasFileNodeWithoutProjectResource(t *testing.T) {
+	references, err := Validate(json.RawMessage(`{
+		"nodes":[{"id":"file","type":"file","x":0,"y":0,"width":240,"height":120,"file":"research/map.pdf","custom":{"preserved":true}}],
+		"edges":[]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(references.DocumentIDs)+len(references.MediaIDs)+len(references.CanvasIDs) != 0 {
+		t.Fatalf("unexpected external file references: %#v", references)
+	}
+}
+
+func TestValidateCanvasDocumentV2ElementsLinksAndNestedCanvas(t *testing.T) {
+	raw := json.RawMessage(`{
+		"nodes":[
+			{"id":"stroke","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[5,5,0.2],[50,50,0.8]],"brush":"pen","color":"#112233","size":4,"opacity":1}}},
+			{"id":"shape","type":"group","x":120,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"shape","shape":"diamond","color":"5","fill":"transparent","size":3,"opacity":0.8,"rotation":45,"dash":"dashed","label":"Choice"}}},
+			{"id":"frame","type":"group","x":-20,"y":-40,"width":400,"height":240,"x-writers-studio":{"element":{"kind":"frame","order":1,"label":"Act I"}}},
+			{"id":"link","type":"link","x":240,"y":0,"width":200,"height":120,"url":"https://example.com/research"},
+			{"id":"nested","type":"file","x":460,"y":0,"width":200,"height":120,"file":"writers-studio://canvases/other","x-writers-studio":{"resource":{"kind":"canvas","id":"other"}}}
+		],
+		"edges":[{"id":"shape-link","fromNode":"shape","toNode":"link","toEnd":"arrow"}],
+		"x-writers-studio":{"schemaVersion":2}
+	}`)
+	references, err := Validate(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if references.SchemaVersion != 2 || strings.Join(references.CanvasIDs, ",") != "other" {
+		t.Fatalf("unexpected v2 references: %#v", references)
+	}
+}
+
+func TestValidateRejectsInvalidV2ElementsAndLinks(t *testing.T) {
+	validText := `{"id":"card","type":"text","x":0,"y":0,"width":100,"height":100,"text":"ok"}`
+	validStroke := `{"id":"stroke","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[1,1],[2,2]],"brush":"pen","color":"1","size":2,"opacity":1}}}`
+	tests := map[string]string{
+		"invalid document extension": `{"nodes":[],"edges":[],"x-writers-studio":"bad"}`,
+		"unsupported schema":         `{"nodes":[],"edges":[],"x-writers-studio":{"schemaVersion":3}}`,
+		"missing link url":           `{"nodes":[{"id":"link","type":"link","x":0,"y":0,"width":100,"height":100}],"edges":[]}`,
+		"unsafe link protocol":       `{"nodes":[{"id":"link","type":"link","x":0,"y":0,"width":100,"height":100,"url":"file:///secret"}],"edges":[]}`,
+		"invalid group extension":    `{"nodes":[{"id":"group","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":"bad"}],"edges":[]}`,
+		"unknown element":            `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"widget"}}}],"edges":[]}`,
+		"short stroke":               `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[1,1]],"brush":"pen","color":"1","size":2,"opacity":1}}}],"edges":[]}`,
+		"bad stroke brush":           `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[1,1],[2,2]],"brush":"airbrush","color":"1","size":2,"opacity":1}}}],"edges":[]}`,
+		"bad stroke point":           `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[1],[2,2]],"brush":"pen","color":"1","size":2,"opacity":1}}}],"edges":[]}`,
+		"bad stroke pressure":        `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"stroke","points":[[1,1,-1],[2,2]],"brush":"pen","color":"1","size":2,"opacity":1}}}],"edges":[]}`,
+		"bad shape":                  `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"shape","shape":"star","color":"1","fill":"transparent","size":2,"opacity":1,"dash":"solid"}}}],"edges":[]}`,
+		"bad shape style":            `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"shape","shape":"ellipse","color":"bad","fill":"bad","size":0,"opacity":0,"rotation":999,"dash":"waves"}}}],"edges":[]}`,
+		"bad frame order":            `{"nodes":[{"id":"x","type":"group","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"element":{"kind":"frame","order":-1}}}],"edges":[]}`,
+		"edge attached to stroke":    `{"nodes":[` + validStroke + `,` + validText + `],"edges":[{"id":"e","fromNode":"stroke","toNode":"card"}]}`,
+	}
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Validate(json.RawMessage(raw)); !errors.Is(err, ErrInvalidDocument) {
+				t.Fatalf("Validate() error = %v", err)
+			}
+		})
+	}
+
+	oversized := append([]byte(`{"padding":"`), bytes.Repeat([]byte("x"), MaxSnapshotBytes)...)
+	oversized = append(oversized, []byte(`"}`)...)
+	if _, err := Validate(oversized); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("oversized snapshot error = %v", err)
+	}
+}
+
+func TestValidateRejectsTotalStrokePointLimit(t *testing.T) {
+	points := make([][]float64, MaxStrokePoints)
+	for index := range points {
+		points[index] = []float64{float64(index % 100), float64(index % 100)}
+	}
+	nodes := make([]node, MaxTotalStrokePoints/MaxStrokePoints+1)
+	for index := range nodes {
+		extension, err := json.Marshal(resourceExtension{Element: &canvasElement{
+			Kind: "stroke", Points: points, Brush: "pen", Color: "1", Size: 2, Opacity: 1,
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodes[index] = node{
+			ID: fmt.Sprintf("stroke-%d", index), Type: "group", Width: 100, Height: 100,
+			Extension: extension,
+		}
+	}
+	raw, err := json.Marshal(document{Nodes: nodes, Edges: []edge{}, Extension: json.RawMessage(`{"schemaVersion":2}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Validate(raw); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("total stroke point limit error = %v", err)
+	}
+}
+
 func TestValidateCollectsSortedUniqueResourcesAndAllEdgeOptions(t *testing.T) {
 	raw := json.RawMessage(`{
 		"nodes":[
@@ -87,7 +184,6 @@ func TestValidateRejectsEveryInvalidShape(t *testing.T) {
 		"missing text":        `{"nodes":[{"id":"a","type":"text","x":0,"y":0,"width":100,"height":100}],"edges":[]}`,
 		"long text":           `{"nodes":[{"id":"a","type":"text","x":0,"y":0,"width":100,"height":100,"text":` + quoted(longText) + `}],"edges":[]}`,
 		"missing file":        `{"nodes":[{"id":"a","type":"file","x":0,"y":0,"width":100,"height":100,"x-writers-studio":{"resource":{"kind":"document","id":"doc"}}}],"edges":[]}`,
-		"missing extension":   `{"nodes":[{"id":"a","type":"file","x":0,"y":0,"width":100,"height":100,"file":"a"}],"edges":[]}`,
 		"empty resource id":   `{"nodes":[{"id":"a","type":"file","x":0,"y":0,"width":100,"height":100,"file":"a","x-writers-studio":{"resource":{"kind":"document","id":""}}}],"edges":[]}`,
 		"unknown resource":    `{"nodes":[{"id":"a","type":"file","x":0,"y":0,"width":100,"height":100,"file":"a","x-writers-studio":{"resource":{"kind":"web","id":"web"}}}],"edges":[]}`,
 		"long group label":    `{"nodes":[{"id":"a","type":"group","x":0,"y":0,"width":100,"height":100,"label":` + quoted(longLabel) + `}],"edges":[]}`,

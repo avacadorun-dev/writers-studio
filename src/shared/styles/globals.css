@@ -396,7 +396,7 @@
   --surface-overlay: #15171459;
   --ink-primary: #292b27;
   --ink-secondary: #60655c;
-  --ink-tertiary: #686d64;
+  --ink-tertiary: #63685f;
   --ink-disabled: #a4a79f;
   --ink-on-inverse: #fcfaf4;
   --ink-on-inverse-muted: #d2cfc4;
@@ -1682,6 +1682,101 @@
 }
 
 @layer components {
+  .ui-tooltip {
+    position: relative;
+  }
+
+  .ui-tooltip::before,
+  .ui-tooltip::after {
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    transition:
+      opacity 120ms ease 280ms,
+      visibility 0s linear 400ms;
+  }
+
+  .ui-tooltip::before {
+    width: 8px;
+    height: 8px;
+    content: "";
+    background: var(--surface-inverse);
+    transform: rotate(45deg);
+  }
+
+  .ui-tooltip::after {
+    width: max-content;
+    max-width: min(260px, calc(100vw - 24px));
+    padding: 6px 9px;
+    border: 1px solid color-mix(in srgb, var(--ink-on-inverse) 12%, transparent);
+    border-radius: 7px;
+    content: attr(data-ui-tooltip);
+    color: var(--ink-on-inverse);
+    background: var(--surface-inverse);
+    box-shadow: 0 6px 20px var(--shadow-color);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .ui-tooltip:is(:hover, :focus-visible)::before,
+  .ui-tooltip:is(:hover, :focus-visible)::after {
+    visibility: visible;
+    opacity: 1;
+    transition:
+      opacity 120ms ease 280ms,
+      visibility 0s linear 280ms;
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="bottom"]::before {
+    top: calc(100% + 4px);
+    left: calc(50% - 4px);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="bottom"]::after {
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="top"]::before {
+    bottom: calc(100% + 4px);
+    left: calc(50% - 4px);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="top"]::after {
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="right"]::before {
+    top: calc(50% - 4px);
+    left: calc(100% + 4px);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="right"]::after {
+    top: 50%;
+    left: calc(100% + 8px);
+    transform: translateY(-50%);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="left"]::before {
+    top: calc(50% - 4px);
+    right: calc(100% + 4px);
+  }
+
+  .ui-tooltip[data-ui-tooltip-side="left"]::after {
+    top: 50%;
+    right: calc(100% + 8px);
+    transform: translateY(-50%);
+  }
+
   .auth-screen {
     color-scheme: light;
     --surface-app: #f5f3ee;

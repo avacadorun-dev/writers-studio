@@ -20,6 +20,7 @@ func validProvider() ProviderRef {
 func TestRunValidation(t *testing.T) {
 	t.Parallel()
 	nodeID := "node"
+	canvasID := "canvas"
 	tests := []struct {
 		name string
 		run  Run
@@ -40,6 +41,21 @@ func TestRunValidation(t *testing.T) {
 				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
 			},
 			ok: true,
+		},
+		{
+			name: "canvas chat run",
+			run: Run{
+				ProjectID: "project", TargetKind: TargetCanvas, TargetCanvasID: &canvasID,
+				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
+			},
+			ok: true,
+		},
+		{
+			name: "canvas target missing",
+			run: Run{
+				ProjectID: "project", TargetKind: TargetCanvas,
+				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
+			},
 		},
 		{
 			name: "node target missing",

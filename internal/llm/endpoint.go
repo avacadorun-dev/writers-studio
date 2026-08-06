@@ -19,6 +19,7 @@ type Resolver interface {
 
 type EndpointPolicy struct {
 	AllowPrivate bool
+	AllowHTTP    bool
 	Resolver     Resolver
 }
 
@@ -27,7 +28,7 @@ func (p EndpointPolicy) Validate(ctx context.Context, rawURL string) (*url.URL, 
 	if err != nil || parsed.Hostname() == "" {
 		return nil, fmt.Errorf("%w: invalid URL", ErrUnsafeEndpoint)
 	}
-	if parsed.Scheme != "https" && !(p.AllowPrivate && parsed.Scheme == "http") {
+	if parsed.Scheme != "https" && !((p.AllowPrivate || p.AllowHTTP) && parsed.Scheme == "http") {
 		return nil, fmt.Errorf("%w: HTTPS is required", ErrUnsafeEndpoint)
 	}
 	if parsed.User != nil || parsed.Fragment != "" {

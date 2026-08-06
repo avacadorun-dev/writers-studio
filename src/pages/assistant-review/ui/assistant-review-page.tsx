@@ -6,6 +6,7 @@ import {
   FileText,
   Link2,
   MessageCircle,
+  Network,
   RotateCcw,
   ShieldCheck,
   X,
@@ -28,6 +29,7 @@ import { RequireSession } from "~widgets/require-session";
 
 import {
   annotationFixes,
+  canvasGhostPreview,
   changeGroupLabel,
   exactTextEdits,
   operationLabel,
@@ -767,6 +769,7 @@ function OperationCard({
   const after = snapshotText(operation.proposedSnapshot);
   const edits = exactTextEdits(operation);
   const noteFixes = annotationFixes(operation);
+  const canvasPreview = canvasGhostPreview(operation.beforeSnapshot, operation.proposedSnapshot);
   const targetTitle = operation.beforeSnapshot?.title;
   return (
     <article
@@ -776,7 +779,11 @@ function OperationCard({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="grid size-9 place-items-center rounded bg-[var(--accent-soft)] text-[var(--accent)]">
-          <FileText className="size-4" aria-hidden="true" />
+          {canvasPreview ? (
+            <Network className="size-4" aria-hidden="true" />
+          ) : (
+            <FileText className="size-4" aria-hidden="true" />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold">{changeGroupLabel([operation], operation.groupKey)}</h3>
@@ -817,6 +824,7 @@ function OperationCard({
           ) : null}
         </div>
       ) : null}
+      {canvasPreview ? <CanvasGhostOverlay preview={canvasPreview} /> : null}
       {noteFixes.length > 0 ? (
         <div className="mt-4 space-y-2">
           {noteFixes.map((fix) => (
@@ -901,5 +909,63 @@ function OperationCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function CanvasGhostOverlay({
+  preview,
+}: {
+  preview: NonNullable<ReturnType<typeof canvasGhostPreview>>;
+}) {
+  const changed = preview.nodes.filter((node) => node.state !== "unchanged");
+  const visible = changed.length > 0 ? changed : preview.nodes.slice(0, 40);
+  const minX = Math.min(...visible.map((node) => node.x), 0);
+  const minY = Math.min(...visible.map((node) => node.y), 0);
+  const maxX = Math.max(...visible.map((node) => node.x + node.width), 320);
+  const maxY = Math.max(...visible.map((node) => node.y + node.height), 180);
+  const width = Math.max(maxX - minX, 1);
+  const height = Math.max(maxY - minY, 1);
+  const scale = Math.min(720 / width, 260 / height, 1);
+  return (
+    <div className="mt-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-app)]">
+      <div className="flex flex-wrap gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-[10px] text-[var(--ink-secondary)]">
+        <strong className="text-[var(--ink-primary)]">Ghost preview</strong>
+        <span>{preview.changedNodes} карточек изменится</span>
+        <span>+{preview.addedEdges} связей</span>
+        <span>−{preview.deletedEdges} связей</span>
+      </div>
+      <div className="relative h-[280px] overflow-hidden">
+        {visible.map((node) => {
+          const colors = {
+            unchanged: "var(--border-strong)",
+            added: "var(--success)",
+            moved: "var(--info)",
+            updated: "var(--warning)",
+            deleted: "var(--danger)",
+          };
+          return (
+            <div
+              key={`${node.state}:${node.id}`}
+              className="absolute overflow-hidden rounded border-2 bg-[var(--surface-raised)] px-2 py-1 text-[9px] shadow-sm"
+              style={{
+                left: 12 + (node.x - minX) * scale,
+                top: 12 + (node.y - minY) * scale,
+                width: Math.max(44, node.width * scale),
+                height: Math.max(28, node.height * scale),
+                borderColor: colors[node.state],
+                opacity: node.state === "deleted" ? 0.5 : 1,
+                borderStyle: node.state === "deleted" ? "dashed" : "solid",
+              }}
+              title={`${node.state}: ${node.label}`}
+            >
+              <span className="font-semibold uppercase" style={{ color: colors[node.state] }}>
+                {node.state}
+              </span>
+              <span className="mt-1 block truncate">{node.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

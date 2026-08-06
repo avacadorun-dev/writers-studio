@@ -151,7 +151,8 @@ func TestProjectTransferV5CarriesProfileAndRemapsProjectImages(t *testing.T) {
 	transfer.Media = []ProjectTransferMedia{{
 		ID: assetID, Path: "media/45b17482-b4a0-4624-a68c-d2f218eb4e20.png",
 		SHA256:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png", Width: 640, Height: 480,
+		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png",
+		Width: transferIntPointer(640), Height: transferIntPointer(480),
 	}}
 	transfer.Project.ExportProfile.Metadata.CoverAssetID = &assetID
 	if err := ValidateProjectTransfer(transfer); err != nil {
@@ -193,7 +194,8 @@ func TestProjectTransferV5CarriesMarkdownSourceMetadataAndRemapsInternalLinks(t 
 	transfer.Media = []ProjectTransferMedia{{
 		ID: "asset-1", Path: "media/asset-1.png", SourcePath: &sourcePath,
 		SHA256:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png", Width: 1, Height: 1,
+		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png",
+		Width: transferIntPointer(1), Height: transferIntPointer(1),
 	}}
 	if err := ValidateProjectTransfer(transfer); err != nil {
 		t.Fatalf("valid v5 source metadata rejected: %v", err)
@@ -225,7 +227,8 @@ func TestProjectTransferV6CarriesCanvasesAndRemapsResources(t *testing.T) {
 	transfer.Media = []ProjectTransferMedia{{
 		ID: "asset-1", Path: "media/asset-1.png",
 		SHA256:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png", Width: 640, Height: 480,
+		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png",
+		Width: transferIntPointer(640), Height: transferIntPointer(480),
 	}}
 	transfer.Canvases = []ProjectTransferCanvas{{
 		ID: "canvas-1", Title: "Сюжет", Position: 1000, CurrentRevision: 1,
@@ -233,7 +236,7 @@ func TestProjectTransferV6CarriesCanvasesAndRemapsResources(t *testing.T) {
 	}}
 	transfer.CanvasRevisions = []ProjectTransferCanvasRevision{{
 		ID: "canvas-revision-1", CanvasID: "canvas-1", Revision: 1, BaseRevision: 0,
-		SchemaVersion: canvasdocument.SchemaVersion, Source: "canvas_create",
+		SchemaVersion: canvasdocument.MinimumSchemaVersion, Source: "canvas_create",
 		CreatedAt: transfer.ExportedAt,
 		Content:   json.RawMessage(`{"nodes":[{"id":"document-card","type":"file","x":0,"y":0,"width":280,"height":180,"file":"writers-studio://documents/node-1","x-writers-studio":{"resource":{"kind":"document","id":"node-1"},"future":"keep"}},{"id":"image-card","type":"file","x":320,"y":0,"width":300,"height":200,"file":"writers-studio://media/asset-1","x-writers-studio":{"resource":{"kind":"media","id":"asset-1"}}}],"edges":[],"x-future":{"drawingLayer":true}}`),
 	}}
@@ -251,6 +254,8 @@ func TestProjectTransferV6CarriesCanvasesAndRemapsResources(t *testing.T) {
 		transfer.CanvasRevisions[0].Content,
 		map[string]string{"node-1": "new-node"},
 		map[string]string{"asset-1": "new-asset"},
+		map[string]string{},
+		map[string]map[string]string{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -264,6 +269,121 @@ func TestProjectTransferV6CarriesCanvasesAndRemapsResources(t *testing.T) {
 		if !strings.Contains(encoded, expected) {
 			t.Fatalf("remapped canvas does not contain %s: %s", expected, encoded)
 		}
+	}
+}
+
+func TestProjectTransferV7CarriesPDFAssets(t *testing.T) {
+	t.Parallel()
+	transfer := validProjectTransferFixture()
+	transfer.FormatVersion = 7
+	transfer.Media = []ProjectTransferMedia{{
+		ID: "pdf-1", Path: "media/pdf-1.pdf",
+		SHA256: strings.Repeat("a", 64), ByteSize: 1_024,
+		MediaType: "application/pdf", OriginalName: "research.pdf",
+		PageCount: transferIntPointer(12),
+	}}
+	if err := ValidateProjectTransfer(transfer); err != nil {
+		t.Fatalf("valid v7 PDF rejected: %v", err)
+	}
+	legacy := transfer
+	legacy.FormatVersion = 6
+	if err := ValidateProjectTransfer(legacy); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("PDF unexpectedly accepted in v6: %v", err)
+	}
+	tooLarge := transfer
+	tooLarge.Media = append([]ProjectTransferMedia(nil), transfer.Media...)
+	tooLarge.Media[0].ByteSize = (25 << 20) + 1
+	if err := ValidateProjectTransfer(tooLarge); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("oversized PDF unexpectedly accepted: %v", err)
+	}
+}
+
+func TestRemapCanvasResourcesCarriesTypedReferencesAndPromotion(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{
+		"nodes":[
+			{"id":"typed","type":"text","x":0,"y":0,"width":200,"height":120,"text":"Evidence","x-writers-studio":{"card":{"typeId":"evidence","promotedDocumentId":"doc-1","fields":{"document":"doc-1","media":"media-1","canvas":"canvas-1","note":"keep"}},"future":{"opaque":true}}},
+			{"id":"file","type":"file","x":240,"y":0,"width":200,"height":120,"file":"writers-studio://documents/doc-1","x-writers-studio":{"resource":{"kind":"document","id":"doc-1"}}}
+		],
+		"edges":[],
+		"x-writers-studio":{"schemaVersion":2}
+	}`)
+	remapped, err := remapCanvasResources(
+		raw,
+		map[string]string{"doc-1": "new-doc"},
+		map[string]string{"media-1": "new-media"},
+		map[string]string{"canvas-1": "new-canvas"},
+		map[string]map[string]string{"evidence": {
+			"document": "document", "media": "media", "canvas": "canvas",
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(remapped)
+	for _, expected := range []string{
+		`"promotedDocumentId":"new-doc"`, `"document":"new-doc"`,
+		`"media":"new-media"`, `"canvas":"new-canvas"`, `"note":"keep"`,
+		`writers-studio://documents/new-doc`, `"opaque":true`,
+	} {
+		if !strings.Contains(encoded, expected) {
+			t.Fatalf("remapped Canvas is missing %s: %s", expected, encoded)
+		}
+	}
+
+	_, err = remapCanvasResources(
+		raw, map[string]string{}, map[string]string{}, map[string]string{},
+		map[string]map[string]string{"evidence": {"document": "document"}},
+	)
+	if !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("missing typed reference error = %v", err)
+	}
+}
+
+func TestProjectTransferV8CarriesTimedMediaAndCanvasSchema(t *testing.T) {
+	t.Parallel()
+	transfer := validProjectTransferFixture()
+	duration := int64(42_000)
+	transfer.Media = []ProjectTransferMedia{{
+		ID: "audio-1", Path: "media/audio-1.mp3", SHA256: strings.Repeat("b", 64),
+		ByteSize: 4_096, MediaType: "audio/mpeg", OriginalName: "theme.mp3",
+		DurationMS: &duration,
+	}}
+	transfer.CanvasSchema = &ProjectTransferCanvasSchema{
+		CurrentRevision: 1,
+		Revisions: []ProjectTransferCanvasSchemaRevision{{
+			Revision: 1, BaseRevision: 0, Source: "manual", CreatedAt: transfer.ExportedAt,
+			Schema: canvasdocument.TypeSchema{
+				Revision: 1,
+				CardTypes: []canvasdocument.CardType{{
+					ID: "idea", Name: "Idea", Category: "general", Color: "1", Icon: "lightbulb",
+					Fields: []canvasdocument.FieldDefinition{},
+				}},
+				RelationTypes: []canvasdocument.RelationType{},
+			},
+		}},
+	}
+	if err := ValidateProjectTransfer(transfer); err != nil {
+		t.Fatalf("valid v8 transfer rejected: %v", err)
+	}
+	legacyMedia := transfer
+	legacyMedia.FormatVersion = 7
+	legacyMedia.CanvasSchema = nil
+	if err := ValidateProjectTransfer(legacyMedia); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("audio unexpectedly accepted in v7: %v", err)
+	}
+	legacySchema := validProjectTransferFixture()
+	legacySchema.FormatVersion = 7
+	legacySchema.CanvasSchema = transfer.CanvasSchema
+	if err := ValidateProjectTransfer(legacySchema); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("Canvas schema unexpectedly accepted in v7: %v", err)
+	}
+	broken := transfer
+	broken.CanvasSchema = &ProjectTransferCanvasSchema{
+		CurrentRevision: 2, Revisions: transfer.CanvasSchema.Revisions,
+	}
+	if err := ValidateProjectTransfer(broken); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("broken Canvas schema history accepted: %v", err)
 	}
 }
 
@@ -343,4 +463,8 @@ func validProjectTransferFixture() ProjectTransfer {
 		ProjectMemory:          []ProjectTransferMemoryRecord{},
 		ProjectMemoryRevisions: []ProjectTransferMemoryRevision{},
 	}
+}
+
+func transferIntPointer(value int) *int {
+	return &value
 }
