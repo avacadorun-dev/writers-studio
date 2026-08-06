@@ -25,6 +25,7 @@ export {
   writerPreferencesStorageKey,
 } from "./preferences";
 export type {
+  CanvasSnapshot,
   EditorSnapshot,
   LocalAudioChunk,
   LocalRecording,
@@ -32,13 +33,16 @@ export type {
 export {
   clearLocalRecoveryData,
   deleteLocalRecording,
+  getCanvasSnapshot,
   getEditorSnapshot,
   getLocalRecording,
   listAudioChunks,
   listLocalRecordings,
   markAudioChunkUploaded,
+  markCanvasSnapshotSynced,
   markEditorSnapshotSynced,
   saveAudioChunk,
+  saveCanvasSnapshot,
   saveEditorSnapshot,
   saveLocalRecording,
 } from "./recovery-db";

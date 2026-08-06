@@ -16,7 +16,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Blocks,
@@ -25,15 +26,20 @@ import {
   Brain,
   ChevronDown,
   ChevronRight,
+  CircleCheckBig,
   Clapperboard,
   Copy,
   FileAudio,
+  FilePenLine,
   FileText,
   FolderOpen,
+  GalleryVerticalEnd,
   Gamepad2,
   GripVertical,
   History,
+  LayoutDashboard,
   LifeBuoy,
+  Lightbulb,
   ListTree,
   MessagesSquare,
   MoreHorizontal,
@@ -44,6 +50,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  ScanText,
   SpellCheck2,
   StickyNote,
   Trash2,
@@ -51,6 +58,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { createCanvas, listCanvases, restoreCanvas } from "~entities/canvas";
 import {
   createNode,
   type DocumentNode,
@@ -132,6 +140,7 @@ interface ProjectTreeProps {
   collapsed: boolean;
   onToggle: () => void;
   integratedWorkspace?: boolean;
+  activeCanvasId?: string;
 }
 
 const iconByName = {
@@ -152,6 +161,65 @@ function nodeIcon(structure: ProjectStructure, kind: string) {
   return iconByName[name as keyof typeof iconByName] ?? FileText;
 }
 
+const documentStatus = {
+  idea: {
+    label: "Идея",
+    icon: Lightbulb,
+    className: "bg-[var(--warning-soft)] text-[var(--warning)]",
+  },
+  draft: {
+    label: "Черновик",
+    icon: FilePenLine,
+    className: "bg-[var(--surface-subtle)] text-[var(--ink-tertiary)]",
+  },
+  editing: {
+    label: "Редактура",
+    icon: ScanText,
+    className: "bg-[var(--info-soft)] text-[var(--info)]",
+  },
+  ready: {
+    label: "Готово",
+    icon: CircleCheckBig,
+    className: "bg-[var(--success-soft)] text-[var(--success)]",
+  },
+} satisfies Record<
+  DocumentNode["status"],
+  { label: string; icon: typeof Lightbulb; className: string }
+>;
+
+function DocumentStatusMark({ status }: { status: DocumentNode["status"] }) {
+  const config = documentStatus[status];
+  const Icon = config.icon;
+  const label = `Статус: ${config.label}`;
+  return (
+    <TooltipPrimitive.Root>
+      <TooltipPrimitive.Trigger asChild>
+        <span
+          role="img"
+          aria-label={label}
+          data-document-status={status}
+          className={cn(
+            "mr-1 grid size-[18px] shrink-0 place-items-center rounded-full",
+            config.className,
+          )}
+        >
+          <Icon className="size-3" aria-hidden="true" />
+        </span>
+      </TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          side="right"
+          sideOffset={8}
+          className="z-[110] rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-inverse)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--ink-on-inverse)] shadow-lg"
+        >
+          {label}
+          <TooltipPrimitive.Arrow className="fill-[var(--surface-inverse)]" />
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
+  );
+}
+
 export function ProjectTree({
   projectId,
   activeNodeId,
@@ -160,6 +228,7 @@ export function ProjectTree({
   collapsed,
   onToggle,
   integratedWorkspace = false,
+  activeCanvasId,
 }: ProjectTreeProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -170,7 +239,15 @@ export function ProjectTree({
   const [dropTargetId, setDropTargetId] = useState<string>();
   const contentNodes = useMemo(() => nodes.filter((node) => !node.trashedAt), [nodes]);
   const trashedNodes = useMemo(() => nodes.filter((node) => node.trashedAt), [nodes]);
-  const activeNode = contentNodes.find((node) => node.id === activeNodeId);
+  const activeNode = activeCanvasId
+    ? undefined
+    : contentNodes.find((node) => node.id === activeNodeId);
+  const canvases = useQuery({
+    queryKey: ["canvases", projectId],
+    queryFn: () => listCanvases(projectId, true),
+  });
+  const activeCanvases = canvases.data?.canvases.filter((item) => !item.trashedAt) ?? [];
+  const trashedCanvases = canvases.data?.canvases.filter((item) => item.trashedAt) ?? [];
   const outline = useMemo(() => buildProjectOutline(nodes), [nodes]);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(() => new Set());
   const [treeScrollTop, setTreeScrollTop] = useState(0);
@@ -227,6 +304,39 @@ export function ProjectTree({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+  const invalidateCanvases = () =>
+    queryClient.invalidateQueries({ queryKey: ["canvases", projectId] });
+
+  const createCanvasMutation = useMutation({
+    mutationFn: (title: string) => createCanvas(projectId, title),
+    onSuccess: async ({ canvas }) => {
+      await invalidateCanvases();
+      showToast({ title: "Доска создана" });
+      void navigate({
+        to: "/projects/$projectId/canvases/$canvasId",
+        params: { projectId, canvasId: canvas.id },
+      });
+    },
+    onError: (error) =>
+      showToast({ title: "Не удалось создать доску", description: error.message }),
+  });
+  const restoreCanvasMutation = useMutation({
+    mutationFn: restoreCanvas,
+    onSuccess: invalidateCanvases,
+  });
+
+  const requestCanvas = () => {
+    void requestInput({
+      title: "Новая доска",
+      description: "Соберите заметки, документы и изображения в свободном пространстве.",
+      label: "Название",
+      defaultValue: "Новая доска",
+      icon: LayoutDashboard,
+      confirmLabel: "Создать",
+    }).then((title) => {
+      if (title?.trim()) createCanvasMutation.mutate(title.trim());
+    });
+  };
 
   const createMutation = useMutation({
     mutationFn: (input: { kind: string; title: string; parentId?: string }) =>
@@ -455,6 +565,7 @@ export function ProjectTree({
   const renderOutlineRow = ({ item: { node, children }, depth }: VisibleOutlineItem) => {
     const Icon = nodeIcon(structure, node.kind);
     const nodeType = structure.nodeTypes.find((item) => item.key === node.kind);
+    const documentIsActive = !activeCanvasId && node.id === activeNodeId;
     const canAcceptDrop =
       Boolean(draggedNodeId) &&
       canMoveNodeToParent(contentNodes, draggedNodeId ?? "", node.id, structure);
@@ -464,13 +575,12 @@ export function ProjectTree({
           id={node.id}
           title={node.title}
           level={depth + 1}
-          selected={node.id === activeNodeId}
+          selected={documentIsActive}
           disabled={moveMutation.isPending}
           kind={node.kind}
           canAcceptDrop={canAcceptDrop}
           className={cn(
-            node.id === activeNodeId &&
-              "bg-[var(--surface-selected)] font-medium text-[var(--accent-ink)]",
+            documentIsActive && "bg-[var(--surface-selected)] font-medium text-[var(--accent-ink)]",
             dropTargetId === node.id && "outline-2 outline-offset-[-2px] outline-[var(--accent)]",
           )}
           paddingLeft={Math.min(depth, 5) * 14 + 2}
@@ -507,6 +617,14 @@ export function ProjectTree({
             to="/projects/$projectId/studio/$nodeId"
             params={{ projectId, nodeId: node.id }}
             className="flex min-w-0 flex-1 items-center gap-2 py-2"
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "copy";
+              event.dataTransfer.setData(
+                "application/x-writers-studio-document",
+                JSON.stringify({ nodeId: node.id }),
+              );
+            }}
           >
             <Icon className="size-4 shrink-0" aria-hidden="true" />
             <span className="truncate">{node.title}</span>
@@ -520,7 +638,10 @@ export function ProjectTree({
             >
               <Plus className="size-3.5" aria-hidden="true" />
             </button>
-          ) : null}
+          ) : (
+            <span className="mr-1 block size-7 shrink-0" aria-hidden="true" />
+          )}
+          <DocumentStatusMark status={node.status} />
         </SortableTreeRow>
       </div>
     );
@@ -560,6 +681,18 @@ export function ProjectTree({
           icon={Blocks}
           label={structure.rootLabel}
         />
+        {activeCanvases[0] ? (
+          <Button asChild variant="ghost" size="icon" className="size-10">
+            <Link
+              to="/projects/$projectId/canvases/$canvasId"
+              params={{ projectId, canvasId: activeCanvasId ?? activeCanvases[0].id }}
+              aria-label="Доски"
+              title="Доски"
+            >
+              <LayoutDashboard className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        ) : null}
         <div className="mt-auto grid gap-1">
           <UtilityLinks projectId={projectId} nodeId={activeNodeId} compact />
         </div>
@@ -568,204 +701,256 @@ export function ProjectTree({
   }
 
   return (
-    <nav
-      className="hidden w-[280px] shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex"
-      aria-label="Структура проекта"
-    >
-      <div
-        data-testid="project-tree-header"
-        className={cn(
-          "flex shrink-0 items-center px-4",
-          integratedWorkspace ? "h-14 border-b border-[var(--border-subtle)]" : "h-11",
-        )}
+    <TooltipPrimitive.Provider delayDuration={350} skipDelayDuration={150}>
+      <nav
+        className="hidden w-[280px] shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex"
+        aria-label="Структура проекта"
       >
-        <span className="text-[11px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-          Структура
-        </span>
-        <div className="ml-auto flex">
-          <Button variant="ghost" size="icon" aria-label="Свернуть структуру" onClick={onToggle}>
-            <PanelLeftClose className="size-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Добавить материал"
-            onClick={() => chooseNodeType()}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-          </Button>
-          <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
-            <DropdownMenuTrigger asChild>
+        <div
+          data-testid="project-tree-header"
+          className={cn(
+            "flex shrink-0 items-center px-4",
+            integratedWorkspace ? "h-14 border-b border-[var(--border-subtle)]" : "h-11",
+          )}
+        >
+          <span className="text-[11px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
+            Структура
+          </span>
+          <div className="ml-auto flex">
+            <Button variant="ghost" size="icon" aria-label="Свернуть структуру" onClick={onToggle}>
+              <PanelLeftClose className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Добавить материал"
+              onClick={() => chooseNodeType()}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+            </Button>
+            <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Действия с материалом"
+                  disabled={!activeNode}
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              {activeNode ? (
+                <DropdownMenuContent align="end">
+                  <TreeAction
+                    icon={Pencil}
+                    label="Переименовать"
+                    onClick={() =>
+                      void requestInput({
+                        title: `Переименовать «${activeNode.title}»`,
+                        description: "Содержимое и история не изменятся.",
+                        label: "Новое название",
+                        defaultValue: activeNode.title,
+                        icon: Pencil,
+                        confirmLabel: "Сохранить",
+                      }).then((title) => {
+                        if (title?.trim()) updateMutation.mutate({ title: title.trim() });
+                      })
+                    }
+                  />
+                  <TreeAction
+                    icon={RotateCcw}
+                    label="Изменить статус"
+                    onClick={() =>
+                      void requestSelect({
+                        title: "Изменить статус",
+                        description: "Статус помогает ориентироваться и не меняет содержимое.",
+                        label: "Статус",
+                        defaultValue: activeNode.status,
+                        icon: RotateCcw,
+                        confirmLabel: "Сохранить",
+                        options: [
+                          { value: "idea", label: "Идея" },
+                          { value: "draft", label: "Черновик" },
+                          { value: "editing", label: "Редактура" },
+                          { value: "ready", label: "Готово" },
+                        ],
+                      }).then((status) => {
+                        if (status)
+                          updateMutation.mutate({
+                            status: status as DocumentNode["status"],
+                          });
+                      })
+                    }
+                  />
+                  <TreeAction
+                    icon={Move}
+                    label="Переместить"
+                    onClick={() =>
+                      void requestSelect({
+                        title: `Переместить «${activeNode.title}»`,
+                        description: "Показываются только допустимые родители по схеме проекта.",
+                        label: "Новое расположение",
+                        defaultValue: activeNode.parentId ?? "",
+                        icon: Move,
+                        confirmLabel: "Переместить",
+                        options: [
+                          { value: "", label: structure.rootLabel },
+                          ...getValidParentNodes(contentNodes, activeNode.id, structure).map(
+                            (node) => ({
+                              value: node.id,
+                              label: `${nodeTypeLabel(structure, node.kind)} · ${node.title}`,
+                            }),
+                          ),
+                        ],
+                      }).then((parentId) => {
+                        if (parentId !== undefined)
+                          moveDocument(activeNode.id, parentId || undefined);
+                      })
+                    }
+                  />
+                  <TreeAction
+                    icon={Copy}
+                    label="Дублировать"
+                    onClick={() => duplicateMutation.mutate()}
+                  />
+                  <TreeAction
+                    icon={Trash2}
+                    label="В корзину"
+                    destructive
+                    onClick={() => trashMutation.mutate()}
+                  />
+                </DropdownMenuContent>
+              ) : null}
+            </DropdownMenu>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+          <div className="mb-2 border-b border-[var(--border-subtle)] pb-2">
+            <div className="flex min-h-9 items-center gap-2 pr-2 pl-[26px] text-xs font-medium text-[var(--ink-secondary)]">
+              <GalleryVerticalEnd className="size-4" aria-hidden="true" />
+              <span>Доски</span>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Действия с материалом"
-                disabled={!activeNode}
+                className="ml-auto size-7"
+                aria-label="Создать доску"
+                onClick={requestCanvas}
               >
-                <MoreHorizontal className="size-4" aria-hidden="true" />
+                <Plus className="size-3.5" aria-hidden="true" />
               </Button>
-            </DropdownMenuTrigger>
-            {activeNode ? (
-              <DropdownMenuContent align="end">
-                <TreeAction
-                  icon={Pencil}
-                  label="Переименовать"
-                  onClick={() =>
-                    void requestInput({
-                      title: `Переименовать «${activeNode.title}»`,
-                      description: "Содержимое и история не изменятся.",
-                      label: "Новое название",
-                      defaultValue: activeNode.title,
-                      icon: Pencil,
-                      confirmLabel: "Сохранить",
-                    }).then((title) => {
-                      if (title?.trim()) updateMutation.mutate({ title: title.trim() });
-                    })
-                  }
-                />
-                <TreeAction
-                  icon={RotateCcw}
-                  label="Изменить статус"
-                  onClick={() =>
-                    void requestSelect({
-                      title: "Изменить статус",
-                      description: "Статус помогает ориентироваться и не меняет содержимое.",
-                      label: "Статус",
-                      defaultValue: activeNode.status,
-                      icon: RotateCcw,
-                      confirmLabel: "Сохранить",
-                      options: [
-                        { value: "idea", label: "Идея" },
-                        { value: "draft", label: "Черновик" },
-                        { value: "editing", label: "Редактура" },
-                        { value: "ready", label: "Готово" },
-                      ],
-                    }).then((status) => {
-                      if (status)
-                        updateMutation.mutate({
-                          status: status as DocumentNode["status"],
-                        });
-                    })
-                  }
-                />
-                <TreeAction
-                  icon={Move}
-                  label="Переместить"
-                  onClick={() =>
-                    void requestSelect({
-                      title: `Переместить «${activeNode.title}»`,
-                      description: "Показываются только допустимые родители по схеме проекта.",
-                      label: "Новое расположение",
-                      defaultValue: activeNode.parentId ?? "",
-                      icon: Move,
-                      confirmLabel: "Переместить",
-                      options: [
-                        { value: "", label: structure.rootLabel },
-                        ...getValidParentNodes(contentNodes, activeNode.id, structure).map(
-                          (node) => ({
-                            value: node.id,
-                            label: `${nodeTypeLabel(structure, node.kind)} · ${node.title}`,
-                          }),
-                        ),
-                      ],
-                    }).then((parentId) => {
-                      if (parentId !== undefined)
-                        moveDocument(activeNode.id, parentId || undefined);
-                    })
-                  }
-                />
-                <TreeAction
-                  icon={Copy}
-                  label="Дублировать"
-                  onClick={() => duplicateMutation.mutate()}
-                />
-                <TreeAction
-                  icon={Trash2}
-                  label="В корзину"
-                  destructive
-                  onClick={() => trashMutation.mutate()}
-                />
-              </DropdownMenuContent>
-            ) : null}
-          </DropdownMenu>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        <div className="flex min-h-9 items-center gap-2 px-2 text-xs font-medium text-[var(--ink-secondary)]">
-          <ListTree className="size-4" aria-hidden="true" />
-          <span>{structure.rootLabel}</span>
-          <span className="ml-auto text-[10px] font-normal text-[var(--ink-tertiary)]">
-            схема r{structure.schemaVersion}
-          </span>
-        </div>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragOver={(event) => setDropTargetId(event.over ? String(event.over.id) : undefined)}
-          onDragCancel={() => {
-            setDraggedNodeId(undefined);
-            setDropTargetId(undefined);
-          }}
-          onDragEnd={handleDragEnd}
-          accessibility={{
-            screenReaderInstructions: {
-              draggable:
-                "Нажмите пробел или Enter, затем используйте стрелки для перемещения материала.",
-            },
-          }}
-        >
-          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-            <div
-              ref={treeViewportRef}
-              role="tree"
-              aria-label={structure.rootLabel}
-              className="overflow-y-auto"
-              data-testid="virtualized-project-tree"
-              style={{
-                height: Math.min(
-                  treeViewportHeight,
-                  Math.max(treeRowHeight, visibleOutline.length * treeRowHeight),
-                ),
-              }}
-              onScroll={(event) => setTreeScrollTop(event.currentTarget.scrollTop)}
-            >
-              <div style={{ height: treeVirtualStart * treeRowHeight }} aria-hidden="true" />
-              {virtualOutline.map(renderOutlineRow)}
-              <div
-                style={{ height: (visibleOutline.length - treeVirtualEnd) * treeRowHeight }}
-                aria-hidden="true"
-              />
             </div>
-          </SortableContext>
-        </DndContext>
-        <Link
-          to="/recovery"
-          className="mt-3 flex min-h-9 items-center gap-2 border-t border-[var(--border-subtle)] px-3 pt-3 text-[13px] text-[var(--ink-secondary)]"
-        >
-          <FileAudio className="size-4" aria-hidden="true" />
-          Голосовые сессии
-        </Link>
-        {trashedNodes.length > 0 ? (
-          <details className="mt-3 border-t border-[var(--border-subtle)] pt-2">
-            <summary className="min-h-9 cursor-pointer px-3 py-2 text-xs text-[var(--ink-tertiary)]">
-              Корзина · {trashedNodes.length}
-            </summary>
-            {trashedNodes.map((node) => (
-              <div key={node.id} className="flex min-h-9 items-center gap-2 px-3 text-xs">
-                <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                <button type="button" onClick={() => restoreMutation.mutate(node.id)}>
-                  Вернуть
-                </button>
+            {activeCanvases.length > 0 ? (
+              activeCanvases.map((canvas) => (
+                <Link
+                  key={canvas.id}
+                  to="/projects/$projectId/canvases/$canvasId"
+                  params={{ projectId, canvasId: canvas.id }}
+                  className={cn(
+                    "flex min-h-9 items-center gap-2 rounded-[var(--radius-sm)] pr-2 pl-[26px] text-[13px] text-[var(--ink-secondary)]",
+                    canvas.id === activeCanvasId &&
+                      "bg-[var(--surface-selected)] font-medium text-[var(--accent-ink)]",
+                  )}
+                >
+                  <LayoutDashboard className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{canvas.title}</span>
+                </Link>
+              ))
+            ) : (
+              <button
+                type="button"
+                className="min-h-9 w-full rounded-[var(--radius-sm)] pr-2 pl-[26px] text-left text-xs text-[var(--ink-tertiary)] hover:bg-[var(--surface-subtle)]"
+                onClick={requestCanvas}
+              >
+                Создать первую доску
+              </button>
+            )}
+          </div>
+          <div className="flex min-h-9 items-center gap-2 pr-2 pl-[26px] text-xs font-medium text-[var(--ink-secondary)]">
+            <ListTree className="size-4" aria-hidden="true" />
+            <span>{structure.rootLabel}</span>
+            <span className="ml-auto text-[10px] font-normal text-[var(--ink-tertiary)]">
+              схема r{structure.schemaVersion}
+            </span>
+          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={(event) => setDropTargetId(event.over ? String(event.over.id) : undefined)}
+            onDragCancel={() => {
+              setDraggedNodeId(undefined);
+              setDropTargetId(undefined);
+            }}
+            onDragEnd={handleDragEnd}
+            accessibility={{
+              screenReaderInstructions: {
+                draggable:
+                  "Нажмите пробел или Enter, затем используйте стрелки для перемещения материала.",
+              },
+            }}
+          >
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              <div
+                ref={treeViewportRef}
+                role="tree"
+                aria-label={structure.rootLabel}
+                className="overflow-y-auto"
+                data-testid="virtualized-project-tree"
+                style={{
+                  height: Math.min(
+                    treeViewportHeight,
+                    Math.max(treeRowHeight, visibleOutline.length * treeRowHeight),
+                  ),
+                }}
+                onScroll={(event) => setTreeScrollTop(event.currentTarget.scrollTop)}
+              >
+                <div style={{ height: treeVirtualStart * treeRowHeight }} aria-hidden="true" />
+                {virtualOutline.map(renderOutlineRow)}
+                <div
+                  style={{ height: (visibleOutline.length - treeVirtualEnd) * treeRowHeight }}
+                  aria-hidden="true"
+                />
               </div>
-            ))}
-          </details>
-        ) : null}
-      </div>
-      <div className="border-t border-[var(--border-subtle)] p-2">
-        <UtilityLinks projectId={projectId} nodeId={activeNodeId} />
-      </div>
-    </nav>
+            </SortableContext>
+          </DndContext>
+          <Link
+            to="/recovery"
+            className="mt-3 flex min-h-9 items-center gap-2 border-t border-[var(--border-subtle)] px-3 pt-3 text-[13px] text-[var(--ink-secondary)]"
+          >
+            <FileAudio className="size-4" aria-hidden="true" />
+            Голосовые сессии
+          </Link>
+          {trashedNodes.length > 0 || trashedCanvases.length > 0 ? (
+            <details className="mt-3 border-t border-[var(--border-subtle)] pt-2">
+              <summary className="min-h-9 cursor-pointer px-3 py-2 text-xs text-[var(--ink-tertiary)]">
+                Корзина · {trashedNodes.length + trashedCanvases.length}
+              </summary>
+              {trashedCanvases.map((canvas) => (
+                <div key={canvas.id} className="flex min-h-9 items-center gap-2 px-3 text-xs">
+                  <LayoutDashboard className="size-3.5" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate">{canvas.title}</span>
+                  <button type="button" onClick={() => restoreCanvasMutation.mutate(canvas.id)}>
+                    Вернуть
+                  </button>
+                </div>
+              ))}
+              {trashedNodes.map((node) => (
+                <div key={node.id} className="flex min-h-9 items-center gap-2 px-3 text-xs">
+                  <span className="min-w-0 flex-1 truncate">{node.title}</span>
+                  <button type="button" onClick={() => restoreMutation.mutate(node.id)}>
+                    Вернуть
+                  </button>
+                </div>
+              ))}
+            </details>
+          ) : null}
+        </div>
+        <div className="border-t border-[var(--border-subtle)] p-2">
+          <UtilityLinks projectId={projectId} nodeId={activeNodeId} />
+        </div>
+      </nav>
+    </TooltipPrimitive.Provider>
   );
 }
 
@@ -811,7 +996,7 @@ function SortableTreeRow({
       data-tree-node-kind={kind}
       data-drop-target={canAcceptDrop ? "available" : undefined}
       className={cn(
-        "group/tree-row flex min-h-9 items-center rounded-[var(--radius-sm)] text-[13px] text-[var(--ink-secondary)]",
+        "group/tree-row relative flex min-h-9 items-center rounded-[var(--radius-sm)] text-[13px] text-[var(--ink-secondary)]",
         isDragging && "z-10 opacity-60",
         className,
       )}
@@ -821,17 +1006,32 @@ function SortableTreeRow({
         transition,
       }}
     >
+      {children}
       <button
         ref={setActivatorNodeRef}
         type="button"
-        className="grid size-7 shrink-0 cursor-grab touch-none place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] focus:opacity-100 focus-visible:outline-2 group-hover/tree-row:opacity-100 active:cursor-grabbing"
+        className={cn(
+          "group/drag absolute top-1/2 z-10 grid size-6 -translate-y-1/2 cursor-grab touch-none place-items-center rounded focus-visible:outline-2 active:cursor-grabbing",
+          selected
+            ? "bg-[var(--surface-selected)]"
+            : "group-hover/tree-row:bg-[var(--surface-panel)]",
+        )}
+        style={{ left: `${paddingLeft + 20}px` }}
         aria-label={`Переместить «${title}»`}
+        title={`Переместить «${title}»`}
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="size-3.5" aria-hidden="true" />
+        <GripVertical
+          className={cn(
+            "size-4 opacity-0 transition-opacity",
+            selected
+              ? "opacity-100"
+              : "group-hover/tree-row:opacity-100 group-focus-visible/drag:opacity-100",
+          )}
+          aria-hidden="true"
+        />
       </button>
-      {children}
     </div>
   );
 }

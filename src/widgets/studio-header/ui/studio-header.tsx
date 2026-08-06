@@ -23,11 +23,11 @@ import { BrandMark, Button, type SaveState, SaveStatus } from "~shared/ui";
 
 interface StudioHeaderProps {
   project: Project;
-  nodeId: string;
+  nodeId?: string;
   nodeTitle: string;
   saveState: SaveState;
-  onDictate: () => void;
-  onAssistant: () => void;
+  onDictate?: () => void;
+  onAssistant?: () => void;
 }
 
 export function StudioHeader({
@@ -94,8 +94,9 @@ export function StudioHeader({
           variant="record"
           size="compact"
           onClick={onDictate}
+          disabled={!onDictate}
           className="rounded-[var(--radius-pill)] px-4"
-          aria-label="Диктовать"
+          aria-label={onDictate ? "Диктовать" : "Откройте документ, чтобы начать диктовку"}
         >
           <span className="size-2 rounded-full bg-current" aria-hidden="true" />
           <span className="hidden sm:inline">Диктовка</span>
@@ -105,8 +106,9 @@ export function StudioHeader({
           variant="creative"
           size="compact"
           onClick={onAssistant}
+          disabled={!onAssistant}
           className="rounded-[var(--radius-pill)] px-4"
-          aria-label="Открыть ассистента"
+          aria-label={onAssistant ? "Открыть ассистента" : "Откройте документ для ассистента"}
         >
           <MessageCircle className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Ассистент</span>

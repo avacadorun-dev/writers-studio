@@ -1,8 +1,8 @@
 # «Студия автора»: архитектурная спецификация по arc42
 
-> Версия: 0.5  
-> Статус: dictation baseline + Assistant implementation baseline  
-> Дата: 31 июля 2026  
+> Версия: 0.6
+> Статус: dictation + Assistant + Canvas implementation baseline
+> Дата: 5 августа 2026
 > Связанные документы: [продуктовый бриф](../../PRODUCT_BRIEF.md),
 > [STT ADR](../adr/ADR-001-speech-to-text.md),
 > [Editor ADR](../adr/ADR-002-editor-engine.md),
@@ -10,6 +10,7 @@
 > [Assistant continuous-flow ADR](../adr/ADR-007-assistant-continuous-workspace.md),
 > [workflows](../specification/WORKFLOWS.md),
 > [assistant mode](../specification/ASSISTANT_MODE.md),
+> [Canvas boards](../specification/CANVAS_BOARDS.md),
 > [design handoff](../design/DESIGN_HANDOFF.md)
 
 ## 1. Введение и цели
@@ -19,6 +20,7 @@
 «Студия автора» — единая среда для автора длинных текстов. Система помогает:
 
 - создать и структурировать писательский проект;
+- визуально разложить идеи, документы и изображения на Canvas-досках;
 - надиктовать сцену с живой расшифровкой;
 - безопасно сохранить исходное аудио;
 - получить стабильную финальную расшифровку;
@@ -63,6 +65,7 @@
 - словарь проекта;
 - autosave, revisions и именованные версии;
 - поиск;
+- несколько card-first Canvas-досок с локальным recovery и revisions;
 - экспорт DOCX, Markdown и TXT.
 
 Текущий реализуемый scope — Assistant Alpha:
@@ -109,6 +112,8 @@
 ### 2.2. Технические
 
 - Frontend: React + TypeScript, PWA.
+- Canvas viewport: React Flow (`@xyflow/react`), канонический JSON Canvas-compatible
+  snapshot и расширения `x-writers-studio`.
 - Backend: Go.
 - Редактор: Tiptap 3 / ProseMirror, open-source core.
 - Конкретная STT-модель не является архитектурным ограничением.

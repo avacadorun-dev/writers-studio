@@ -2139,3 +2139,7 @@
     scroll-behavior: auto;
   }
 }
+
+.canvas-flow .react-flow__attribution a {
+  color: var(--ink-tertiary);
+}

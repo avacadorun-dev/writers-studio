@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	exportformat "writers.studio/internal/export"
 )
@@ -215,6 +216,54 @@ func TestProjectTransferV5CarriesMarkdownSourceMetadataAndRemapsInternalLinks(t 
 	}
 	if !strings.Contains(string(remapped), "/projects/target-project/studio/target-node#heading") {
 		t.Fatalf("internal link was not remapped: %s", remapped)
+	}
+}
+
+func TestProjectTransferV6CarriesCanvasesAndRemapsResources(t *testing.T) {
+	t.Parallel()
+	transfer := validProjectTransferFixture()
+	transfer.Media = []ProjectTransferMedia{{
+		ID: "asset-1", Path: "media/asset-1.png",
+		SHA256:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ByteSize: 128, MediaType: "image/png", OriginalName: "map.png", Width: 640, Height: 480,
+	}}
+	transfer.Canvases = []ProjectTransferCanvas{{
+		ID: "canvas-1", Title: "Сюжет", Position: 1000, CurrentRevision: 1,
+		CreatedAt: transfer.ExportedAt, UpdatedAt: transfer.ExportedAt,
+	}}
+	transfer.CanvasRevisions = []ProjectTransferCanvasRevision{{
+		ID: "canvas-revision-1", CanvasID: "canvas-1", Revision: 1, BaseRevision: 0,
+		SchemaVersion: canvasdocument.SchemaVersion, Source: "canvas_create",
+		CreatedAt: transfer.ExportedAt,
+		Content:   json.RawMessage(`{"nodes":[{"id":"document-card","type":"file","x":0,"y":0,"width":280,"height":180,"file":"writers-studio://documents/node-1","x-writers-studio":{"resource":{"kind":"document","id":"node-1"},"future":"keep"}},{"id":"image-card","type":"file","x":320,"y":0,"width":300,"height":200,"file":"writers-studio://media/asset-1","x-writers-studio":{"resource":{"kind":"media","id":"asset-1"}}}],"edges":[],"x-future":{"drawingLayer":true}}`),
+	}}
+	if err := ValidateProjectTransfer(transfer); err != nil {
+		t.Fatalf("valid v6 canvas rejected: %v", err)
+	}
+
+	legacy := transfer
+	legacy.FormatVersion = 5
+	if err := ValidateProjectTransfer(legacy); !errors.Is(err, ErrInvalidProjectTransfer) {
+		t.Fatalf("v5 unexpectedly accepted canvases: %v", err)
+	}
+
+	remapped, err := remapCanvasResources(
+		transfer.CanvasRevisions[0].Content,
+		map[string]string{"node-1": "new-node"},
+		map[string]string{"asset-1": "new-asset"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(remapped)
+	for _, expected := range []string{
+		`"id":"new-node"`, `writers-studio://documents/new-node`,
+		`"id":"new-asset"`, `writers-studio://media/new-asset`,
+		`"future":"keep"`, `"drawingLayer":true`,
+	} {
+		if !strings.Contains(encoded, expected) {
+			t.Fatalf("remapped canvas does not contain %s: %s", expected, encoded)
+		}
 	}
 }
 

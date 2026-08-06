@@ -1,6 +1,6 @@
 {
   "name": "writers-studio",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "type-check": "tsc -b --pretty false",
     "test": "bun test ./src/",
     "test:coverage": "bun test ./src/ --coverage",
+    "test:canvas:coverage": "bun test ./src/entities/canvas ./src/features/canvas-autosave ./src/shared/lib/recovery-db.test.ts --coverage && bun run ./scripts/verify-canvas-coverage.ts",
     "e2e": "playwright test",
     "e2e:compose": "bash ./scripts/e2e-compose.sh",
     "e2e:real-stt": "playwright test -c playwright.real-stt.config.ts",
@@ -50,6 +51,7 @@
     "@tiptap/react": "^3.2.2",
     "@tiptap/starter-kit": "^3.2.2",
     "@types/mdx": "2.0.13",
+    "@xyflow/react": "^12.11.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fumadocs-core": "16.12.1",

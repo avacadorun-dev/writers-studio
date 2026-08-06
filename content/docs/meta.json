@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "projects",
+    "canvas",
     "editor",
     "dictation",
     "recovery",

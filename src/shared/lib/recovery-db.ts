@@ -12,6 +12,15 @@ export interface EditorSnapshot {
   synced: boolean;
 }
 
+export interface CanvasSnapshot {
+  canvasId: string;
+  projectId: string;
+  baseRevision: number;
+  content: Record<string, unknown>;
+  savedAt: number;
+  synced: boolean;
+}
+
 export interface LocalRecording {
   localId: string;
   serverSessionId?: string;
@@ -46,6 +55,10 @@ interface RecoverySchema extends DBSchema {
     key: string;
     value: EditorSnapshot;
   };
+  canvasSnapshots: {
+    key: string;
+    value: CanvasSnapshot;
+  };
   recordings: {
     key: string;
     value: LocalRecording;
@@ -64,15 +77,20 @@ let databasePromise: Promise<IDBPDatabase<RecoverySchema>> | undefined;
 
 function database(): Promise<IDBPDatabase<RecoverySchema>> {
   if (!databasePromise) {
-    databasePromise = openDB<RecoverySchema>("writers-studio-recovery", 1, {
-      upgrade(db) {
-        db.createObjectStore("editorSnapshots", { keyPath: "nodeId" });
-        const recordings = db.createObjectStore("recordings", { keyPath: "localId" });
-        recordings.createIndex("by-status", "status");
-        const chunks = db.createObjectStore("audioChunks", {
-          keyPath: ["localId", "sequence"],
-        });
-        chunks.createIndex("by-recording", "localId");
+    databasePromise = openDB<RecoverySchema>("writers-studio-recovery", 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore("editorSnapshots", { keyPath: "nodeId" });
+          const recordings = db.createObjectStore("recordings", { keyPath: "localId" });
+          recordings.createIndex("by-status", "status");
+          const chunks = db.createObjectStore("audioChunks", {
+            keyPath: ["localId", "sequence"],
+          });
+          chunks.createIndex("by-recording", "localId");
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore("canvasSnapshots", { keyPath: "canvasId" });
+        }
       },
     });
   }
@@ -99,6 +117,26 @@ export async function markEditorSnapshotSynced(
     return;
   }
   await db.put("editorSnapshots", { ...snapshot, baseRevision, synced: true });
+}
+
+export async function saveCanvasSnapshot(snapshot: CanvasSnapshot): Promise<void> {
+  const db = await database();
+  await db.put("canvasSnapshots", snapshot);
+}
+
+export async function getCanvasSnapshot(canvasId: string): Promise<CanvasSnapshot | undefined> {
+  const db = await database();
+  return db.get("canvasSnapshots", canvasId);
+}
+
+export async function markCanvasSnapshotSynced(
+  canvasId: string,
+  baseRevision: number,
+): Promise<void> {
+  const db = await database();
+  const snapshot = await db.get("canvasSnapshots", canvasId);
+  if (!snapshot) return;
+  await db.put("canvasSnapshots", { ...snapshot, baseRevision, synced: true });
 }
 
 export async function saveLocalRecording(recording: LocalRecording): Promise<void> {

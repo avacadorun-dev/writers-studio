@@ -34,6 +34,7 @@ import { Route as ProjectsProjectIdExportRouteImport } from './routes/projects.$
 import { Route as ProjectsProjectIdMemoryRouteImport } from './routes/projects.$projectId.memory'
 import { Route as ProjectsProjectIdSearchRouteImport } from './routes/projects.$projectId.search'
 import { Route as ProjectsProjectIdAssistantRunIdRouteImport } from './routes/projects.$projectId.assistant.$runId'
+import { Route as ProjectsProjectIdCanvasesCanvasIdRouteImport } from './routes/projects.$projectId.canvases.$canvasId'
 import { Route as ProjectsProjectIdDictateLocalIdRouteImport } from './routes/projects.$projectId.dictate.$localId'
 import { Route as ProjectsProjectIdStudioNodeIdRouteImport } from './routes/projects.$projectId.studio.$nodeId'
 import { Route as ProjectsProjectIdAssistantRunIdIndexRouteImport } from './routes/projects.$projectId.assistant.$runId.index'
@@ -172,6 +173,12 @@ const ProjectsProjectIdAssistantRunIdRoute =
     path: '/assistant/$runId',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ProjectsProjectIdCanvasesCanvasIdRoute =
+  ProjectsProjectIdCanvasesCanvasIdRouteImport.update({
+    id: '/canvases/$canvasId',
+    path: '/canvases/$canvasId',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ProjectsProjectIdDictateLocalIdRoute =
   ProjectsProjectIdDictateLocalIdRouteImport.update({
     id: '/dictate/$localId',
@@ -223,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/search': typeof ProjectsProjectIdSearchRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/assistant/$runId': typeof ProjectsProjectIdAssistantRunIdRouteWithChildren
+  '/projects/$projectId/canvases/$canvasId': typeof ProjectsProjectIdCanvasesCanvasIdRoute
   '/projects/$projectId/dictate/$localId': typeof ProjectsProjectIdDictateLocalIdRoute
   '/projects/$projectId/studio/$nodeId': typeof ProjectsProjectIdStudioNodeIdRoute
   '/projects/$projectId/assistant/$runId/': typeof ProjectsProjectIdAssistantRunIdIndexRoute
@@ -251,6 +259,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/memory': typeof ProjectsProjectIdMemoryRoute
   '/projects/$projectId/search': typeof ProjectsProjectIdSearchRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/canvases/$canvasId': typeof ProjectsProjectIdCanvasesCanvasIdRoute
   '/projects/$projectId/dictate/$localId': typeof ProjectsProjectIdDictateLocalIdRoute
   '/projects/$projectId/studio/$nodeId': typeof ProjectsProjectIdStudioNodeIdRoute
   '/projects/$projectId/assistant/$runId': typeof ProjectsProjectIdAssistantRunIdIndexRoute
@@ -283,6 +292,7 @@ export interface FileRoutesById {
   '/projects/$projectId/search': typeof ProjectsProjectIdSearchRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/assistant/$runId': typeof ProjectsProjectIdAssistantRunIdRouteWithChildren
+  '/projects/$projectId/canvases/$canvasId': typeof ProjectsProjectIdCanvasesCanvasIdRoute
   '/projects/$projectId/dictate/$localId': typeof ProjectsProjectIdDictateLocalIdRoute
   '/projects/$projectId/studio/$nodeId': typeof ProjectsProjectIdStudioNodeIdRoute
   '/projects/$projectId/assistant/$runId/': typeof ProjectsProjectIdAssistantRunIdIndexRoute
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/search'
     | '/projects/$projectId/'
     | '/projects/$projectId/assistant/$runId'
+    | '/projects/$projectId/canvases/$canvasId'
     | '/projects/$projectId/dictate/$localId'
     | '/projects/$projectId/studio/$nodeId'
     | '/projects/$projectId/assistant/$runId/'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/memory'
     | '/projects/$projectId/search'
     | '/projects/$projectId'
+    | '/projects/$projectId/canvases/$canvasId'
     | '/projects/$projectId/dictate/$localId'
     | '/projects/$projectId/studio/$nodeId'
     | '/projects/$projectId/assistant/$runId'
@@ -375,6 +387,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/search'
     | '/projects/$projectId/'
     | '/projects/$projectId/assistant/$runId'
+    | '/projects/$projectId/canvases/$canvasId'
     | '/projects/$projectId/dictate/$localId'
     | '/projects/$projectId/studio/$nodeId'
     | '/projects/$projectId/assistant/$runId/'
@@ -574,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdAssistantRunIdRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/canvases/$canvasId': {
+      id: '/projects/$projectId/canvases/$canvasId'
+      path: '/canvases/$canvasId'
+      fullPath: '/projects/$projectId/canvases/$canvasId'
+      preLoaderRoute: typeof ProjectsProjectIdCanvasesCanvasIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/dictate/$localId': {
       id: '/projects/$projectId/dictate/$localId'
       path: '/dictate/$localId'
@@ -649,6 +669,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdSearchRoute: typeof ProjectsProjectIdSearchRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdAssistantRunIdRoute: typeof ProjectsProjectIdAssistantRunIdRouteWithChildren
+  ProjectsProjectIdCanvasesCanvasIdRoute: typeof ProjectsProjectIdCanvasesCanvasIdRoute
   ProjectsProjectIdDictateLocalIdRoute: typeof ProjectsProjectIdDictateLocalIdRoute
   ProjectsProjectIdStudioNodeIdRoute: typeof ProjectsProjectIdStudioNodeIdRoute
 }
@@ -665,6 +686,8 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
   ProjectsProjectIdAssistantRunIdRoute:
     ProjectsProjectIdAssistantRunIdRouteWithChildren,
+  ProjectsProjectIdCanvasesCanvasIdRoute:
+    ProjectsProjectIdCanvasesCanvasIdRoute,
   ProjectsProjectIdDictateLocalIdRoute: ProjectsProjectIdDictateLocalIdRoute,
   ProjectsProjectIdStudioNodeIdRoute: ProjectsProjectIdStudioNodeIdRoute,
 }

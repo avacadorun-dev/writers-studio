@@ -3,10 +3,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   clearLocalRecoveryData,
   deleteLocalRecording,
+  getCanvasSnapshot,
   getLocalRecording,
   listAudioChunks,
   markAudioChunkUploaded,
+  markCanvasSnapshotSynced,
   saveAudioChunk,
+  saveCanvasSnapshot,
   saveLocalRecording,
   sha256Hex,
 } from "./index";
@@ -81,5 +84,27 @@ describe("recovery database", () => {
     await clearLocalRecoveryData();
 
     expect(await getLocalRecording(localId)).toBeUndefined();
+  });
+
+  test("stores and acknowledges a canvas snapshot", async () => {
+    const canvasId = crypto.randomUUID();
+    await saveCanvasSnapshot({
+      canvasId,
+      projectId: crypto.randomUUID(),
+      baseRevision: 3,
+      content: { nodes: [], edges: [], future: { preserved: true } },
+      savedAt: Date.now(),
+      synced: false,
+    });
+    expect(await getCanvasSnapshot(canvasId)).toMatchObject({
+      baseRevision: 3,
+      synced: false,
+    });
+    await markCanvasSnapshotSynced(canvasId, 4);
+    expect(await getCanvasSnapshot(canvasId)).toMatchObject({
+      baseRevision: 4,
+      synced: true,
+    });
+    await markCanvasSnapshotSynced("missing-canvas", 1);
   });
 });

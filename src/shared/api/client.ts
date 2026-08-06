@@ -6,6 +6,7 @@ export interface APIErrorPayload {
     message?: string;
     currentRevision?: number;
     conflictNodeId?: string;
+    conflictCanvasId?: string;
   };
 }
 
@@ -14,6 +15,7 @@ export class APIError extends Error {
   readonly code: string;
   readonly currentRevision?: number;
   readonly conflictNodeId?: string;
+  readonly conflictCanvasId?: string;
 
   constructor(status: number, payload: APIErrorPayload) {
     super(payload.error?.message ?? "Не удалось выполнить действие");
@@ -22,6 +24,7 @@ export class APIError extends Error {
     this.code = payload.error?.code ?? "unknown_error";
     this.currentRevision = payload.error?.currentRevision;
     this.conflictNodeId = payload.error?.conflictNodeId;
+    this.conflictCanvasId = payload.error?.conflictCanvasId;
   }
 }
 
