@@ -13,8 +13,27 @@ import {
   saveLocalRecording,
   sha256Hex,
 } from "./index";
+import { withLocalRecoveryTimeout } from "./recovery-db";
 
 const createdIds: string[] = [];
+
+async function openLegacyRecoveryDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("writers-studio-recovery", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore("editorSnapshots", { keyPath: "nodeId" });
+      const recordings = db.createObjectStore("recordings", { keyPath: "localId" });
+      recordings.createIndex("by-status", "status");
+      const chunks = db.createObjectStore("audioChunks", {
+        keyPath: ["localId", "sequence"],
+      });
+      chunks.createIndex("by-recording", "localId");
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
 
 afterEach(async () => {
   for (const localId of createdIds.splice(0)) {
@@ -106,5 +125,36 @@ describe("recovery database", () => {
       synced: true,
     });
     await markCanvasSnapshotSynced("missing-canvas", 1);
+  });
+
+  test("fails open when IndexedDB does not answer", async () => {
+    const pending = new Promise<never>(() => undefined);
+    await expect(withLocalRecoveryTimeout(pending, 10)).rejects.toThrow(
+      "Локальное хранилище восстановления не ответило вовремя",
+    );
+  });
+
+  test("opens Canvas while an old tab blocks the shared database upgrade", async () => {
+    await clearLocalRecoveryData();
+    const legacyConnection = await openLegacyRecoveryDatabase();
+    const startedAt = Date.now();
+
+    expect(await getCanvasSnapshot("blocked-upgrade-canvas")).toBeUndefined();
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+    await saveCanvasSnapshot({
+      canvasId: "blocked-upgrade-canvas",
+      projectId: crypto.randomUUID(),
+      baseRevision: 1,
+      content: { nodes: [], edges: [] },
+      savedAt: Date.now(),
+      synced: false,
+    });
+    expect(await getCanvasSnapshot("blocked-upgrade-canvas")).toMatchObject({
+      baseRevision: 1,
+      synced: false,
+    });
+
+    legacyConnection.close();
+    await clearLocalRecoveryData();
   });
 });

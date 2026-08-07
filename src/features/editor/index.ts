@@ -5,6 +5,16 @@ export {
   setDocumentAnnotations,
 } from "./model/annotations";
 export {
+  migrateFencedCodeBlocks,
+  migrateInlineCodeMarks,
+  parseFencedCode,
+} from "./model/code-block";
+export {
+  codeHighlightLanguage,
+  codeLanguageOptions,
+  normalizeCodeLanguage,
+} from "./model/code-languages";
+export {
   editorDocumentSchemaVersion,
   editorExtensions,
   highlightSourceNode,

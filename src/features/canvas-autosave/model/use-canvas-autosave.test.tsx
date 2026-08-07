@@ -4,7 +4,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import type { CanvasDocument } from "~entities/canvas";
 import { getCanvasSnapshot } from "~shared/lib";
 
-import { useCanvasAutosave } from "./use-canvas-autosave";
+import { runLocalRecoveryOperation, useCanvasAutosave } from "./use-canvas-autosave";
 
 const content: CanvasDocument = {
   nodes: [{ id: "note", type: "text", x: 0, y: 0, width: 200, height: 120, text: "Идея" }],
@@ -35,6 +35,15 @@ function revisionResponse(revision = 2) {
 }
 
 describe("canvas autosave", () => {
+  test("treats unavailable local recovery as best-effort", async () => {
+    expect(await runLocalRecoveryOperation(async () => undefined)).toBeTrue();
+    expect(
+      await runLocalRecoveryOperation(async () => {
+        throw new Error("IndexedDB unavailable");
+      }),
+    ).toBeFalse();
+  });
+
   test("keeps queue stable when a parent recreates the revision callback", () => {
     let queue: ((value: CanvasDocument) => void) | undefined;
     function Harness({ tick }: { tick: number }) {

@@ -1,6 +1,6 @@
 {
   "name": "writers-studio",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,8 @@
     "type-check": "tsc -b --pretty false",
     "test": "bun test ./src/",
     "test:coverage": "bun test ./src/ --coverage",
+    "test:code-block:coverage": "bun test ./src/features/editor/model/code-block.test.ts ./src/features/editor/model/code-block-ui.test.tsx ./src/features/editor/model/extensions.test.ts --coverage && bun run ./scripts/verify-code-block-coverage.ts",
+    "test:rich-blocks:coverage": "bun run test:code-block:coverage && bun run ./scripts/verify-rich-block-coverage.ts",
     "test:canvas:coverage": "bun test ./src/entities/canvas ./src/features/canvas-autosave ./src/shared/lib/recovery-db.test.ts --coverage && bun run ./scripts/verify-canvas-coverage.ts",
     "e2e": "playwright test",
     "e2e:compose": "bash ./scripts/e2e-compose.sh",
@@ -68,6 +70,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
+    "refractor": "^5.0.0",
     "remark-gfm": "^4.0.1",
     "swagger-ui-dist": "5.32.12",
     "tailwind-merge": "^3.3.1",

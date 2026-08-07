@@ -1831,7 +1831,12 @@
     padding: 0.12rem 0.35rem;
     color: var(--accent-ink);
     font-family: "IBM Plex Mono", monospace;
+    font-feature-settings: normal;
     font-size: 0.9em;
+    white-space: pre-wrap;
+    word-spacing: normal;
+    letter-spacing: normal;
+    hyphens: none;
   }
 
   .editor-content .tiptap pre {
@@ -1845,11 +1850,86 @@
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.84em;
     line-height: 1.65;
-    tab-size: 2;
+    tab-size: 4;
   }
 
   .editor-content .tiptap pre code {
     font-family: inherit;
+  }
+
+  .editor-content .tiptap .ws-code-block {
+    margin: 1.4em 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-subtle);
+  }
+
+  .editor-content .tiptap .ws-code-block-toolbar {
+    display: flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+    background: color-mix(in srgb, var(--surface-raised) 75%, transparent);
+    font-family: var(--font-ui);
+  }
+
+  .editor-content .tiptap .ws-code-block-toolbar select {
+    min-height: 1.9rem;
+    max-width: 14rem;
+    border: 0;
+    background: transparent;
+    color: var(--ink-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .editor-content .tiptap .ws-code-block pre {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    white-space: pre;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.comment,
+  .editor-content .tiptap .ws-code-block .token.prolog,
+  .editor-content .tiptap .ws-code-block .token.doctype {
+    color: var(--ink-tertiary);
+    font-style: italic;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.keyword,
+  .editor-content .tiptap .ws-code-block .token.selector,
+  .editor-content .tiptap .ws-code-block .token.important {
+    color: #8b4f9f;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.string,
+  .editor-content .tiptap .ws-code-block .token.char,
+  .editor-content .tiptap .ws-code-block .token.attr-value {
+    color: #2d7668;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.number,
+  .editor-content .tiptap .ws-code-block .token.boolean,
+  .editor-content .tiptap .ws-code-block .token.constant {
+    color: #a15336;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.function,
+  .editor-content .tiptap .ws-code-block .token.class-name,
+  .editor-content .tiptap .ws-code-block .token.builtin {
+    color: #315f9a;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.operator,
+  .editor-content .tiptap .ws-code-block .token.punctuation {
+    color: var(--ink-secondary);
   }
 
   .editor-content .tableWrapper {

@@ -41,6 +41,7 @@ import {
   useActionDialog,
   useToast,
 } from "~shared/ui";
+import { codeLanguageOptions } from "../model/code-languages";
 
 interface FormattingToolbarProps {
   editor: Editor | null;
@@ -223,17 +224,10 @@ export function FormattingToolbar({
                 defaultValue: "plain",
                 icon: Code2,
                 confirmLabel: "Вставить",
-                options: [
-                  { value: "plain", label: "Обычный текст" },
-                  { value: "javascript", label: "JavaScript" },
-                  { value: "typescript", label: "TypeScript" },
-                  { value: "json", label: "JSON" },
-                  { value: "lua", label: "Lua" },
-                  { value: "csharp", label: "C#" },
-                  { value: "cpp", label: "C++" },
-                  { value: "python", label: "Python" },
-                  { value: "sql", label: "SQL" },
-                ],
+                options: codeLanguageOptions.map((option) => ({
+                  value: option.value || "plain",
+                  label: option.label,
+                })),
               }).then((language) => {
                 if (!language) return;
                 editor

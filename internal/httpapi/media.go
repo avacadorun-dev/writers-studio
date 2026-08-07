@@ -4,25 +4,21 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
-	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"writers.studio/internal/projectmedia"
 	"writers.studio/internal/store"
 )
 
 const (
-	maxProjectImageBytes = 12 << 20
 	maxProjectPDFBytes   = 25 << 20
 	maxProjectMediaBytes = 100 << 20
 )
@@ -31,12 +27,14 @@ var supportedProjectImages = map[string]string{
 	"image/png":  ".png",
 	"image/jpeg": ".jpg",
 	"image/gif":  ".gif",
+	"image/webp": ".webp",
 }
 
 var supportedProjectMedia = map[string]string{
 	"image/png":       ".png",
 	"image/jpeg":      ".jpg",
 	"image/gif":       ".gif",
+	"image/webp":      ".webp",
 	"application/pdf": ".pdf",
 	"audio/mpeg":      ".mp3",
 	"audio/mp4":       ".m4a",
@@ -64,17 +62,16 @@ func (s *Server) handleUploadProjectMedia(response http.ResponseWriter, request 
 	}
 	var width, height *int
 	if _, imageMedia := supportedProjectImages[mediaType]; imageMedia {
-		if len(data) > maxProjectImageBytes {
+		metadata, validationErr := projectmedia.InspectImage(data)
+		if errors.Is(validationErr, projectmedia.ErrImageTooLarge) {
 			writeError(response, http.StatusRequestEntityTooLarge, "image_too_large", "Изображение больше 12 МБ")
 			return
 		}
-		configuration, _, decodeErr := image.DecodeConfig(bytes.NewReader(data))
-		if decodeErr != nil || configuration.Width < 1 || configuration.Height < 1 ||
-			configuration.Width > 20_000 || configuration.Height > 20_000 {
+		if validationErr != nil || metadata.MediaType != mediaType {
 			writeError(response, http.StatusUnprocessableEntity, "invalid_image", "Файл изображения повреждён или имеет недопустимый размер")
 			return
 		}
-		widthValue, heightValue := configuration.Width, configuration.Height
+		widthValue, heightValue := metadata.Width, metadata.Height
 		width, height = &widthValue, &heightValue
 	} else if mediaType == "application/pdf" && !validPDF(data) {
 		writeError(response, http.StatusUnprocessableEntity, "invalid_pdf", "PDF повреждён или имеет недопустимый формат")
@@ -185,20 +182,5 @@ func safeUploadedFileName(headerValue, extension string) string {
 	if err != nil {
 		value = ""
 	}
-	value = path.Base(strings.ReplaceAll(value, "\\", "/"))
-	value = strings.Map(func(character rune) rune {
-		if unicode.IsControl(character) {
-			return -1
-		}
-		return character
-	}, value)
-	value = strings.TrimSpace(value)
-	if value == "" || value == "." {
-		return "image" + extension
-	}
-	runes := []rune(value)
-	if len(runes) > 255 {
-		value = string(runes[:255])
-	}
-	return value
+	return projectmedia.SafeFileName(value, extension)
 }

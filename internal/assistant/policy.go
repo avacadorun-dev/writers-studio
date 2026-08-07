@@ -6,6 +6,7 @@ type ToolAuthority string
 
 const (
 	AuthorityRead         ToolAuthority = "A0"
+	AuthorityDirectLow    ToolAuthority = "A1D"
 	AuthorityStageLow     ToolAuthority = "A1"
 	AuthorityStageHigh    ToolAuthority = "A2"
 	AuthorityNativeOnly   ToolAuthority = "A3"
@@ -44,6 +45,11 @@ func ClassifyTool(name string) ToolPolicy {
 	if isReadTool(name) {
 		return ToolPolicy{Name: name, Authority: AuthorityRead, RiskLevel: RiskLow}
 	}
+	if name == "project.upload_image" {
+		return ToolPolicy{
+			Name: name, Authority: AuthorityDirectLow, RiskLevel: RiskLow,
+		}
+	}
 	for _, toolName := range highRiskStagedTools {
 		if name == toolName {
 			return ToolPolicy{
@@ -81,7 +87,7 @@ func isReadTool(name string) bool {
 	switch name {
 	case "assistant.begin_turn", "assistant.get_recent_change_set",
 		"project.get_overview", "project.get_structure",
-		"project.list_recent", "project.search",
+		"project.list_media", "project.list_recent", "project.search",
 		"project.get_activity", "tree.list", "tree.get_node", "document.get",
 		"canvas.list", "canvas.get", "canvas.search", "canvas.analyze_graph",
 		"document.find_exact", "document.find_exact_batch", "document.get_range",
@@ -121,7 +127,7 @@ func isStagedMutation(name string) bool {
 func AllowedToolNames() []string {
 	return []string{
 		"assistant.begin_turn", "assistant.get_recent_change_set",
-		"project.get_overview", "project.get_structure", "project.list_recent",
+		"project.get_overview", "project.get_structure", "project.list_media", "project.upload_image", "project.list_recent",
 		"project.search", "project.get_activity",
 		"canvas.list", "canvas.get", "canvas.search", "canvas.analyze_graph",
 		"canvas.propose_patch", "canvas.promote_cards",

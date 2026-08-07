@@ -10,6 +10,7 @@ import StarterKit from "@tiptap/starter-kit";
 
 import { createClientId } from "~shared/lib";
 import { DocumentAnnotationsExtension } from "./annotations";
+import { codeBlockExtensions } from "./code-block";
 import { Callout, ImageBlock, MermaidBlock } from "./rich-blocks";
 import { sanitizePastedHTML } from "./sanitize-pasted-html";
 
@@ -291,9 +292,11 @@ const SceneBreak = TiptapNode.create({
 export const editorExtensions = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3, 4, 5, 6] },
+    codeBlock: false,
     link: false,
     underline: false,
   }),
+  ...codeBlockExtensions,
   TableKit.configure({
     table: {
       resizable: true,

@@ -67,7 +67,7 @@ func New(
 		mcpMetadataHTTPClient: llm.EndpointPolicy{}.HTTPClient(5 * time.Second),
 		assistantExecutions:   newAssistantExecutionManager(),
 	}
-	backend := assistantapp.NewProjectBackend(dataStore)
+	backend := assistantapp.NewProjectBackend(dataStore, objects)
 	providers, providerErr := assistantapp.NewProviderRegistry(cfg, dataStore)
 	if providerErr != nil {
 		logger.Error("initialize assistant providers", "errorClass", "invalid_llm_credential_key")

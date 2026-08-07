@@ -33,6 +33,8 @@ import {
   editorExtensions,
   FormattingToolbar,
   mappedAnnotationAnchors,
+  migrateFencedCodeBlocks,
+  migrateInlineCodeMarks,
   revealDocumentAnnotation,
   setDocumentAnnotations,
 } from "~features/editor";
@@ -118,7 +120,10 @@ export function ManuscriptEditor({
     const words = text.trim() ? text.trim().split(/\s+/u).length : 0;
     setTextStats({ words, characters: Array.from(text).length });
   }, []);
-  const initialContent = useMemo(() => node.content ?? fallbackDocument, [node.content]);
+  const initialContent = useMemo(
+    () => migrateInlineCodeMarks(migrateFencedCodeBlocks(node.content ?? fallbackDocument)),
+    [node.content],
+  );
   const editor = useEditor({
     extensions: editorExtensions,
     content: initialContent,
@@ -203,9 +208,14 @@ export function ManuscriptEditor({
         !snapshot.synced &&
         snapshot.baseRevision >= node.currentRevision &&
         snapshot.savedAt > new Date(node.updatedAt).getTime();
-      editor.commands.setContent(canRecover ? snapshot.content : initialContent, {
-        emitUpdate: false,
-      });
+      editor.commands.setContent(
+        canRecover
+          ? migrateInlineCodeMarks(migrateFencedCodeBlocks(snapshot.content))
+          : initialContent,
+        {
+          emitUpdate: false,
+        },
+      );
       if (annotationsRef.current) {
         setDocumentAnnotations(editor, annotationsRef.current);
       }

@@ -34,10 +34,12 @@ RUN apk add --no-cache ca-certificates chromium curl fontconfig font-noto freety
     && addgroup -S app && adduser -S app -G app
 ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 ENV EXPORT_FONT_DIR=/app/fonts
+ENV MERMAID_JS_PATH=/app/mermaid.min.js
 WORKDIR /app
 COPY --from=api-build /out/writers-studio /app/writers-studio
 COPY --from=web-build /src/dist /app/web
 COPY --from=web-build /out/fonts /app/fonts
+COPY --from=web-build /src/node_modules/mermaid/dist/mermaid.min.js /app/mermaid.min.js
 USER app
 EXPOSE 8080
 ENTRYPOINT ["/app/writers-studio"]

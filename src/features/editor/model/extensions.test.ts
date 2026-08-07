@@ -64,6 +64,30 @@ describe("Writer's Studio Tiptap schema", () => {
     editor.destroy();
   });
 
+  test("keeps code ranges in preformatted mode without prose input rules", () => {
+    const source = "1. not a list  \n\tindented\n\nfinal";
+    const editor = new Editor({
+      extensions: editorExtensions,
+      content: {
+        type: "doc",
+        attrs: { schemaVersion: 2 },
+        content: [
+          {
+            type: "codeBlock",
+            attrs: { language: "go" },
+            content: [{ type: "text", text: source }],
+          },
+        ],
+      },
+    });
+    expect(editor.schema.nodes.codeBlock.spec.code).toBeTrue();
+    expect(
+      (editor.getJSON().content?.[0]?.content?.[0] as { text?: string } | undefined)?.text,
+    ).toBe(source);
+    expect(editor.getJSON().content?.some((node) => node.type.endsWith("List"))).toBeFalse();
+    editor.destroy();
+  });
+
   test("preserves provenance and assigns a new block identity when splitting", () => {
     const editor = new Editor({
       extensions: editorExtensions,

@@ -887,13 +887,15 @@ function PublicationPreview({
         </div>
       ) : null}
       <article
-        className="mx-auto aspect-[0.707] max-h-[560px] overflow-hidden bg-[var(--surface-panel)] px-[12%] py-[10%] text-[var(--ink-primary)] shadow-sm"
+        className={`mx-auto aspect-[0.707] max-h-[560px] overflow-hidden bg-[var(--surface-panel)] text-[var(--ink-primary)] shadow-sm ${
+          activePage?.kind === "cover" ? "p-0" : "px-[12%] py-[10%]"
+        }`}
         style={style}
         aria-label={activePage?.label ?? "Пустой предпросмотр"}
       >
         {activePage?.kind === "cover" && coverUrl ? (
-          <div className="flex h-full items-center justify-center">
-            <img src={coverUrl} alt="Обложка" className="max-h-full w-full object-contain" />
+          <div className="h-full w-full">
+            <img src={coverUrl} alt="Обложка" className="h-full w-full object-cover" />
           </div>
         ) : null}
         {activePage?.kind === "title" ? (

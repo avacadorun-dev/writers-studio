@@ -19,6 +19,15 @@ interface UseCanvasAutosaveResult {
   flush: () => Promise<void>;
 }
 
+export async function runLocalRecoveryOperation(operation: () => Promise<void>): Promise<boolean> {
+  try {
+    await operation();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function useCanvasAutosave({
   canvasId,
   projectId,
@@ -45,17 +54,36 @@ export function useCanvasAutosave({
     onRevisionRef.current = onRevision;
   }, [onRevision]);
 
+  const persistSnapshot = useCallback(
+    (content: CanvasDocument, revision: number) =>
+      runLocalRecoveryOperation(() =>
+        saveCanvasSnapshot({
+          canvasId,
+          projectId,
+          baseRevision: revision,
+          content,
+          savedAt: Date.now(),
+          synced: false,
+        }),
+      ),
+    [canvasId, projectId],
+  );
+
   const persistLocal = useCallback(async () => {
-    if (!latestContent.current) return;
-    await saveCanvasSnapshot({
-      canvasId,
-      projectId,
-      baseRevision: baseRevision.current,
-      content: latestContent.current,
-      savedAt: Date.now(),
-      synced: false,
-    });
-  }, [canvasId, projectId]);
+    if (!latestContent.current) return true;
+    return persistSnapshot(latestContent.current, baseRevision.current);
+  }, [persistSnapshot]);
+
+  const markLocalSynced = useCallback(
+    (revision: number) =>
+      runLocalRecoveryOperation(() => markCanvasSnapshotSynced(canvasId, revision)),
+    [canvasId],
+  );
+
+  const localFailureState = useCallback((persisted: boolean): SaveState => {
+    if (!navigator.onLine && persisted) return "local";
+    return "pending";
+  }, []);
 
   const flush = useCallback(async () => {
     if (!latestContent.current || !dirty.current || inFlight.current || conflict.current) return;
@@ -67,15 +95,8 @@ export function useCanvasAutosave({
     dirty.current = false;
     inFlight.current = true;
     setSaveState("saving");
+    const locallyPersisted = await persistSnapshot(content, savingBase);
     try {
-      await saveCanvasSnapshot({
-        canvasId,
-        projectId,
-        baseRevision: savingBase,
-        content,
-        savedAt: Date.now(),
-        synced: false,
-      });
       const response = await saveCanvasRevision(canvasId, {
         baseRevision: savingBase,
         content,
@@ -89,7 +110,7 @@ export function useCanvasAutosave({
         await persistLocal();
         setSaveState("saving");
       } else {
-        await markCanvasSnapshotSynced(canvasId, response.revision.revision);
+        await markLocalSynced(response.revision.revision);
         setSaveState("saved");
       }
     } catch (error) {
@@ -102,12 +123,12 @@ export function useCanvasAutosave({
         if (changedWhileSaving) {
           await persistLocal();
         } else {
-          await markCanvasSnapshotSynced(canvasId, baseRevision.current);
+          await markLocalSynced(baseRevision.current);
         }
         setSaveState("conflict");
       } else {
         dirty.current = true;
-        setSaveState(navigator.onLine ? "pending" : "local");
+        setSaveState(localFailureState(locallyPersisted));
       }
     } finally {
       inFlight.current = false;
@@ -115,7 +136,7 @@ export function useCanvasAutosave({
         serverTimer.current = window.setTimeout(() => void flush(), 1_500);
       }
     }
-  }, [canvasId, persistLocal, projectId]);
+  }, [canvasId, localFailureState, markLocalSynced, persistLocal, persistSnapshot]);
 
   const queue = useCallback(
     (content: CanvasDocument) => {
