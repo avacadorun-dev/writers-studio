@@ -1,10 +1,10 @@
 # «Студия автора»: режим «Ассистент» и проектный MCP
 
-> Версия: 1.0  
-> Статус: нормативный product/design baseline; multi-session WF-37 реализован и проверен  
-> Дата: 4 августа 2026  
-> Нормативное поведение: [WORKFLOWS.md](./WORKFLOWS.md), WF-20–WF-37  
-> Архитектурные решения: [ADR-003](../adr/ADR-003-assistant-mcp.md) и [ADR-007](../adr/ADR-007-assistant-continuous-workspace.md)  
+> Версия: 1.0
+> Статус: нормативный product/design baseline; Assistant UX release 0.7.0 реализован и проверен
+> Дата: 28 августа 2026
+> Нормативное поведение: [WORKFLOWS.md](./WORKFLOWS.md), WF-20–WF-37
+> Архитектурные решения: [ADR-003](../adr/ADR-003-assistant-mcp.md) и [ADR-007](../adr/ADR-007-assistant-continuous-workspace.md)
 > Реализация и доказательства: [TRACEABILITY.md](../implementation/TRACEABILITY.md)
 
 ## 1. Назначение
@@ -131,8 +131,14 @@ project tree, editor toolbar и Assistant образуют одну прямоу
 высотой 56 px сразу под главным header. Закрытие панели возвращает плавающее
 полотно без remount editor и потери его состояния.
 
-Панель можно свернуть и изменять по ширине в пределах design constraints, но её
-открытие не демонтирует editor и не создаёт второй документ. Voice и Chat меняют
+Общий `AssistantDockShell` используется в Studio и Canvas. На desktop он занимает
+правые 380 px workspace без внешнего отступа, радиуса и плавающей тени; Canvas
+пересчитывает доступную ширину, но не меняет canonical координаты узлов. На tablet
+это управляемый overlay от правого края, на mobile — полноширинное presentation. Закрытие
+возвращает focus в control, который открыл panel. Один run и выбранное представление
+сохраняются при переходе Studio ↔ Canvas; background run не останавливается.
+
+Открытие панели не демонтирует editor и не создаёт второй документ. Voice и Chat меняют
 только input/feed внутри этой панели. Для global run в центральной области остаётся
 последний открытый документ или project overview; когда target разрешён, нужный
 документ открывается там же без потери истории run.
@@ -149,6 +155,15 @@ route/URL; полноэкранный переход из panel считаетс
 двумя кнопками: `Отмена` и `Отправить`. `Применить изменения` не показывается рядом
 с `Отправить`: сначала автор выбирает, применяет ли текущий вариант или формулирует
 новое уточнение.
+
+Transcript и history имеют собственную прокрутку: header, target/mode и composer остаются
+на месте, wheel/touch не передаётся Canvas или Studio. Auto-follow работает только у конца
+feed; позиция хранится отдельно для каждого run. В review независимо прокручиваются
+группы, точный diff и контекс, а footer с единственным primary action остаётся видимым.
+
+Общий message renderer переносит длинные token/URL, показывает valid JSON как
+форматированный, сворачиваемый и точно копируемый code surface. Сырой HTML не
+интерпретируется; fenced code имеет отдельную keyboard-accessible прокрутку.
 
 До voice capture применяется тот же security preflight, что для диктовки.
 `getUserMedia` доступен только на HTTPS или browser-trusted loopback origin.

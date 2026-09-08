@@ -292,15 +292,28 @@ func decodeProjectTransferArchive(
 		if sha256Hex(content) != strings.ToLower(item.SHA256) {
 			return store.ProjectTransfer{}, nil, fmt.Errorf("media checksum mismatch")
 		}
-		configuration, _, err := image.DecodeConfig(bytes.NewReader(content))
-		if err != nil || http.DetectContentType(content) != item.MediaType ||
-			configuration.Width != item.Width || configuration.Height != item.Height {
+		if http.DetectContentType(content) != item.MediaType {
 			return store.ProjectTransfer{}, nil, fmt.Errorf("media content mismatch")
+		}
+		if item.MediaType == "application/pdf" {
+			if !validPDF(content) || item.Width != nil || item.Height != nil {
+				return store.ProjectTransfer{}, nil, fmt.Errorf("media content mismatch")
+			}
+		} else if !isTimedProjectMedia(item.MediaType) {
+			configuration, _, decodeErr := image.DecodeConfig(bytes.NewReader(content))
+			if decodeErr != nil || item.Width == nil || item.Height == nil ||
+				configuration.Width != *item.Width || configuration.Height != *item.Height {
+				return store.ProjectTransfer{}, nil, fmt.Errorf("media content mismatch")
+			}
 		}
 		totalUncompressed += item.ByteSize
 		fileContent[item.Path] = content
 	}
 	return transfer, fileContent, nil
+}
+
+func isTimedProjectMedia(mediaType string) bool {
+	return strings.HasPrefix(mediaType, "audio/") || strings.HasPrefix(mediaType, "video/")
 }
 
 func readZipEntry(entry *zip.File, limit int64) ([]byte, error) {

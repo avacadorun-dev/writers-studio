@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import {
   getProjectAssistantSettings,
+  updateNode,
   updateProject,
   updateProjectAssistantSettings,
   uploadProjectImage,
@@ -10,6 +11,25 @@ import {
 afterEach(() => mock.restore());
 
 describe("project metadata API", () => {
+  test("renames a node through the canonical mutation without touching content", async () => {
+    let request: { url: string; method: string; body: unknown } | undefined;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      request = {
+        url: String(input),
+        method: init?.method ?? "GET",
+        body: JSON.parse(String(init?.body)),
+      };
+      return Response.json({ node: { id: "node-1", title: "Новая сцена" } });
+    }) as unknown as typeof fetch;
+
+    await updateNode("node-1", { title: "Новая сцена" });
+    expect(request).toEqual({
+      url: "/api/nodes/node-1",
+      method: "PATCH",
+      body: { title: "Новая сцена" },
+    });
+  });
+
   test("updates editable project fields through the project endpoint", async () => {
     let request: { url: string; method: string; body: unknown } | undefined;
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {

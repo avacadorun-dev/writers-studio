@@ -1,4 +1,33 @@
-import type { AssistantChangeOperation, AssistantResolvedTarget } from "~entities/assistant";
+import type {
+  AssistantChangeOperation,
+  AssistantChangeSet,
+  AssistantResolvedTarget,
+} from "~entities/assistant";
+
+export type ReviewPrimaryAction = "apply" | "send-feedback" | "undo" | "return";
+
+export function reviewStatusLabel(state: AssistantChangeSet["state"]): string {
+  return {
+    staged: "Не применено",
+    applied: "Применено",
+    rejected: "Отклонено",
+    stale: "Устарело",
+    failed: "Ошибка",
+    undone: "Отменено",
+  }[state];
+}
+
+export function reviewPrimaryAction(
+  state: AssistantChangeSet["state"],
+  requestingChanges: boolean,
+): { action: ReviewPrimaryAction; label: string } {
+  if (state === "staged" && requestingChanges) {
+    return { action: "send-feedback", label: "Отправить замечания" };
+  }
+  if (state === "staged") return { action: "apply", label: "Применить изменения" };
+  if (state === "applied") return { action: "undo", label: "Отменить набор" };
+  return { action: "return", label: "Вернуться" };
+}
 
 const groupLabels: Record<string, string> = {
   document: "Текст и структура",
@@ -6,6 +35,7 @@ const groupLabels: Record<string, string> = {
   memory: "Память проекта",
   guide: "Руководство ассистента",
   version: "Именованная версия",
+  canvas: "Canvas-доска",
 };
 
 const operationLabels: Record<string, string> = {
@@ -25,7 +55,97 @@ const operationLabels: Record<string, string> = {
   "project_memory.update": "Обновление памяти проекта",
   "assistant_guide.propose_create": "Новое руководство ассистента",
   "assistant_guide.propose_update": "Обновление руководства ассистента",
+  "canvas.propose_patch": "Предложение для доски",
+  "canvas.promote_cards": "Карточки станут документами",
 };
+
+export interface CanvasGhostNode {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  state: "unchanged" | "added" | "moved" | "updated" | "deleted";
+}
+
+export interface CanvasGhostPreview {
+  nodes: CanvasGhostNode[];
+  addedEdges: number;
+  deletedEdges: number;
+  changedNodes: number;
+}
+
+export function canvasGhostPreview(
+  beforeValue: unknown,
+  proposedValue: unknown,
+): CanvasGhostPreview | undefined {
+  const before = canvasSnapshot(beforeValue);
+  const proposed = canvasSnapshot(proposedValue);
+  if (!before || !proposed) return undefined;
+  const beforeNodes = new Map(before.nodes.map((node) => [node.id, node]));
+  const proposedNodes = new Map(proposed.nodes.map((node) => [node.id, node]));
+  const nodes: CanvasGhostNode[] = [];
+  for (const node of proposed.nodes) {
+    const previous = beforeNodes.get(node.id);
+    let state: CanvasGhostNode["state"] = "unchanged";
+    if (!previous) state = "added";
+    else if (previous.x !== node.x || previous.y !== node.y) state = "moved";
+    else if (JSON.stringify(previous) !== JSON.stringify(node)) state = "updated";
+    nodes.push({ ...node, state });
+  }
+  for (const node of before.nodes) {
+    if (!proposedNodes.has(node.id)) nodes.push({ ...node, state: "deleted" });
+  }
+  const beforeEdges = new Set(before.edges);
+  const proposedEdges = new Set(proposed.edges);
+  return {
+    nodes,
+    addedEdges: [...proposedEdges].filter((id) => !beforeEdges.has(id)).length,
+    deletedEdges: [...beforeEdges].filter((id) => !proposedEdges.has(id)).length,
+    changedNodes: nodes.filter((node) => node.state !== "unchanged").length,
+  };
+}
+
+function canvasSnapshot(
+  value: unknown,
+): { nodes: Omit<CanvasGhostNode, "state">[]; edges: string[] } | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const nested = record.content && typeof record.content === "object" ? record.content : record;
+  if (!nested || typeof nested !== "object") return undefined;
+  const snapshot = nested as Record<string, unknown>;
+  if (!Array.isArray(snapshot.nodes) || !Array.isArray(snapshot.edges)) return undefined;
+  const nodes = snapshot.nodes.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const node = raw as Record<string, unknown>;
+    if (typeof node.id !== "string" || typeof node.x !== "number" || typeof node.y !== "number") {
+      return [];
+    }
+    const label =
+      typeof node.text === "string"
+        ? node.text.split("\n", 1)[0]
+        : typeof node.label === "string"
+          ? node.label
+          : String(node.type ?? "Карточка");
+    return [
+      {
+        id: node.id,
+        x: node.x,
+        y: node.y,
+        width: typeof node.width === "number" ? node.width : 180,
+        height: typeof node.height === "number" ? node.height : 100,
+        label,
+      },
+    ];
+  });
+  const edges = snapshot.edges.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const edge = raw as Record<string, unknown>;
+    return typeof edge.id === "string" ? [edge.id] : [];
+  });
+  return { nodes, edges };
+}
 
 export interface ExactTextEdit {
   blockId: string;
@@ -45,6 +165,7 @@ export function operationLabel(toolName: string): string {
   if (toolName.startsWith("dictionary.")) return "Изменение словаря";
   if (toolName.startsWith("project_memory.")) return "Изменение памяти проекта";
   if (toolName.startsWith("assistant_guide.")) return "Изменение руководства";
+  if (toolName.startsWith("canvas.")) return "Изменение Canvas-доски";
   return "Предложенное изменение";
 }
 

@@ -67,7 +67,7 @@ func New(
 		mcpMetadataHTTPClient: llm.EndpointPolicy{}.HTTPClient(5 * time.Second),
 		assistantExecutions:   newAssistantExecutionManager(),
 	}
-	backend := assistantapp.NewProjectBackend(dataStore)
+	backend := assistantapp.NewProjectBackend(dataStore, objects)
 	providers, providerErr := assistantapp.NewProviderRegistry(cfg, dataStore)
 	if providerErr != nil {
 		logger.Error("initialize assistant providers", "errorClass", "invalid_llm_credential_key")
@@ -139,6 +139,20 @@ func (s *Server) routes() chi.Router {
 		router.Get("/api/projects/{projectID}/transfer", s.handleDownloadProjectTransfer)
 		router.Patch("/api/projects/{projectID}/status", s.handleProjectStatus)
 		router.Delete("/api/projects/{projectID}/purge", s.handlePurgeProject)
+		router.Get("/api/projects/{projectID}/canvases", s.handleListCanvases)
+		router.Post("/api/projects/{projectID}/canvases", s.handleCreateCanvas)
+		router.Post("/api/projects/{projectID}/canvases/import", s.handleImportCanvas)
+		router.Post("/api/projects/{projectID}/link-previews", s.handleLinkPreviews)
+		router.Get("/api/projects/{projectID}/canvas-schema", s.handleGetCanvasTypeSchema)
+		router.Put("/api/projects/{projectID}/canvas-schema", s.handleSaveCanvasTypeSchema)
+		router.Get("/api/canvases/{canvasID}", s.handleGetCanvas)
+		router.Patch("/api/canvases/{canvasID}", s.handleUpdateCanvas)
+		router.Delete("/api/canvases/{canvasID}", s.handleTrashCanvas)
+		router.Post("/api/canvases/{canvasID}/duplicate", s.handleDuplicateCanvas)
+		router.Post("/api/canvases/{canvasID}/restore", s.handleRestoreCanvas)
+		router.Get("/api/canvases/{canvasID}/export", s.handleExportCanvas)
+		router.Put("/api/canvases/{canvasID}/revisions", s.handleSaveCanvasRevision)
+		router.Post("/api/canvases/{canvasID}/promotions", s.handlePromoteCanvasNode)
 
 		router.Post("/api/projects/{projectID}/nodes", s.handleCreateNode)
 		router.Post("/api/projects/{projectID}/media", s.handleUploadProjectMedia)

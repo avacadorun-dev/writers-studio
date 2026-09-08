@@ -4,52 +4,80 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"writers.studio/internal/projectmedia"
 	"writers.studio/internal/store"
 )
 
-const maxProjectImageBytes = 12 << 20
+const (
+	maxProjectPDFBytes   = 25 << 20
+	maxProjectMediaBytes = 100 << 20
+)
 
 var supportedProjectImages = map[string]string{
 	"image/png":  ".png",
 	"image/jpeg": ".jpg",
 	"image/gif":  ".gif",
+	"image/webp": ".webp",
+}
+
+var supportedProjectMedia = map[string]string{
+	"image/png":       ".png",
+	"image/jpeg":      ".jpg",
+	"image/gif":       ".gif",
+	"image/webp":      ".webp",
+	"application/pdf": ".pdf",
+	"audio/mpeg":      ".mp3",
+	"audio/mp4":       ".m4a",
+	"audio/ogg":       ".ogg",
+	"audio/wav":       ".wav",
+	"video/mp4":       ".mp4",
+	"video/webm":      ".webm",
 }
 
 func (s *Server) handleUploadProjectMedia(response http.ResponseWriter, request *http.Request) {
-	data, err := io.ReadAll(http.MaxBytesReader(response, request.Body, maxProjectImageBytes))
+	data, err := io.ReadAll(http.MaxBytesReader(response, request.Body, maxProjectMediaBytes))
 	if err != nil {
-		writeError(response, http.StatusRequestEntityTooLarge, "image_too_large", "Изображение больше 12 МБ")
+		writeError(response, http.StatusRequestEntityTooLarge, "media_too_large", "Файл больше 100 МБ")
 		return
 	}
 	if len(data) == 0 {
-		writeError(response, http.StatusUnprocessableEntity, "invalid_image", "Выберите непустой файл изображения")
+		writeError(response, http.StatusUnprocessableEntity, "invalid_media", "Выберите непустой файл")
 		return
 	}
-	mediaType := http.DetectContentType(data)
-	extension, supported := supportedProjectImages[mediaType]
+	mediaType := normalizedUploadedMediaType(http.DetectContentType(data), request.Header.Get("Content-Type"), data)
+	extension, supported := supportedProjectMedia[mediaType]
 	if !supported {
-		writeError(response, http.StatusUnsupportedMediaType, "unsupported_image", "Поддерживаются PNG, JPEG и GIF")
+		writeError(response, http.StatusUnsupportedMediaType, "unsupported_media", "Поддерживаются изображения, PDF, MP3/M4A/OGG/WAV и MP4/WebM")
 		return
 	}
-	configuration, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || configuration.Width < 1 || configuration.Height < 1 ||
-		configuration.Width > 20_000 || configuration.Height > 20_000 {
-		writeError(response, http.StatusUnprocessableEntity, "invalid_image", "Файл изображения повреждён или имеет недопустимый размер")
+	var width, height *int
+	if _, imageMedia := supportedProjectImages[mediaType]; imageMedia {
+		metadata, validationErr := projectmedia.InspectImage(data)
+		if errors.Is(validationErr, projectmedia.ErrImageTooLarge) {
+			writeError(response, http.StatusRequestEntityTooLarge, "image_too_large", "Изображение больше 12 МБ")
+			return
+		}
+		if validationErr != nil || metadata.MediaType != mediaType {
+			writeError(response, http.StatusUnprocessableEntity, "invalid_image", "Файл изображения повреждён или имеет недопустимый размер")
+			return
+		}
+		widthValue, heightValue := metadata.Width, metadata.Height
+		width, height = &widthValue, &heightValue
+	} else if mediaType == "application/pdf" && !validPDF(data) {
+		writeError(response, http.StatusUnprocessableEntity, "invalid_pdf", "PDF повреждён или имеет недопустимый формат")
+		return
+	} else if strings.HasPrefix(mediaType, "audio/") && len(data) > 50<<20 {
+		writeError(response, http.StatusRequestEntityTooLarge, "audio_too_large", "Аудио больше 50 МБ")
 		return
 	}
 	projectID := chi.URLParam(request, "projectID")
@@ -68,8 +96,8 @@ func (s *Server) handleUploadProjectMedia(response http.ResponseWriter, request 
 			OriginalName: safeUploadedFileName(request.Header.Get("X-File-Name"), extension),
 			SHA256:       hex.EncodeToString(checksum[:]),
 			ByteSize:     int64(len(data)),
-			Width:        configuration.Width,
-			Height:       configuration.Height,
+			Width:        width,
+			Height:       height,
 			StorageKey:   storageKey,
 		},
 	)
@@ -81,6 +109,26 @@ func (s *Server) handleUploadProjectMedia(response http.ResponseWriter, request 
 		return
 	}
 	writeJSON(response, http.StatusCreated, map[string]any{"media": media})
+}
+
+func normalizedUploadedMediaType(detected, declared string, data []byte) string {
+	declared = strings.TrimSpace(strings.SplitN(declared, ";", 2)[0])
+	if detected == "application/ogg" && (declared == "audio/ogg" || declared == "video/ogg") {
+		return "audio/ogg"
+	}
+	if detected == "audio/x-wav" || detected == "audio/wave" {
+		return "audio/wav"
+	}
+	if detected == "application/octet-stream" && len(data) >= 12 && string(data[4:8]) == "ftyp" {
+		if declared == "audio/mp4" {
+			return declared
+		}
+		return "video/mp4"
+	}
+	if detected == "video/mp4" && declared == "audio/mp4" {
+		return declared
+	}
+	return detected
 }
 
 func (s *Server) handleProjectMediaContent(response http.ResponseWriter, request *http.Request) {
@@ -99,20 +147,34 @@ func (s *Server) handleProjectMediaContent(response http.ResponseWriter, request
 	}
 	data, err := s.objects.Get(request.Context(), media.StorageKey)
 	if err != nil {
-		writeError(response, http.StatusServiceUnavailable, "image_unavailable", "Изображение временно недоступно")
+		writeError(response, http.StatusServiceUnavailable, "media_unavailable", "Файл временно недоступен")
 		return
 	}
 	checksum := sha256.Sum256(data)
 	if int64(len(data)) != media.ByteSize || hex.EncodeToString(checksum[:]) != media.SHA256 {
-		writeError(response, http.StatusConflict, "image_checksum_mismatch", "Проверка целостности изображения не пройдена")
+		writeError(response, http.StatusConflict, "media_checksum_mismatch", "Проверка целостности файла не пройдена")
 		return
 	}
 	response.Header().Set("Content-Type", media.MediaType)
-	response.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	response.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	response.Header().Set("ETag", `"`+media.SHA256+`"`)
-	response.WriteHeader(http.StatusOK)
-	_, _ = response.Write(data)
+	response.Header().Set("Accept-Ranges", "bytes")
+	response.Header().Set(
+		"Content-Disposition",
+		"inline; filename*=UTF-8''"+strings.ReplaceAll(url.QueryEscape(media.OriginalName), "+", "%20"),
+	)
+	http.ServeContent(response, request, media.OriginalName, media.CreatedAt, bytes.NewReader(data))
+}
+
+func validPDF(data []byte) bool {
+	if len(data) < 12 || !bytes.HasPrefix(data, []byte("%PDF-")) {
+		return false
+	}
+	tail := data
+	if len(tail) > 4_096 {
+		tail = tail[len(tail)-4_096:]
+	}
+	return bytes.Contains(tail, []byte("%%EOF"))
 }
 
 func safeUploadedFileName(headerValue, extension string) string {
@@ -120,20 +182,5 @@ func safeUploadedFileName(headerValue, extension string) string {
 	if err != nil {
 		value = ""
 	}
-	value = path.Base(strings.ReplaceAll(value, "\\", "/"))
-	value = strings.Map(func(character rune) rune {
-		if unicode.IsControl(character) {
-			return -1
-		}
-		return character
-	}, value)
-	value = strings.TrimSpace(value)
-	if value == "" || value == "." {
-		return "image" + extension
-	}
-	runes := []rune(value)
-	if len(runes) > 255 {
-		value = string(runes[:255])
-	}
-	return value
+	return projectmedia.SafeFileName(value, extension)
 }

@@ -91,7 +91,7 @@ func TestRemoteMCPAgentOnlyApplyAndUndo(t *testing.T) {
 	publicURL := "http://" + listener.Addr().String()
 	gateway, err := New(
 		dataStore,
-		assistantapp.NewProjectBackend(dataStore),
+		assistantapp.NewProjectBackend(dataStore, objectstore.NewMemory()),
 		objectstore.NewMemory(),
 		publicURL,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),

@@ -10,12 +10,13 @@ import (
 )
 
 type ExecutionContext struct {
-	OwnerUserID  string
-	ProjectID    string
-	RunID        string
-	TurnID       string
-	TargetNodeID *string
-	Instruction  string
+	OwnerUserID    string
+	ProjectID      string
+	RunID          string
+	TurnID         string
+	TargetNodeID   *string
+	TargetCanvasID *string
+	Instruction    string
 	// Durable is set only for remote MCP turns. The built-in assistant keeps its
 	// existing in-process lifecycle while remote staged calls are committed to a
 	// recoverable draft before the result is returned to the client.

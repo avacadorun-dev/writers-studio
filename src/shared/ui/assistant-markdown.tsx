@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/noNoninteractiveTabindex: overflow code regions must be keyboard-scrollable
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -20,7 +21,11 @@ const components: Components = {
   h1: ({ children }) => <h1 className="mt-6 mb-3 text-2xl font-semibold">{children}</h1>,
   h2: ({ children }) => <h2 className="mt-5 mb-2 text-xl font-semibold">{children}</h2>,
   h3: ({ children }) => <h3 className="mt-4 mb-2 text-base font-semibold">{children}</h3>,
-  p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
+  p: ({ children }) => (
+    <p className="my-2 whitespace-pre-wrap [overflow-wrap:anywhere] first:mt-0 last:mb-0">
+      {children}
+    </p>
+  ),
   ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6">{children}</ul>,
   ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6">{children}</ol>,
   li: ({ children }) => <li className="pl-1 marker:text-[var(--accent)]">{children}</li>,
@@ -55,9 +60,13 @@ const components: Components = {
     );
   },
   pre: ({ children }) => (
-    <pre className="my-4 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4 text-[12px] leading-5">
-      {children}
-    </pre>
+    <section
+      tabIndex={0}
+      aria-label="Блок кода"
+      className="my-4 max-h-80 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4 text-[12px] leading-5 [scrollbar-gutter:stable]"
+    >
+      <pre>{children}</pre>
+    </section>
   ),
   table: ({ children }) => (
     <div className="my-4 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)]">
@@ -91,7 +100,12 @@ export function AssistantMarkdown({
   const safe = sanitizeAssistantMarkdown(children);
   if (!safe) return null;
   return (
-    <div className={cn("assistant-markdown min-w-0 leading-6", className)}>
+    <div
+      className={cn(
+        "assistant-markdown min-w-0 max-w-full leading-6 [overflow-wrap:anywhere]",
+        className,
+      )}
+    >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {safe}
       </ReactMarkdown>

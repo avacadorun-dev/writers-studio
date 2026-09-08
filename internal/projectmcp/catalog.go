@@ -3,6 +3,7 @@ package projectmcp
 import (
 	"writers.studio/internal/assistant"
 	"writers.studio/internal/llm"
+	"writers.studio/internal/projectmedia"
 )
 
 type ToolSpec struct {
@@ -56,6 +57,13 @@ func Catalog() []ToolSpec {
 		"tags": arraySchema(stringSchema()), "active": booleanSchema(),
 		"alwaysRelevant": booleanSchema(),
 	})
+	canvasID := strictSchema(map[string]any{"canvasId": stringSchema()})
+	canvasPatchOperation := strictSchema(map[string]any{
+		"op":        enumSchema("add", "update", "delete"),
+		"kind":      enumSchema("node", "edge"),
+		"id":        stringSchema(),
+		"valueJson": stringSchema(),
+	})
 	return []ToolSpec{
 		spec(
 			"assistant.begin_turn",
@@ -75,9 +83,36 @@ func Catalog() []ToolSpec {
 		),
 		spec("project.get_overview", "Read project metadata, structure summary and current target.", noArgs),
 		spec("project.get_structure", "Read project-defined node types, labels and nesting rules.", noArgs),
+		spec("project.list_media", "List project media that may be referenced by canonical image blocks. Use an image assetId from this result.", noArgs),
+		spec(
+			"project.upload_image",
+			"Upload one PNG, JPEG, GIF or WebP image directly into the open project and return its assetId plus a ready canonical image block. Pass raw base64 only, without a data-URL prefix. This stores the otherwise unattached asset immediately; document insertion remains a separately reviewed change.",
+			strictSchema(map[string]any{
+				"filename": boundedStringSchema(1, 255),
+				"mediaType": enumSchema(
+					"image/png", "image/jpeg", "image/gif", "image/webp",
+				),
+				"dataBase64": boundedStringSchema(1, projectmedia.MaxBase64Length),
+			}),
+		),
 		spec("project.list_recent", "List recently changed project artifacts.", strictSchema(map[string]any{"limit": integerSchema()})),
 		spec("project.search", "Search documents, notes, drafts and transcripts in this project.", projectQuery),
 		spec("project.get_activity", "Read recent native and assistant project activity.", strictSchema(map[string]any{"limit": integerSchema()})),
+		spec("canvas.list", "List active Canvas boards in this project.", noArgs),
+		spec("canvas.get", "Read one Canvas snapshot with its current revision and resolved project resources.", canvasID),
+		spec("canvas.search", "Search standalone Canvas text, typed fields and linked metadata in this project.", projectQuery),
+		spec("canvas.analyze_graph", "Analyze one Canvas graph for components, orphans, roots, leaves and cycles without changing it.", canvasID),
+		spec("canvas.propose_patch", "Stage typed add, update and delete operations for one Canvas revision. valueJson must contain one complete JSON Canvas node or edge for add/update and be an empty string for delete. Canonical Canvas stays unchanged until Apply.", strictSchema(map[string]any{
+			"canvasId": stringSchema(), "baseRevision": integerSchema(),
+			"operations": boundedArraySchema(canvasPatchOperation, 1, 500),
+		})),
+		spec("canvas.promote_cards", "Stage atomic promotion of selected Canvas text cards into project documents. Canonical Canvas and project tree stay unchanged until Apply.", strictSchema(map[string]any{
+			"canvasId": stringSchema(), "baseRevision": integerSchema(),
+			"items": boundedArraySchema(strictSchema(map[string]any{
+				"nodeId": stringSchema(), "title": stringSchema(), "kind": stringSchema(),
+				"parentId": nullableStringSchema(),
+			}), 1, 50),
+		})),
 		spec("tree.list", "List the complete project tree without document bodies.", noArgs),
 		spec("tree.get_node", "Read node metadata and revision.", nodeID),
 		spec("tree.create_node", "Stage creation of a project node.", strictSchema(map[string]any{
@@ -100,7 +135,7 @@ func Catalog() []ToolSpec {
 		})),
 		spec("tree.duplicate_node", "Stage duplication of a node.", nodeID),
 		spec("tree.prepare_archive", "Prepare a high-risk archive operation for review.", nodeID),
-		spec("document.get", "Read the current structured document and plain text.", nodeID),
+		spec("document.get", "Read the current structured document, canonical blocks and plain text. Blocks preserve native code, lists, separators, tables, project images, Mermaid diagrams and info/idea/warning/todo callouts without flattening them into paragraphs.", nodeID),
 		spec(
 			"document.find_exact",
 			"Locate an exact literal substring and return verified block-local Unicode anchors for "+
@@ -126,7 +161,7 @@ func Catalog() []ToolSpec {
 			"start": integerSchema(), "end": integerSchema(),
 		})),
 		spec("document.list_references", "List source references attached to document blocks.", nodeID),
-		spec("document.insert", "Stage structured content insertion at an exact position.", strictSchema(map[string]any{
+		spec("document.insert", "Stage structured content insertion at an exact position. Content supports canonical prose, native code, tables, project images, Mermaid diagrams and info/idea/warning/todo callouts.", strictSchema(map[string]any{
 			"nodeId": stringSchema(), "baseRevision": integerSchema(),
 			"position": integerSchema(), "content": content,
 		})),
@@ -146,7 +181,7 @@ func Catalog() []ToolSpec {
 				"protectedRanges": protectedRanges,
 			}),
 		),
-		spec("document.append", "Stage appending structured content to a document.", documentMutation),
+		spec("document.append", "Stage appending canonical prose, native code, tables, project images, Mermaid diagrams or info/idea/warning/todo callouts to a document.", documentMutation),
 		spec(
 			"document.append_chunk",
 			"Stage one bounded long-form chunk in an existing document. Use this repeatedly instead of document.append whenever the requested new prose may exceed 1500 words. Chunks are accumulated in sequence into one reviewable document operation; canonical state remains unchanged until Apply. Keep each chunk between roughly 600 and 1200 words, copy the author's approximate total into targetWords, start sequence at 1, and set finalChunk only when the accumulated draft reaches the target.",
@@ -166,7 +201,7 @@ func Catalog() []ToolSpec {
 			"blockId": stringSchema(), "start": integerSchema(), "end": integerSchema(),
 			"marks": arraySchema(mark), "protectedRanges": protectedRanges,
 		})),
-		spec("document.create_draft", "Stage a new draft document.", strictSchema(map[string]any{
+		spec("document.create_draft", "Stage a new draft document with canonical prose, native code, tables, project images, Mermaid diagrams and info/idea/warning/todo callouts.", strictSchema(map[string]any{
 			"title": stringSchema(), "content": content,
 			"parentId": nullableStringSchema(), "positionAfterId": nullableStringSchema(),
 		})),
@@ -434,13 +469,58 @@ func booleanSchema() map[string]any {
 }
 
 func assistantContentSchema() map[string]any {
-	block := strictSchema(map[string]any{
+	inlineText := map[string]any{
+		"type":        "string",
+		"description": "Prose text; wrap inline code in matching Markdown backticks, for example `go test`. It is stored as a canonical code mark and returned with the language-neutral backtick syntax.",
+	}
+	proseBlock := strictSchema(map[string]any{
 		"type": enumSchema("paragraph", "heading", "blockquote"),
-		"text": stringSchema(),
+		"text": inlineText,
 	})
-	return strictSchema(map[string]any{
+	codeBlockWithoutLanguage := strictSchema(map[string]any{
+		"type": enumSchema("code"), "text": stringSchema(),
+	})
+	codeBlockWithLanguage := strictSchema(map[string]any{
+		"type": enumSchema("code"), "language": stringSchema(), "text": stringSchema(),
+	})
+	calloutBlock := strictSchema(map[string]any{
+		"type": enumSchema("callout"), "kind": enumSchema("info", "idea", "warning", "todo"),
+		"text": inlineText,
+	})
+	mermaidBlock := strictSchema(map[string]any{
+		"type": enumSchema("mermaid"), "code": stringSchema(), "caption": stringSchema(),
+	})
+	imageBlock := strictSchema(map[string]any{
+		"type": enumSchema("image"), "assetId": stringSchema(),
+		"alt": stringSchema(), "caption": stringSchema(),
+	})
+	tableCell := strictSchema(map[string]any{
+		"text": inlineText, "header": booleanSchema(),
+		"colspan": boundedIntegerSchema(1, 100), "rowspan": boundedIntegerSchema(1, 100),
+	})
+	tableRow := strictSchema(map[string]any{
+		"cells": boundedArraySchema(tableCell, 1, 100),
+	})
+	tableBlock := strictSchema(map[string]any{
+		"type": enumSchema("table"), "rows": boundedArraySchema(tableRow, 1, 1_000),
+	})
+	listBlock := strictSchema(map[string]any{
+		"type":  enumSchema("bullet_list", "ordered_list"),
+		"items": boundedArraySchema(inlineText, 1, 1_000),
+	})
+	separatorBlock := strictSchema(map[string]any{
+		"type": enumSchema("scene_break", "horizontal_rule"),
+	})
+	block := map[string]any{"anyOf": []any{
+		proseBlock, codeBlockWithoutLanguage, codeBlockWithLanguage,
+		calloutBlock, mermaidBlock, imageBlock, tableBlock,
+		listBlock, separatorBlock,
+	}}
+	result := strictSchema(map[string]any{
 		"blocks": arraySchema(block),
 	})
+	result["description"] = "Canonical document blocks. Prose strings support Markdown backtick spans as native inline code; code blocks keep their text byte-for-byte and may declare an optional language."
+	return result
 }
 
 func arraySchema(items map[string]any) map[string]any {

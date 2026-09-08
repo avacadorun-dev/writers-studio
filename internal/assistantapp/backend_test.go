@@ -318,9 +318,241 @@ func TestDocumentProposalSupportsAppendInsertReplaceAndMarks(t *testing.T) {
 		t.Fatalf("assistant block metadata missing: %#v", normalizedDocument)
 	}
 	if _, err := normalizeAssistantContent(map[string]any{
-		"blocks": []any{map[string]any{"type": "table", "text": "bad"}},
+		"blocks": []any{map[string]any{"type": "unsupported", "text": "bad"}},
 	}); err == nil {
 		t.Fatal("unsupported assistant block type was accepted")
+	}
+}
+
+func TestAssistantNativeCodeBlocksRoundTripAndEditLosslessly(t *testing.T) {
+	t.Parallel()
+	code := "package main  \n\nfunc main() {\n\tprintln(\"hello\")\n}\n"
+	normalized, err := normalizeAssistantContent(map[string]any{
+		"blocks": []any{map[string]any{
+			"type": "code", "language": "go", "text": code,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks, err := assistantBlocksFromDocument(normalized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "code" || blocks[0].Language == nil ||
+		*blocks[0].Language != "go" || blocks[0].Text != code {
+		t.Fatalf("native code round-trip changed: %#v", blocks)
+	}
+
+	var document editor.Node
+	if err := json.Unmarshal(normalized, &document); err != nil {
+		t.Fatal(err)
+	}
+	blockID, _ := document.Content[0].Attrs["blockId"].(string)
+	edited, err := replaceDocumentRanges(normalized, map[string]any{
+		"edits": []any{map[string]any{
+			"blockId": blockID, "start": 8, "end": 12,
+			"expectedText": "main", "replacement": "entry",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	editedBlocks, err := assistantBlocksFromDocument(edited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "package entry  \n\nfunc main() {\n\tprintln(\"hello\")\n}\n"
+	if editedBlocks[0].Text != want || *editedBlocks[0].Language != "go" {
+		t.Fatalf("range edit normalized code: %#v", editedBlocks[0])
+	}
+}
+
+func TestDocumentRangeReplacementRejectsMalformedCodeEdits(t *testing.T) {
+	t.Parallel()
+	if _, err := replaceDocumentRanges(json.RawMessage(`{`), map[string]any{"edits": []any{}}); err == nil {
+		t.Fatal("malformed document was accepted")
+	}
+	valid := json.RawMessage(`{
+		"type":"doc","attrs":{"schemaVersion":2},"content":[
+			{"type":"codeBlock","attrs":{"blockId":"code","language":"go"},
+			 "content":[{"type":"text","text":"package main"}]}
+		]
+	}`)
+	for name, edits := range map[string]any{
+		"malformed JSON": func() {},
+		"invalid anchor": []any{map[string]any{
+			"blockId": "", "start": 0, "end": 1, "expectedText": "p", "replacement": "x",
+		}},
+		"same-start overlap": []any{
+			map[string]any{"blockId": "code", "start": 0, "end": 2, "expectedText": "pa", "replacement": "x"},
+			map[string]any{"blockId": "code", "start": 0, "end": 1, "expectedText": "p", "replacement": "y"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := replaceDocumentRanges(valid, map[string]any{"edits": edits}); err == nil {
+				t.Fatal("malformed code edit was accepted")
+			}
+		})
+	}
+}
+
+func TestDocumentInsertPlacesNativeCodeBlocksWithoutReplacingExistingText(t *testing.T) {
+	t.Parallel()
+	current := json.RawMessage(`{
+		"type":"doc","content":[
+			{"type":"paragraph","attrs":{"blockId":"before"},"content":[{"type":"text","text":"Before"}]},
+			{"type":"paragraph","attrs":{"blockId":"after"},"content":[{"type":"text","text":"After"}]}
+		]
+	}`)
+	inserted, err := buildDocumentProposal("document.insert", current, map[string]any{
+		"position": 1,
+		"content": map[string]any{"blocks": []any{map[string]any{
+			"type": "code", "language": "go", "text": "\tprintln(\"hello\")\n",
+		}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document editor.Node
+	if err := json.Unmarshal(inserted, &document); err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Content) != 3 || document.Content[0].Content[0].Text != "Before" ||
+		document.Content[1].Type != "codeBlock" || document.Content[1].Attrs["language"] != "go" ||
+		document.Content[1].Content[0].Text != "\tprintln(\"hello\")\n" ||
+		document.Content[2].Content[0].Text != "After" {
+		t.Fatalf("document insertion replaced or normalized content: %#v", document.Content)
+	}
+	if _, err := buildDocumentProposal("document.insert", current, map[string]any{
+		"position": 3, "content": map[string]any{"blocks": []any{map[string]any{
+			"type": "code", "text": "bad position",
+		}}},
+	}); err == nil {
+		t.Fatal("out-of-bounds multi-block insertion was accepted")
+	}
+}
+
+func TestAssistantCodeLanguageIsOptionalAndFencedParagraphsMigrate(t *testing.T) {
+	t.Parallel()
+	withoutLanguage, err := normalizeAssistantContent(map[string]any{
+		"blocks": []any{map[string]any{"type": "code", "text": "\tplain  \n"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks, err := assistantBlocksFromDocument(withoutLanguage)
+	if err != nil || len(blocks) != 1 || blocks[0].Language != nil || blocks[0].Text != "\tplain  \n" {
+		t.Fatalf("optional language changed: %#v, %v", blocks, err)
+	}
+
+	migrated, err := normalizeAssistantContent(map[string]any{
+		"blocks": []any{map[string]any{
+			"type": "paragraph", "text": "```go\npackage main\n```",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks, err = assistantBlocksFromDocument(migrated)
+	if err != nil || len(blocks) != 1 || blocks[0].Type != "code" ||
+		blocks[0].Language == nil || *blocks[0].Language != "go" ||
+		blocks[0].Text != "package main" {
+		t.Fatalf("fenced paragraph migration failed: %#v, %v", blocks, err)
+	}
+}
+
+func TestAssistantCanonicalBlocksCoverAllSupportedShapes(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{
+		"type":"doc","attrs":{"schemaVersion":2},"content":[
+			{"type":"paragraph","content":[{"type":"text","text":"Paragraph"}]},
+			{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Heading"}]},
+			{"type":"blockquote","content":[{"type":"text","text":"Quote"}]},
+			{"type":"codeBlock","content":[{"type":"text","text":"plain code"}]},
+			{"type":"paragraph","content":[{"type":"text","text":"` + "```\\nlegacy code\\n```" + `"}]},
+			{"type":"horizontalRule"}
+		]
+	}`)
+	blocks, err := assistantBlocksFromDocument(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocks) != 6 {
+		t.Fatalf("canonical block count = %d: %#v", len(blocks), blocks)
+	}
+	for index, expected := range []assistantContentBlock{
+		{Type: "paragraph", Text: "Paragraph"},
+		{Type: "heading", Text: "Heading"},
+		{Type: "blockquote", Text: "Quote"},
+		{Type: "code", Text: "plain code"},
+		{Type: "code", Text: "legacy code"},
+		{Type: "horizontal_rule"},
+	} {
+		if blocks[index].Type != expected.Type || blocks[index].Text != expected.Text ||
+			blocks[index].Language != nil {
+			t.Fatalf("canonical block %d = %#v", index, blocks[index])
+		}
+	}
+	if _, err := assistantBlocksFromDocument(json.RawMessage(`{"type":"bad"}`)); err == nil {
+		t.Fatal("invalid document was converted to canonical blocks")
+	}
+}
+
+func TestAssistantRawRichDocumentNormalizesBeforeFencedMigration(t *testing.T) {
+	t.Parallel()
+	normalized, err := normalizeAssistantContent(map[string]any{
+		"type": "doc",
+		"content": []any{map[string]any{
+			"type": "codeBlock", "attrs": map[string]any{"language": "go"},
+			"content": []any{map[string]any{"type": "text", "text": "package main"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version, err := editor.SchemaVersion(normalized); err != nil || version != 2 {
+		t.Fatalf("raw rich document schema version = %d, %v", version, err)
+	}
+}
+
+func TestAssistantContentNormalizationBoundaryShapes(t *testing.T) {
+	t.Parallel()
+	for name, value := range map[string]any{
+		"default paragraph": map[string]any{
+			"blocks": []any{map[string]any{"type": "", "text": "fallback"}},
+		},
+		"empty code language": map[string]any{
+			"blocks": []any{map[string]any{"type": "code", "language": "", "text": "plain"}},
+		},
+		"raw fenced document": map[string]any{
+			"type": "doc", "content": []any{map[string]any{
+				"type": "paragraph", "content": []any{map[string]any{
+					"type": "text", "text": "```go\ncode\n```",
+				}},
+			}},
+		},
+		"single node": map[string]any{
+			"type": "paragraph", "content": []any{map[string]any{
+				"type": "text", "text": "single",
+			}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := normalizeAssistantContent(value); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	for name, value := range map[string]any{
+		"empty envelope": map[string]any{},
+		"invalid JSON":   func() {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := normalizeAssistantContent(value); err == nil {
+				t.Fatal("invalid assistant content was accepted")
+			}
+		})
 	}
 }
 

@@ -70,6 +70,10 @@ test("P-03 protects author edits, supports diff undo, compare, and restore", asy
 }, testInfo) => {
   const suffix = `p03-${testInfo.project.name}-${Date.now()}`;
   const { projectId, nodeId } = await registerAndCreateProject(page, suffix);
+  const existingSceneText = "Существующий текст сцены нельзя заменять расшифровкой.";
+  await page.locator(".tiptap").click();
+  await page.keyboard.type(existingSceneText);
+  await expect(page.locator('[data-save-state="saved"]:visible')).toBeVisible({ timeout: 10_000 });
   const sessionId = await createRecoverableDictationViaAPI(page, projectId, nodeId);
 
   await expect
@@ -141,6 +145,7 @@ test("P-03 protects author edits, supports diff undo, compare, and restore", asy
   await page.getByLabel("Документ", { exact: true }).selectOption(nodeId);
   await page.getByRole("button", { name: "Подтвердить вставку" }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/studio/${nodeId}`));
+  await expect(page.locator(".tiptap")).toContainText(existingSceneText);
   await expect(page.locator(".tiptap")).toContainText("Авторская строка не должна исчезнуть");
   await page.locator('[data-radix-toast-announce-alt="Отменить"]').click();
   await expect
@@ -152,6 +157,7 @@ test("P-03 protects author edits, supports diff undo, compare, and restore", asy
   await page.getByLabel("Документ", { exact: true }).selectOption(nodeId);
   await page.getByRole("button", { name: "Подтвердить вставку" }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/studio/${nodeId}`));
+  await expect(page.locator(".tiptap")).toContainText(existingSceneText);
   await expect(page.locator(".tiptap")).toContainText("Авторская строка не должна исчезнуть");
 
   await page.goto(`/nodes/${nodeId}/versions`);
@@ -349,7 +355,7 @@ async function uploadedLocalChunkCount(page: Page): Promise<number> {
 function countLocalChunks(page: Page, uploadedOnly: boolean): Promise<number> {
   return page.evaluate((onlyUploaded) => {
     return new Promise<number>((resolve, reject) => {
-      const open = indexedDB.open("writers-studio-recovery", 1);
+      const open = indexedDB.open("writers-studio-recovery");
       open.onerror = () => reject(open.error);
       open.onsuccess = () => {
         const request = open.result.transaction("audioChunks").objectStore("audioChunks").getAll();

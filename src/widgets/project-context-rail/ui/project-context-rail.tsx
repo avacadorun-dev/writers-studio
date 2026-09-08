@@ -57,7 +57,7 @@ export function ProjectContextRail({
       >
         <AudioLines className="size-4" aria-hidden="true" />
       </Button>
-      <Button asChild variant="ghost" size="icon">
+      <Button asChild variant="ghost" size="icon" tooltip="История версий" tooltipSide="left">
         <Link to="/nodes/$nodeId/versions" params={{ nodeId }} aria-label="История версий">
           <History className="size-4" aria-hidden="true" />
         </Link>

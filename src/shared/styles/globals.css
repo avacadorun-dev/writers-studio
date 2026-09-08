@@ -50,6 +50,7 @@
   --focus-on-inverse: #bce6d7;
   --control-thumb: #fffefb;
   --shadow-color: #10151229;
+  --shadow-lg: 0 18px 40px var(--shadow-color);
   --diff-insert: #ddefe4;
   --diff-delete: #f5e1de;
   --brand-mark-shield: #e4eee9;
@@ -79,6 +80,8 @@
   --editor-font-features: "locl" 0, "liga" 0;
   --editor-font-size: 19px;
   --editor-line-height: 1.75;
+  --editor-paragraph-spacing: 0.9em;
+  --editor-list-item-spacing: 0.25em;
   --editor-max-width: 70ch;
 }
 
@@ -396,7 +399,7 @@
   --surface-overlay: #15171459;
   --ink-primary: #292b27;
   --ink-secondary: #60655c;
-  --ink-tertiary: #686d64;
+  --ink-tertiary: #63685f;
   --ink-disabled: #a4a79f;
   --ink-on-inverse: #fcfaf4;
   --ink-on-inverse-muted: #d2cfc4;
@@ -1661,6 +1664,50 @@
     background: var(--creative-soft);
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+    }
+
+    *:hover,
+    *:focus-within {
+      scrollbar-color: color-mix(in srgb, var(--ink-tertiary) 52%, transparent) transparent;
+    }
+
+    *::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: var(--radius-pill);
+      background: transparent;
+      background-clip: padding-box;
+    }
+
+    *:hover::-webkit-scrollbar-thumb,
+    *:focus-within::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--ink-tertiary) 52%, transparent);
+      background-clip: padding-box;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--ink-primary) 68%, transparent);
+      background-clip: padding-box;
+    }
+
+    *::-webkit-scrollbar-button {
+      display: none;
+    }
+  }
+
   .font-ui {
     font-family: var(--font-ui);
   }
@@ -1713,6 +1760,10 @@
     font-size: var(--editor-font-size);
     line-height: var(--editor-line-height);
     caret-color: var(--accent);
+    border-right: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+    border-left: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+    background: color-mix(in srgb, var(--surface-paper) 96%, var(--surface-subtle));
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--surface-subtle) 24%, transparent);
   }
 
   .editor-shell-width {
@@ -1725,7 +1776,7 @@
   }
 
   .editor-content .tiptap p {
-    margin: 0 0 1.1em;
+    margin: 0 0 var(--editor-paragraph-spacing);
   }
 
   .editor-content .tiptap [data-active-source="true"] {
@@ -1768,6 +1819,20 @@
     padding-left: 1.5em;
   }
 
+  .editor-content .tiptap li > p {
+    margin: 0;
+  }
+
+  .editor-content .tiptap li + li {
+    margin-top: var(--editor-list-item-spacing);
+  }
+
+  .editor-content .tiptap li > ul,
+  .editor-content .tiptap li > ol {
+    margin-top: var(--editor-list-item-spacing);
+    margin-bottom: 0;
+  }
+
   .editor-content .tiptap ul {
     list-style: disc;
   }
@@ -1787,7 +1852,12 @@
     padding: 0.12rem 0.35rem;
     color: var(--accent-ink);
     font-family: "IBM Plex Mono", monospace;
+    font-feature-settings: normal;
     font-size: 0.9em;
+    white-space: pre-wrap;
+    word-spacing: normal;
+    letter-spacing: normal;
+    hyphens: none;
   }
 
   .editor-content .tiptap pre {
@@ -1801,11 +1871,86 @@
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.84em;
     line-height: 1.65;
-    tab-size: 2;
+    tab-size: 4;
   }
 
   .editor-content .tiptap pre code {
     font-family: inherit;
+  }
+
+  .editor-content .tiptap .ws-code-block {
+    margin: 1.4em 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-subtle);
+  }
+
+  .editor-content .tiptap .ws-code-block-toolbar {
+    display: flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+    background: color-mix(in srgb, var(--surface-raised) 75%, transparent);
+    font-family: var(--font-ui);
+  }
+
+  .editor-content .tiptap .ws-code-block-toolbar select {
+    min-height: 1.9rem;
+    max-width: 14rem;
+    border: 0;
+    background: transparent;
+    color: var(--ink-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .editor-content .tiptap .ws-code-block pre {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    white-space: pre;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.comment,
+  .editor-content .tiptap .ws-code-block .token.prolog,
+  .editor-content .tiptap .ws-code-block .token.doctype {
+    color: var(--ink-tertiary);
+    font-style: italic;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.keyword,
+  .editor-content .tiptap .ws-code-block .token.selector,
+  .editor-content .tiptap .ws-code-block .token.important {
+    color: #8b4f9f;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.string,
+  .editor-content .tiptap .ws-code-block .token.char,
+  .editor-content .tiptap .ws-code-block .token.attr-value {
+    color: #2d7668;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.number,
+  .editor-content .tiptap .ws-code-block .token.boolean,
+  .editor-content .tiptap .ws-code-block .token.constant {
+    color: #a15336;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.function,
+  .editor-content .tiptap .ws-code-block .token.class-name,
+  .editor-content .tiptap .ws-code-block .token.builtin {
+    color: #315f9a;
+  }
+
+  .editor-content .tiptap .ws-code-block .token.operator,
+  .editor-content .tiptap .ws-code-block .token.punctuation {
+    color: var(--ink-secondary);
   }
 
   .editor-content .tableWrapper {
@@ -1993,14 +2138,21 @@
     font-size: 0.68rem;
   }
 
-  .editor-content .ws-rich-block-field input {
+  .editor-content .ws-rich-block-field input,
+  .editor-content .ws-rich-block-field textarea {
     min-height: 2rem;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     background: var(--surface-paper);
-    padding: 0 0.55rem;
+    padding: 0.45rem 0.55rem;
     color: var(--ink-primary);
     font-size: 0.78rem;
+  }
+
+  .editor-content .ws-rich-block-field textarea {
+    resize: vertical;
+    font-family: "IBM Plex Mono", monospace;
+    line-height: 1.5;
   }
 
   .editor-content .ws-rich-block-heading {
@@ -2061,6 +2213,98 @@
     color: var(--danger);
     font-family: var(--font-ui);
     font-size: 0.75rem;
+  }
+
+  .editor-content .ws-inline-math {
+    position: relative;
+    display: inline-flex;
+    max-width: 100%;
+    align-items: baseline;
+    border-radius: var(--radius-sm);
+    padding: 0 0.16em;
+    vertical-align: baseline;
+  }
+
+  .editor-content .ws-inline-math[data-selected="true"] {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .editor-content .ws-inline-math-editor {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    display: grid;
+    width: min(340px, 82vw);
+    gap: 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-lg);
+    padding: 0.75rem;
+    color: var(--ink-primary);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+  }
+
+  .editor-content .ws-inline-math-editor label {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .editor-content .ws-inline-math-editor input {
+    min-height: 2.25rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-paper);
+    padding: 0 0.55rem;
+    color: var(--ink-primary);
+  }
+
+  .editor-content .ws-math-block {
+    overflow: visible;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+
+  .editor-content .ws-math-block[data-selected="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  .editor-content .ws-math-block > .ws-math-preview {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .editor-content .ws-math-block > .ws-rich-block-field {
+    margin: 0.75rem;
+  }
+
+  .editor-content .ws-math-error {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: flex-start;
+    gap: 0.4rem;
+    border-radius: var(--radius-sm);
+    background: var(--danger-soft);
+    padding: 0.35rem 0.5rem;
+    color: var(--danger);
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  /* biome-ignore lint/style/noDescendingSpecificity: the formula fallback intentionally overrides the generic editor code style. */
+  .editor-content .ws-math-error code {
+    overflow-wrap: anywhere;
+    color: inherit;
+    font-family: "IBM Plex Mono", monospace;
   }
 
   .editor-content .tiptap .ws-annotation {
@@ -2131,6 +2375,9 @@
   .editor-content .tiptap {
     min-height: 420px;
     padding: 28px 20px 112px;
+    border-right: 0;
+    border-left: 0;
+    box-shadow: none;
   }
 }
 
@@ -2138,4 +2385,8 @@
   html {
     scroll-behavior: auto;
   }
+}
+
+.canvas-flow .react-flow__attribution a {
+  color: var(--ink-tertiary);
 }

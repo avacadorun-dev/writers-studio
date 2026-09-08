@@ -6,13 +6,21 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
+	stdhtml "html"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
+
+	"writers.studio/internal/editor"
 )
 
 func fixtureSnapshot() Snapshot {
@@ -50,6 +58,53 @@ func TestRenderPortableFormatsContainSnapshotContent(t *testing.T) {
 				t.Fatalf("export lost content: %q", content)
 			}
 		})
+	}
+}
+
+func TestExportMigratesLegacyInlineCodeBeforeEveryPublicationRenderer(t *testing.T) {
+	t.Parallel()
+	legacy := json.RawMessage(`{
+		"type":"doc","content":[{"type":"paragraph","content":[
+			{"type":"text","text":"Команды: ` + "`go run`" + ` и ` + "``fmt `raw`  ``" + `."}
+		]}]
+	}`)
+	snapshot := fixtureSnapshot()
+	snapshot.Profile = NormalizeProfile(snapshot.Profile, snapshot.ProjectTitle, "")
+	snapshot.Profile.TitlePage = false
+	snapshot.Profile.ChapterTitles = false
+	snapshot.Documents[0].Content = legacy
+	snapshot.TreeNodes = []SnapshotTreeNode{{NodeID: "legacy", Content: legacy}}
+
+	normalized := normalizeLegacyCodeFormatting(snapshot)
+	for _, content := range []json.RawMessage{
+		normalized.Documents[0].Content, normalized.TreeNodes[0].Content,
+	} {
+		var document editor.Node
+		if err := json.Unmarshal(content, &document); err != nil {
+			t.Fatal(err)
+		}
+		inline := document.Content[0].Content
+		if len(inline) != 5 || inline[1].Text != "go run" || inline[3].Text != "fmt `raw`  " ||
+			len(inline[1].Marks) != 1 || inline[1].Marks[0].Type != "code" ||
+			len(inline[3].Marks) != 1 || inline[3].Marks[0].Type != "code" {
+			t.Fatalf("legacy inline code was not canonicalized: %#v", inline)
+		}
+	}
+
+	markdown, _, err := Render("markdown", snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "Команды: `go run` и ``fmt `raw`  ``.") {
+		t.Fatalf("Markdown lost inline code: %q", markdown)
+	}
+	var document editor.Node
+	if err := json.Unmarshal(normalized.Documents[0].Content, &document); err != nil {
+		t.Fatal(err)
+	}
+	html := renderPublicationNodes(document.Content, nil)
+	if !strings.Contains(html, "Команды: <code>go run</code> и <code>fmt `raw`  </code>.") {
+		t.Fatalf("publication HTML lost inline code: %s", html)
 	}
 }
 
@@ -143,7 +198,7 @@ func TestRenderDOCXPreservesRichPublicationStructure(t *testing.T) {
 	document := readZipFile(t, archive, "word/document.xml")
 	for _, expected := range []string{
 		`w:pStyle w:val="Heading2"`, `<w:b/>`, `w:numId w:val="2"`,
-		`w:pStyle w:val="Callout"`, `<w:tbl>`, `r:embed="rIdImage1"`,
+		`w:pStyle w:val="CalloutInfo"`, `<w:tbl>`, `r:embed="rIdImage1"`,
 		`w:pStyle w:val="SceneBreak"`, `w:pStyle w:val="CodeBlock"`,
 	} {
 		if !strings.Contains(document, expected) {
@@ -234,8 +289,18 @@ func TestFrontMatterPagesStaySeparateWhenDocumentsAreContinuous(t *testing.T) {
 		t.Fatal(err)
 	}
 	docxXML := string(readDOCXDocument(t, docx))
-	if breaks := strings.Count(docxXML, `w:br w:type="page"`); breaks != 3 {
-		t.Fatalf("DOCX front matter produced %d explicit page breaks, want cover, title, and TOC breaks", breaks)
+	if breaks := strings.Count(docxXML, `w:br w:type="page"`); breaks != 2 {
+		t.Fatalf("DOCX front matter produced %d explicit page breaks, want title and TOC breaks after the cover section", breaks)
+	}
+	for _, expected := range []string{
+		`<w:type w:val="nextPage"/>`,
+		`<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0"`,
+		`<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>`,
+		`<wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>`,
+	} {
+		if !strings.Contains(docxXML, expected) {
+			t.Fatalf("DOCX cover is missing full-page section markup %q", expected)
+		}
 	}
 
 	epub, _, err := RenderWithAssets(context.Background(), "epub", snapshot, assets, "")
@@ -277,6 +342,18 @@ func TestFrontMatterPagesStaySeparateWhenDocumentsAreContinuous(t *testing.T) {
 	printHTML := renderPrintHTML(snapshot, publication, func(string) string {
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(cover)
 	}, assets)
+	for _, expected := range []string{
+		`@page cover { size: A5; margin: 0; }`,
+		`<body><section class="cover-page">`,
+		`</section><main><section class="title-page">`,
+		`.cover { position: absolute; inset: -.5mm; display: block;`,
+		`width: calc(100% + 1mm); height: calc(100% + 1mm);`,
+		`object-fit: cover;`,
+	} {
+		if !strings.Contains(printHTML, expected) {
+			t.Fatalf("PDF cover is missing borderless markup %q", expected)
+		}
+	}
 	coverPosition := strings.Index(printHTML, `alt="Обложка"`)
 	titlePosition := strings.Index(printHTML, `<section class="title-page"><h1>`+snapshot.ProjectTitle)
 	tocPosition := strings.Index(printHTML, `<nav class="toc">`)
@@ -435,6 +512,68 @@ func TestRenderPDFWithChromium(t *testing.T) {
 	}
 }
 
+func TestRenderBorderlessCoverArtifacts(t *testing.T) {
+	chromiumPath := os.Getenv("WRITERS_TEST_CHROMIUM")
+	coverPath := os.Getenv("WRITERS_TEST_COVER_INPUT")
+	outputDirectory := os.Getenv("WRITERS_TEST_COVER_OUTPUT_DIR")
+	if chromiumPath == "" || coverPath == "" || outputDirectory == "" {
+		t.Skip("borderless cover visual QA is not configured")
+	}
+	cover, err := os.ReadFile(coverPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, format, err := image.DecodeConfig(bytes.NewReader(cover))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mediaType := map[string]string{"jpeg": "image/jpeg", "png": "image/png"}[format]
+	if mediaType == "" {
+		t.Fatalf("unsupported cover format %q", format)
+	}
+
+	const coverID = "55555555-5555-5555-5555-555555555555"
+	snapshot := fixtureSnapshot()
+	snapshot.SchemaVersion = 2
+	snapshot.Profile = DefaultProfile(snapshot.ProjectTitle, "")
+	snapshot.Profile.Style.PageSize = "a4"
+	snapshot.Profile.Style.MarginMM = 25
+	snapshot.Profile.TitlePage = false
+	snapshot.Profile.TableOfContents = false
+	snapshot.Profile.ChapterTitles = false
+	snapshot.Profile.Metadata.CoverAssetID = pointerTo(coverID)
+	snapshot.Media = []SnapshotMedia{{
+		ID: coverID, MediaType: mediaType, Width: configuration.Width, Height: configuration.Height,
+	}}
+	assets := map[string][]byte{coverID: cover}
+
+	if err := os.MkdirAll(outputDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, exportFormat := range []string{"pdf", "docx", "epub"} {
+		data, _, renderErr := RenderWithAssets(context.Background(), exportFormat, snapshot, assets, chromiumPath)
+		if renderErr != nil {
+			t.Fatal(renderErr)
+		}
+		if writeErr := os.WriteFile(filepath.Join(outputDirectory, "borderless-cover."+exportFormat), data, 0o600); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+		if exportFormat == "pdf" {
+			info, infoErr := api.PDFInfo(bytes.NewReader(data), "borderless-cover.pdf", nil, false, nil)
+			if infoErr != nil {
+				t.Fatal(infoErr)
+			}
+			if info.PageCount != 2 {
+				t.Fatalf("cover plus manuscript produced %d PDF pages, want 2", info.PageCount)
+			}
+		}
+	}
+}
+
+func pointerTo[T any](value T) *T {
+	return &value
+}
+
 func TestRenderPreservesRussianTypographyAcrossPortableFormats(t *testing.T) {
 	t.Parallel()
 
@@ -469,6 +608,131 @@ func TestRenderPreservesRussianTypographyAcrossPortableFormats(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCodeListingsPreserveWhitespaceLanguageAndFormattingAcrossExports(t *testing.T) {
+	t.Parallel()
+	code := "package main  \n\nfunc main() {\n\tprintln(\"hello\")\n}\n"
+	content, err := json.Marshal(map[string]any{
+		"type": "doc", "attrs": map[string]any{"schemaVersion": 2},
+		"content": []any{map[string]any{
+			"type": "codeBlock", "attrs": map[string]any{"language": "go"},
+			"content": []any{map[string]any{"type": "text", "text": code}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := fixtureSnapshot()
+	snapshot.Documents[0].Content = content
+	snapshot.Documents[0].PlainText = code
+	snapshot.Profile = NormalizeProfile(snapshot.Profile, snapshot.ProjectTitle, "")
+
+	publication := buildPublication(snapshot, nil)
+	htmlDocument := renderPrintHTML(snapshot, publication, nil, nil)
+	if !strings.Contains(htmlDocument, `class="code-block" data-language="go"`) ||
+		!strings.Contains(htmlDocument, `class="code-listing"`) ||
+		!strings.Contains(htmlDocument, `style="color:#`) ||
+		extractHTMLCodeText(htmlDocument) != code {
+		t.Fatalf("PDF publication HTML lost code listing: %q", htmlDocument)
+	}
+
+	docx, _, err := Render("docx", snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	documentXML := string(readDOCXDocument(t, docx))
+	for _, expected := range []string{
+		`w:pStyle w:val="CodeLanguage"`, `>go</w:t>`,
+		`w:pStyle w:val="CodeBlock"`, `w:color w:val="CF222E"`, "<w:br/>", "<w:tab/>",
+	} {
+		if !strings.Contains(documentXML, expected) {
+			t.Fatalf("DOCX code listing missing %q: %s", expected, documentXML)
+		}
+	}
+	if rendered := extractWordParagraphText(t, documentXML, "CodeBlock"); rendered != code {
+		t.Fatalf("DOCX code listing changed whitespace: %q", rendered)
+	}
+
+	epub, _, err := Render("epub", snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, err := zip.NewReader(bytes.NewReader(epub), int64(len(epub)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var xhtml strings.Builder
+	for _, file := range archive.File {
+		if strings.HasSuffix(file.Name, ".xhtml") {
+			xhtml.WriteString(readZipFile(t, archive, file.Name))
+		}
+	}
+	if !strings.Contains(xhtml.String(), `class="code-block" data-language="go"`) ||
+		!strings.Contains(xhtml.String(), `style="color:#`) ||
+		extractHTMLCodeText(xhtml.String()) != code {
+		t.Fatalf("EPUB lost code listing: %s", xhtml.String())
+	}
+}
+
+func extractHTMLCodeText(document string) string {
+	start := strings.Index(document, "<code>")
+	if start < 0 {
+		return ""
+	}
+	start += len("<code>")
+	end := strings.Index(document[start:], "</code>")
+	if end < 0 {
+		return ""
+	}
+	return stdhtml.UnescapeString(stripSyntaxSpans(document[start : start+end]))
+}
+
+func extractWordParagraphText(t *testing.T, document, style string) string {
+	t.Helper()
+	marker := `w:pStyle w:val="` + style + `"`
+	markerIndex := strings.Index(document, marker)
+	if markerIndex < 0 {
+		t.Fatalf("Word style %s is missing", style)
+	}
+	start := strings.LastIndex(document[:markerIndex], "<w:p>")
+	end := strings.Index(document[markerIndex:], "</w:p>")
+	if start < 0 || end < 0 {
+		t.Fatalf("Word paragraph %s is malformed", style)
+	}
+	fragment := document[start : markerIndex+end+len("</w:p>")]
+	decoder := xml.NewDecoder(strings.NewReader(`<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` + fragment + `</root>`))
+	var output strings.Builder
+	inText := false
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch value := token.(type) {
+		case xml.StartElement:
+			switch value.Name.Local {
+			case "t":
+				inText = true
+			case "br":
+				output.WriteByte('\n')
+			case "tab":
+				output.WriteByte('\t')
+			}
+		case xml.EndElement:
+			if value.Name.Local == "t" {
+				inText = false
+			}
+		case xml.CharData:
+			if inText {
+				output.Write(value)
+			}
+		}
+	}
+	return output.String()
 }
 
 func readDOCXDocument(t *testing.T, data []byte) []byte {

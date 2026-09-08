@@ -4,8 +4,10 @@ import { type ButtonHTMLAttributes, forwardRef } from "react";
 
 import { cn } from "~shared/lib/cn";
 
+import { UiTooltip } from "./tooltip";
+
 const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -39,17 +41,44 @@ export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  tooltip?: string | false;
+  tooltipSide?: "top" | "right" | "bottom" | "left";
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ asChild = false, className, variant, size, ...props }, ref) => {
+  (
+    { asChild = false, className, variant, size, title, tooltip, tooltipSide = "bottom", ...props },
+    ref,
+  ) => {
     const Component = asChild ? Slot : "button";
-    return (
+    const accessibleLabel = props["aria-label"];
+    const tooltipLabel =
+      tooltip === false
+        ? undefined
+        : (tooltip ??
+          (size === "icon"
+            ? typeof title === "string"
+              ? title
+              : typeof accessibleLabel === "string"
+                ? accessibleLabel
+                : undefined
+            : undefined));
+    const control = (
       <Component
         ref={ref}
         className={cn(buttonVariants({ variant, size }), className)}
+        data-ui-tooltip={tooltipLabel}
+        data-ui-tooltip-side={tooltipLabel ? tooltipSide : undefined}
+        title={tooltipLabel ? undefined : title}
         {...props}
       />
+    );
+    return tooltipLabel ? (
+      <UiTooltip content={tooltipLabel} side={tooltipSide}>
+        {control}
+      </UiTooltip>
+    ) : (
+      control
     );
   },
 );

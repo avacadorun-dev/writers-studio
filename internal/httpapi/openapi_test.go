@@ -38,8 +38,8 @@ func TestOpenAPICoversEveryAPIRoute(t *testing.T) {
 	}
 
 	operations := openAPIOperations()
-	if len(operations) != 110 {
-		t.Fatalf("operation count=%d, want 110", len(operations))
+	if len(operations) != 124 {
+		t.Fatalf("operation count=%d, want 124", len(operations))
 	}
 	expected := map[string]bool{}
 	operationIDs := map[string]bool{}

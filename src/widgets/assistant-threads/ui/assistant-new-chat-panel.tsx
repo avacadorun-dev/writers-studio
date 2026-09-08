@@ -7,6 +7,7 @@ import {
   Globe2,
   MessageCircle,
   Mic2,
+  PanelsTopLeft,
   Paperclip,
   Send,
   Settings2,
@@ -29,7 +30,12 @@ import { Banner, Button, Select } from "~shared/ui";
 
 interface AssistantNewChatPanelProps {
   project: Project;
-  node: DocumentNode;
+  node?: DocumentNode;
+  canvas?: { id: string; title: string };
+  canvasContext?: {
+    selectionIds: string[];
+    viewport: { x: number; y: number; zoom: number };
+  };
   selectionAttachment?: AssistantSelectionAttachment;
   hasThreads: boolean;
   backgroundWorkingCount: number;
@@ -42,6 +48,8 @@ interface AssistantNewChatPanelProps {
 export function AssistantNewChatPanel({
   project,
   node,
+  canvas,
+  canvasContext,
   selectionAttachment,
   hasThreads,
   backgroundWorkingCount,
@@ -51,7 +59,9 @@ export function AssistantNewChatPanel({
   onClose,
 }: AssistantNewChatPanelProps) {
   const queryClient = useQueryClient();
-  const [targetKind, setTargetKind] = useState<AssistantTargetKind>("node");
+  const [targetKind, setTargetKind] = useState<AssistantTargetKind>(() =>
+    canvas ? "canvas" : node ? "node" : "project",
+  );
   const [inputMode, setInputMode] = useState<AssistantInputMode>("chat");
   const [message, setMessage] = useState("");
   const [providerChoice, setProviderChoice] = useState("");
@@ -104,7 +114,10 @@ export function AssistantNewChatPanel({
       createAssistantRun(project.id, {
         title: inputMode === "chat" ? message.trim() : "Голосовое поручение",
         targetKind,
-        targetNodeId: targetKind === "node" ? node.id : undefined,
+        targetNodeId: targetKind === "node" ? node?.id : undefined,
+        targetCanvasId: targetKind === "canvas" ? canvas?.id : undefined,
+        canvasSelectionIds: targetKind === "canvas" ? canvasContext?.selectionIds : undefined,
+        canvasViewport: targetKind === "canvas" ? canvasContext?.viewport : undefined,
         inputMode,
         silenceCheckpointMs: preferences.assistantSilenceCheckpointMs,
         providerConnectionId: selectedConnection?.id,
@@ -169,7 +182,8 @@ export function AssistantNewChatPanel({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <h2 className="font-[var(--font-display)] text-xl font-semibold">Что поручить?</h2>
           <p className="mt-1 text-[12px] leading-5 text-[var(--ink-secondary)]">
-            Новый чат работает независимо. Проект, рукопись и руководство остаются общими.
+            Новый чат работает независимо. {canvas ? "Доска" : "Рукопись"}, проект и руководство
+            остаются перед глазами.
           </p>
 
           {selectionAttachment ? (
@@ -192,12 +206,21 @@ export function AssistantNewChatPanel({
               Область работы
             </legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <ScopeButton
-                active={targetKind === "node"}
-                icon={FileText}
-                label={node.title}
-                onClick={() => setTargetKind("node")}
-              />
+              {canvas ? (
+                <ScopeButton
+                  active={targetKind === "canvas"}
+                  icon={PanelsTopLeft}
+                  label={canvas.title}
+                  onClick={() => setTargetKind("canvas")}
+                />
+              ) : node ? (
+                <ScopeButton
+                  active={targetKind === "node"}
+                  icon={FileText}
+                  label={node.title}
+                  onClick={() => setTargetKind("node")}
+                />
+              ) : null}
               <ScopeButton
                 active={targetKind === "project"}
                 icon={Globe2}
@@ -239,7 +262,11 @@ export function AssistantNewChatPanel({
                 onChange={(event) => setMessage(event.target.value)}
                 rows={6}
                 maxLength={32_000}
-                placeholder="Например: сделай первый абзац загадочнее, но не меняй последнюю реплику…"
+                placeholder={
+                  canvas
+                    ? "Например: сгруппируй выбранные идеи и предложи недостающие связи…"
+                    : "Например: сделай первый абзац загадочнее, но не меняй последнюю реплику…"
+                }
                 className="w-full resize-none bg-transparent text-sm leading-6 outline-none placeholder:text-[var(--ink-tertiary)]"
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -252,8 +279,8 @@ export function AssistantNewChatPanel({
             </div>
           ) : (
             <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4 text-[12px] leading-5 text-[var(--ink-secondary)]">
-              Чат откроется рядом с рукописью. Запись начнётся только после явного нажатия кнопки
-              микрофона.
+              Чат останется рядом с {canvas ? "доской" : "рукописью"}. Запись начнётся только после
+              явного нажатия кнопки микрофона.
             </div>
           )}
 

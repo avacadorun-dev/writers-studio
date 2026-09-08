@@ -217,7 +217,8 @@ export function ExportPage({
     Math.ceil((queueScrollTop + exportViewportHeight) / exportRowHeight) + 8,
   );
   const virtualQueue = visibleQueue.slice(virtualStart, virtualEnd);
-  const cover = media.data?.media.find((item) => item.id === profile.metadata.coverAssetId);
+  const imageMedia = media.data?.media.filter((item) => item.mediaType.startsWith("image/")) ?? [];
+  const cover = imageMedia.find((item) => item.id === profile.metadata.coverAssetId);
   const previewDocuments = orderedSelectedIds
     .map((id) => project.data.nodes.find((node) => node.id === id))
     .filter((node): node is NonNullable<typeof node> => Boolean(node));
@@ -682,7 +683,7 @@ export function ExportPage({
                     }
                   >
                     <option value="">Без обложки</option>
-                    {media.data?.media.map((item) => (
+                    {imageMedia.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.originalName}
                       </option>
@@ -778,8 +779,10 @@ function SortableExportRow({
       <button
         ref={setActivatorNodeRef}
         type="button"
-        className="grid size-8 touch-none place-items-center rounded text-[var(--ink-tertiary)] hover:bg-[var(--surface-raised)]"
+        className="ui-tooltip grid size-8 touch-none place-items-center rounded text-[var(--ink-tertiary)] hover:bg-[var(--surface-raised)]"
         aria-label={`Изменить порядок «${item.title}»`}
+        data-ui-tooltip={`Изменить порядок «${item.title}»`}
+        data-ui-tooltip-side="right"
         {...attributes}
         {...listeners}
       >
@@ -884,13 +887,15 @@ function PublicationPreview({
         </div>
       ) : null}
       <article
-        className="mx-auto aspect-[0.707] max-h-[560px] overflow-hidden bg-[var(--surface-panel)] px-[12%] py-[10%] text-[var(--ink-primary)] shadow-sm"
+        className={`mx-auto aspect-[0.707] max-h-[560px] overflow-hidden bg-[var(--surface-panel)] text-[var(--ink-primary)] shadow-sm ${
+          activePage?.kind === "cover" ? "p-0" : "px-[12%] py-[10%]"
+        }`}
         style={style}
         aria-label={activePage?.label ?? "Пустой предпросмотр"}
       >
         {activePage?.kind === "cover" && coverUrl ? (
-          <div className="flex h-full items-center justify-center">
-            <img src={coverUrl} alt="Обложка" className="max-h-full w-full object-contain" />
+          <div className="h-full w-full">
+            <img src={coverUrl} alt="Обложка" className="h-full w-full object-cover" />
           </div>
         ) : null}
         {activePage?.kind === "title" ? (

@@ -44,6 +44,7 @@ export {
   updateProject,
   updateProjectAssistantSettings,
   uploadProjectImage,
+  uploadProjectMedia,
 } from "./api/project-api";
 export type {
   AnnotationAnchor,

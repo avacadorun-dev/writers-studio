@@ -111,6 +111,7 @@ func (o *Orchestrator) ExecuteTurn(
 	execution := projectmcp.ExecutionContext{
 		OwnerUserID: ownerID, ProjectID: run.ProjectID, RunID: run.ID, TurnID: turn.ID,
 		TargetNodeID: run.TargetNodeID, Instruction: turn.Instruction,
+		TargetCanvasID: run.TargetCanvasID,
 	}
 	mcpSession, err := projectmcp.NewSession(ctx, execution, o.backend)
 	if err != nil {
@@ -151,7 +152,8 @@ func (o *Orchestrator) ExecuteTurn(
 	if err := o.appendEvent(ctx, run.ID, turn.ID, assistant.EventRunStarted, map[string]any{
 		"inputMode": turn.InputMode, "targetKind": run.TargetKind,
 		"targetNodeId": run.TargetNodeID, "guideRevision": turn.GuideRevision,
-		"stepLimit": projectSettings.StepLimit,
+		"targetCanvasId": run.TargetCanvasID,
+		"stepLimit":      projectSettings.StepLimit,
 	}); err != nil {
 		return ExecutionResult{}, err
 	}
@@ -630,6 +632,10 @@ func turnModeInstructions(run assistant.Run) string {
 		scope = "The run already has an active node target. Its title, content, blocks, and " +
 			"coordinates can be resolved later with project read tools."
 	}
+	if run.TargetKind == assistant.TargetCanvas && run.TargetCanvasID != nil {
+		scope = "The run already has an active Canvas target. Use canvas.get before proposing typed " +
+			"Canvas operations, preserve its extensions, and never mutate canonical state before review."
+	}
 	return "Classify the current author request by its required outcome, not its wording. " +
 		"Call assistant.begin_turn exactly once. Use mode=change whenever successfully fulfilling " +
 		"the request requires a reviewable proposed difference from current project state. A " +
@@ -742,6 +748,8 @@ func (o *Orchestrator) buildPrompt(
 	target := "project"
 	if run.TargetNodeID != nil {
 		target = "node " + *run.TargetNodeID
+	} else if run.TargetCanvasID != nil {
+		target = "canvas " + *run.TargetCanvasID
 	}
 	pendingState := "none"
 	if run.PendingChangeSet != nil {

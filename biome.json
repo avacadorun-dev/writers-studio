@@ -3,6 +3,7 @@
   "files": {
     "includes": [
       "**",
+      "!.soba",
       "!src/app/routeTree.gen.ts",
       "!.source",
       "!coverage",

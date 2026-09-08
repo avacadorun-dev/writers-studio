@@ -129,16 +129,20 @@ func (c *markdownConverter) block(node ast.Node) []editor.Node {
 		return []editor.Node{{Type: "horizontalRule"}}
 	case *ast.CodeBlock:
 		return []editor.Node{{
-			Type: "codeBlock", Attrs: map[string]any{"language": ""},
-			Content: textContent(strings.TrimSuffix(string(current.Lines().Value(c.source)), "\n")),
+			Type: "codeBlock", Attrs: blockAttrs(),
+			Content: textContent(trimMarkdownFenceLineEnding(string(current.Lines().Value(c.source)))),
 		}}
 	case *ast.FencedCodeBlock:
 		language := string(current.Language(c.source))
-		code := strings.TrimSuffix(string(current.Lines().Value(c.source)), "\n")
+		code := trimMarkdownFenceLineEnding(string(current.Lines().Value(c.source)))
 		if strings.EqualFold(language, "mermaid") {
 			return []editor.Node{{Type: "mermaidBlock", Attrs: map[string]any{"code": code, "caption": ""}}}
 		}
-		return []editor.Node{{Type: "codeBlock", Attrs: map[string]any{"language": language}, Content: textContent(code)}}
+		attrs := blockAttrs()
+		if language != "" {
+			attrs["language"] = language
+		}
+		return []editor.Node{{Type: "codeBlock", Attrs: attrs, Content: textContent(code)}}
 	case *ast.Blockquote:
 		children := c.blockChildren(current)
 		if callout, ok := asCallout(children); ok {
@@ -171,6 +175,13 @@ func (c *markdownConverter) block(node ast.Node) []editor.Node {
 		}
 	}
 	return nil
+}
+
+func trimMarkdownFenceLineEnding(value string) string {
+	if strings.HasSuffix(value, "\r\n") {
+		return strings.TrimSuffix(value, "\r\n")
+	}
+	return strings.TrimSuffix(value, "\n")
 }
 
 func (c *markdownConverter) blockChildren(parent ast.Node) []editor.Node {

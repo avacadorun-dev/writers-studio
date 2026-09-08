@@ -28,7 +28,12 @@ interface AssistantLauncherProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: Project;
-  node: DocumentNode;
+  node?: DocumentNode;
+  canvas?: { id: string; title: string };
+  canvasContext?: {
+    selectionIds: string[];
+    viewport: { x: number; y: number; zoom: number };
+  };
   onStarted?: (runId: string) => void;
 }
 
@@ -37,10 +42,12 @@ export function AssistantLauncher({
   onOpenChange,
   project,
   node,
+  canvas,
+  canvasContext,
   onStarted,
 }: AssistantLauncherProps) {
   const navigate = useNavigate();
-  const [targetKind, setTargetKind] = useState<AssistantTargetKind>("node");
+  const [targetKind, setTargetKind] = useState<AssistantTargetKind>(canvas ? "canvas" : "node");
   const [inputMode, setInputMode] = useState<AssistantInputMode>("voice");
   const [providerChoice, setProviderChoice] = useState("");
   const preferences = loadWriterPreferences();
@@ -86,8 +93,12 @@ export function AssistantLauncher({
     }
   }, [capabilities.data, compatibleConnections, open, providerChoice, providers.data]);
   useEffect(() => {
-    if (!open) setProviderChoice("");
-  }, [open]);
+    if (!open) {
+      setProviderChoice("");
+      return;
+    }
+    setTargetKind(canvas ? "canvas" : node ? "node" : "project");
+  }, [canvas, node, open]);
   const selectedConnection = compatibleConnections.find(
     (connection) => connection.id === providerChoice,
   );
@@ -99,7 +110,10 @@ export function AssistantLauncher({
     mutationFn: () =>
       createAssistantRun(project.id, {
         targetKind,
-        targetNodeId: targetKind === "node" ? node.id : undefined,
+        targetNodeId: targetKind === "node" ? node?.id : undefined,
+        targetCanvasId: targetKind === "canvas" ? canvas?.id : undefined,
+        canvasSelectionIds: targetKind === "canvas" ? canvasContext?.selectionIds : undefined,
+        canvasViewport: targetKind === "canvas" ? canvasContext?.viewport : undefined,
         inputMode,
         silenceCheckpointMs,
         providerConnectionId: selectedConnection?.id,
@@ -178,7 +192,11 @@ export function AssistantLauncher({
       <div className="mt-4 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] px-4 py-3 text-sm">
         <p className="font-medium">{project.title}</p>
         <p className="mt-1 text-[12px] text-[var(--ink-secondary)]">
-          {targetKind === "node" ? node.title : project.structure.rootLabel}
+          {targetKind === "canvas"
+            ? canvas?.title
+            : targetKind === "node"
+              ? node?.title
+              : project.structure.rootLabel}
         </p>
       </div>
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4">
@@ -230,13 +248,27 @@ export function AssistantLauncher({
           Область работы
         </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <ChoiceCard
-            selected={targetKind === "node"}
-            icon={FileText}
-            title={`Только «${node.title}»`}
-            body="Точная работа в открытом документе; остальной проект доступен как контекст."
-            onClick={() => setTargetKind("node")}
-          />
+          {canvas ? (
+            <ChoiceCard
+              selected={targetKind === "canvas"}
+              icon={FileText}
+              title={`Доска «${canvas.title}»`}
+              body={
+                canvasContext?.selectionIds.length
+                  ? `Выбрано элементов: ${canvasContext.selectionIds.length}. Ассистент увидит selection и текущую область.`
+                  : "Ассистент увидит доску и текущую область viewport; изменения сначала появятся как preview."
+              }
+              onClick={() => setTargetKind("canvas")}
+            />
+          ) : node ? (
+            <ChoiceCard
+              selected={targetKind === "node"}
+              icon={FileText}
+              title={`Только «${node.title}»`}
+              body="Точная работа в открытом документе; остальной проект доступен как контекст."
+              onClick={() => setTargetKind("node")}
+            />
+          ) : null}
           <ChoiceCard
             selected={targetKind === "project"}
             icon={Globe2}

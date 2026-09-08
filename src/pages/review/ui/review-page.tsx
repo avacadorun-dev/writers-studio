@@ -11,7 +11,7 @@ import {
   saveTranscriptDraft,
   transferTranscript,
 } from "~entities/dictation";
-import { createNode, getProject, saveRevision, type TiptapNode } from "~entities/project";
+import { createNode, getNode, getProject, saveRevision, type TiptapNode } from "~entities/project";
 import { editorExtensions, FormattingToolbar, highlightSourceNode } from "~features/editor";
 import { loadWriterPreferences } from "~shared/lib";
 import {
@@ -26,6 +26,8 @@ import {
   useToast,
 } from "~shared/ui";
 import { ProjectUtilityShell } from "~widgets/project-utility-shell";
+
+import { mergeTranscriptAtEnd } from "../model/transcript-transfer";
 
 export function ReviewPage({ sessionId }: { sessionId: string }) {
   const queryClient = useQueryClient();
@@ -187,13 +189,18 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
           }).format(new Date())}`,
         });
         target = created.node;
+      } else if (target) {
+        // The project outline intentionally contains no revision body. Read the
+        // canonical document before composing an append so existing text cannot
+        // be mistaken for an empty document.
+        target = (await getNode(target.id)).node;
       }
       if (!target) {
         throw new Error("Выберите документ");
       }
       const draft = editor.getJSON() as TiptapNode;
       const content =
-        mode === "replace" || !target.content ? draft : mergeDocuments(target.content, draft);
+        mode === "replace" || !target.content ? draft : mergeTranscriptAtEnd(target.content, draft);
       return {
         target,
         previousContent: target.content,
@@ -538,13 +545,6 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
       </div>
     </ProjectUtilityShell>
   );
-}
-
-function mergeDocuments(destination: TiptapNode, draft: TiptapNode): TiptapNode {
-  return {
-    type: "doc",
-    content: [...(destination.content ?? []), ...(draft.content ?? [])],
-  };
 }
 
 function formatClock(milliseconds: number): string {

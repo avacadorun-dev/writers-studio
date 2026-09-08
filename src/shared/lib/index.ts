@@ -6,6 +6,7 @@ export {
 } from "./assistant-guide-draft";
 export { createClientId } from "./client-id";
 export { cn } from "./cn";
+export { maximumNodeTitleLength, normalizeNodeTitle } from "./node-title";
 export {
   type AssistantSilenceCheckpointMs,
   applyWriterPreferences,
@@ -13,9 +14,12 @@ export {
   type EditorFontFamily,
   type EditorFontSize,
   type EditorLineHeight,
+  type EditorListItemSpacing,
   type EditorManuscriptWidth,
+  type EditorParagraphSpacing,
   type EditorStyle,
   type EditorTheme,
+  type EditorToolbarMode,
   editorStyleOptions,
   loadWriterPreferences,
   normalizeWriterPreferences,
@@ -25,6 +29,7 @@ export {
   writerPreferencesStorageKey,
 } from "./preferences";
 export type {
+  CanvasSnapshot,
   EditorSnapshot,
   LocalAudioChunk,
   LocalRecording,
@@ -32,13 +37,16 @@ export type {
 export {
   clearLocalRecoveryData,
   deleteLocalRecording,
+  getCanvasSnapshot,
   getEditorSnapshot,
   getLocalRecording,
   listAudioChunks,
   listLocalRecordings,
   markAudioChunkUploaded,
+  markCanvasSnapshotSynced,
   markEditorSnapshotSynced,
   saveAudioChunk,
+  saveCanvasSnapshot,
   saveEditorSnapshot,
   saveLocalRecording,
 } from "./recovery-db";

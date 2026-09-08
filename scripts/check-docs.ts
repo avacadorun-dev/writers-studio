@@ -32,8 +32,24 @@ for (const name of files) {
   }
 
   for (const match of source.matchAll(/\]\((\/docs(?:\/[^)#\s]*)?)(?:#[^)]+)?\)/g)) {
+    if (match[1].startsWith("/docs/examples/")) {
+      try {
+        await access(join(publicRoot, match[1].replace(/^\//, "")));
+      } catch {
+        errors.push(`${name}: отсутствует файл ${match[1]}`);
+      }
+      continue;
+    }
     const slug = match[1].replace(/^\/docs\/?/, "");
     if (slug && !slugs.has(slug)) errors.push(`${name}: битая ссылка ${match[1]}`);
+  }
+
+  for (const match of source.matchAll(/href=["'](\/docs\/examples\/[^"']+)["']/g)) {
+    try {
+      await access(join(publicRoot, match[1].replace(/^\//, "")));
+    } catch {
+      errors.push(`${name}: отсутствует файл ${match[1]}`);
+    }
   }
 
   for (const match of source.matchAll(/(?:src=|!\[[^\]]*\]\()["']?(\/docs\/images\/[^)"'\s]+)/g)) {

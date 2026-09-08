@@ -30,6 +30,11 @@
   font-family: var(--font-ui);
 }
 
+.ws-docs a[data-active="true"] {
+  color: var(--accent-ink);
+  transition: none;
+}
+
 .ws-docs [data-docs-body] {
   font-family: var(--font-ui);
   font-size: 1rem;

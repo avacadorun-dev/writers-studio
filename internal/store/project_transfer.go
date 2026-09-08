@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/editor"
 	exportformat "writers.studio/internal/export"
@@ -22,7 +24,7 @@ import (
 
 const (
 	ProjectTransferFormat         = "writers-studio-project"
-	ProjectTransferFormatVersion  = 5
+	ProjectTransferFormatVersion  = 8
 	ProjectTransferMinimumVersion = 1
 )
 
@@ -44,6 +46,9 @@ type ProjectTransfer struct {
 	TranscriptDraftRevisions []ProjectTransferDraftRevision      `json:"transcriptDraftRevisions"`
 	Audio                    []ProjectTransferAudio              `json:"audio"`
 	Media                    []ProjectTransferMedia              `json:"media,omitempty"`
+	Canvases                 []ProjectTransferCanvas             `json:"canvases"`
+	CanvasRevisions          []ProjectTransferCanvasRevision     `json:"canvasRevisions"`
+	CanvasSchema             *ProjectTransferCanvasSchema        `json:"canvasSchema,omitempty"`
 	AssistantGuide           *ProjectTransferAssistantGuide      `json:"assistantGuide,omitempty"`
 	ProjectMemory            []ProjectTransferMemoryRecord       `json:"projectMemory"`
 	ProjectMemoryRevisions   []ProjectTransferMemoryRevision     `json:"projectMemoryRevisions"`
@@ -202,9 +207,45 @@ type ProjectTransferMedia struct {
 	MediaType    string  `json:"mediaType"`
 	OriginalName string  `json:"originalName"`
 	SourcePath   *string `json:"sourcePath,omitempty"`
-	Width        int     `json:"width"`
-	Height       int     `json:"height"`
+	Width        *int    `json:"width"`
+	Height       *int    `json:"height"`
+	PageCount    *int    `json:"pageCount,omitempty"`
+	DurationMS   *int64  `json:"durationMs,omitempty"`
 	StorageKey   string  `json:"-"`
+}
+
+type ProjectTransferCanvas struct {
+	ID              string     `json:"id"`
+	Title           string     `json:"title"`
+	Position        float64    `json:"position"`
+	CurrentRevision int        `json:"currentRevision"`
+	TrashedAt       *time.Time `json:"trashedAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+}
+
+type ProjectTransferCanvasRevision struct {
+	ID            string          `json:"id"`
+	CanvasID      string          `json:"canvasId"`
+	Revision      int             `json:"revision"`
+	BaseRevision  int             `json:"baseRevision"`
+	SchemaVersion int             `json:"schemaVersion"`
+	Content       json.RawMessage `json:"content"`
+	Source        string          `json:"source"`
+	CreatedAt     time.Time       `json:"createdAt"`
+}
+
+type ProjectTransferCanvasSchema struct {
+	CurrentRevision int                                   `json:"currentRevision"`
+	Revisions       []ProjectTransferCanvasSchemaRevision `json:"revisions"`
+}
+
+type ProjectTransferCanvasSchemaRevision struct {
+	Revision     int                       `json:"revision"`
+	BaseRevision int                       `json:"baseRevision"`
+	Schema       canvasdocument.TypeSchema `json:"schema"`
+	Source       string                    `json:"source"`
+	CreatedAt    time.Time                 `json:"createdAt"`
 }
 
 type ProjectTransferAssistantGuide struct {
@@ -278,6 +319,8 @@ func (s *Store) BuildProjectTransfer(
 		TranscriptDraftRevisions: make([]ProjectTransferDraftRevision, 0),
 		Audio:                    make([]ProjectTransferAudio, 0),
 		Media:                    make([]ProjectTransferMedia, 0),
+		Canvases:                 make([]ProjectTransferCanvas, 0),
+		CanvasRevisions:          make([]ProjectTransferCanvasRevision, 0),
 		ProjectMemory:            make([]ProjectTransferMemoryRecord, 0),
 		ProjectMemoryRevisions:   make([]ProjectTransferMemoryRevision, 0),
 	}
@@ -311,6 +354,9 @@ func (s *Store) BuildProjectTransfer(
 	if err := s.loadProjectTransferDocuments(ctx, projectID, &result); err != nil {
 		return ProjectTransfer{}, err
 	}
+	if err := s.loadProjectTransferCanvases(ctx, projectID, &result); err != nil {
+		return ProjectTransfer{}, err
+	}
 	if err := s.loadProjectTransferDictations(ctx, projectID, &result); err != nil {
 		return ProjectTransfer{}, err
 	}
@@ -321,6 +367,100 @@ func (s *Store) BuildProjectTransfer(
 		return ProjectTransfer{}, fmt.Errorf("validate generated project transfer: %w", err)
 	}
 	return result, nil
+}
+
+func (s *Store) loadProjectTransferCanvases(
+	ctx context.Context,
+	projectID string,
+	result *ProjectTransfer,
+) error {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT id::text, title, position::float8, current_revision, trashed_at,
+			created_at, updated_at
+		FROM canvases WHERE project_id=$1 ORDER BY position, created_at
+	`, projectID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item ProjectTransferCanvas
+		if err := rows.Scan(
+			&item.ID, &item.Title, &item.Position, &item.CurrentRevision,
+			&item.TrashedAt, &item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return err
+		}
+		result.Canvases = append(result.Canvases, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	revisionRows, err := s.Pool.Query(ctx, `
+		SELECT r.id::text, r.canvas_id::text, r.revision, r.base_revision,
+			r.schema_version, r.content, r.source, r.created_at
+		FROM canvas_revisions r
+		JOIN canvases c ON c.id=r.canvas_id
+		WHERE c.project_id=$1 ORDER BY c.created_at, r.revision
+	`, projectID)
+	if err != nil {
+		return err
+	}
+	defer revisionRows.Close()
+	for revisionRows.Next() {
+		var item ProjectTransferCanvasRevision
+		if err := revisionRows.Scan(
+			&item.ID, &item.CanvasID, &item.Revision, &item.BaseRevision,
+			&item.SchemaVersion, &item.Content, &item.Source, &item.CreatedAt,
+		); err != nil {
+			return err
+		}
+		result.CanvasRevisions = append(result.CanvasRevisions, item)
+	}
+	if err := revisionRows.Err(); err != nil {
+		return err
+	}
+	var currentRevision int
+	err = s.Pool.QueryRow(ctx, `
+		SELECT current_revision FROM canvas_schemas WHERE project_id=$1
+	`, projectID).Scan(&currentRevision)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	schema := &ProjectTransferCanvasSchema{
+		CurrentRevision: currentRevision,
+		Revisions:       make([]ProjectTransferCanvasSchemaRevision, 0),
+	}
+	schemaRows, err := s.Pool.Query(ctx, `
+		SELECT revision, base_revision, schema, source, created_at
+		FROM canvas_schema_revisions WHERE project_id=$1 ORDER BY revision
+	`, projectID)
+	if err != nil {
+		return err
+	}
+	defer schemaRows.Close()
+	for schemaRows.Next() {
+		var item ProjectTransferCanvasSchemaRevision
+		var raw []byte
+		if err := schemaRows.Scan(
+			&item.Revision, &item.BaseRevision, &raw, &item.Source, &item.CreatedAt,
+		); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(raw, &item.Schema); err != nil {
+			return err
+		}
+		schema.Revisions = append(schema.Revisions, item)
+	}
+	if err := schemaRows.Err(); err != nil {
+		return err
+	}
+	result.CanvasSchema = schema
+	return nil
 }
 
 func (s *Store) loadProjectTransferDocuments(
@@ -556,7 +696,7 @@ func (s *Store) loadProjectTransferDictations(
 
 	mediaRows, err := s.Pool.Query(ctx, `
 		SELECT id::text, sha256, storage_key, byte_size, media_type, original_name,
-			width, height, source_path
+			width, height, page_count, duration_ms, source_path
 		FROM project_media
 		WHERE project_id=$1 ORDER BY created_at
 	`, projectID)
@@ -567,7 +707,8 @@ func (s *Store) loadProjectTransferDictations(
 	for mediaRows.Next() {
 		var item ProjectTransferMedia
 		if err := mediaRows.Scan(&item.ID, &item.SHA256, &item.StorageKey, &item.ByteSize,
-			&item.MediaType, &item.OriginalName, &item.Width, &item.Height, &item.SourcePath); err != nil {
+			&item.MediaType, &item.OriginalName, &item.Width, &item.Height,
+			&item.PageCount, &item.DurationMS, &item.SourcePath); err != nil {
 			return err
 		}
 		item.Path = "media/" + item.ID + mediaExtension(item.MediaType)
@@ -683,6 +824,8 @@ func (s *Store) ImportProjectTransfer(
 	artifactIDs := remapIDs(transferArtifactIDs(transfer.TranscriptArtifacts))
 	memoryIDs := remapIDs(transferMemoryIDs(transfer.ProjectMemory))
 	mediaIDs := remapIDs(transferMediaIDs(transfer.Media))
+	canvasIDs := remapIDs(transferCanvasIDs(transfer.Canvases))
+	canvasReferenceFields := canvasReferenceFieldKinds(transfer.CanvasSchema)
 	exportProfile := transfer.Project.ExportProfile
 	exportProfileRevision := transfer.Project.ExportProfileRevision
 	if transfer.FormatVersion < 4 || exportProfile.SchemaVersion == 0 {
@@ -727,11 +870,34 @@ func (s *Store) ImportProjectTransfer(
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO project_media(
 					id,project_id,owner_user_id,storage_key,media_type,original_name,
-					sha256,byte_size,width,height,source_path
-				) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+					sha256,byte_size,width,height,page_count,duration_ms,source_path
+				) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			`, mediaIDs[media.ID], projectID, ownerID, media.StorageKey, media.MediaType,
-				media.OriginalName, media.SHA256, media.ByteSize, media.Width, media.Height, media.SourcePath); err != nil {
+				media.OriginalName, media.SHA256, media.ByteSize, media.Width, media.Height,
+				media.PageCount, media.DurationMS, media.SourcePath); err != nil {
 				return err
+			}
+		}
+		if transfer.CanvasSchema != nil {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO canvas_schemas(project_id, current_revision)
+				VALUES($1,$2)
+			`, projectID, transfer.CanvasSchema.CurrentRevision); err != nil {
+				return err
+			}
+			for _, revision := range transfer.CanvasSchema.Revisions {
+				schema, err := json.Marshal(revision.Schema)
+				if err != nil {
+					return err
+				}
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO canvas_schema_revisions(
+						id, project_id, revision, base_revision, schema, source, created_at
+					) VALUES($1,$2,$3,$4,$5,$6,$7)
+				`, uuid.NewString(), projectID, revision.Revision, revision.BaseRevision,
+					schema, revision.Source, revision.CreatedAt); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -770,6 +936,33 @@ func (s *Store) ImportProjectTransfer(
 			`, uuid.NewString(), nodeIDs[revision.NodeID], revision.Revision,
 				revision.BaseRevision, revision.SchemaVersion, content,
 				revision.PlainText, revision.Source, revision.CreatedAt); err != nil {
+				return err
+			}
+		}
+		for _, canvas := range transfer.Canvases {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO canvases(
+					id,project_id,title,position,current_revision,trashed_at,created_at,updated_at
+				) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+			`, canvasIDs[canvas.ID], projectID, canvas.Title, canvas.Position,
+				canvas.CurrentRevision, canvas.TrashedAt, canvas.CreatedAt, canvas.UpdatedAt); err != nil {
+				return err
+			}
+		}
+		for _, revision := range transfer.CanvasRevisions {
+			content, err := remapCanvasResources(
+				revision.Content, nodeIDs, mediaIDs, canvasIDs, canvasReferenceFields,
+			)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO canvas_revisions(
+					id,canvas_id,revision,base_revision,schema_version,content,source,created_at
+				) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+			`, uuid.NewString(), canvasIDs[revision.CanvasID], revision.Revision,
+				revision.BaseRevision, revision.SchemaVersion, content,
+				revision.Source, revision.CreatedAt); err != nil {
 				return err
 			}
 		}
@@ -1073,7 +1266,8 @@ func ValidateProjectTransfer(transfer ProjectTransfer) error {
 		return invalid("invalid document count")
 	}
 	if len(transfer.DocumentRevisions) > 100_000 || len(transfer.DictationSessions) > 20_000 ||
-		len(transfer.Media) > 20_000 {
+		len(transfer.Media) > 20_000 || len(transfer.Canvases) > 2_000 ||
+		len(transfer.CanvasRevisions) > 100_000 {
 		return invalid("project exceeds transfer limits")
 	}
 
@@ -1214,12 +1408,29 @@ func ValidateProjectTransfer(transfer ProjectTransfer) error {
 	}
 	mediaIDs := map[string]bool{}
 	for _, media := range transfer.Media {
+		isImage := media.MediaType == "image/png" || media.MediaType == "image/jpeg" ||
+			media.MediaType == "image/gif"
+		isPDF := media.MediaType == "application/pdf"
+		validDimensions := isImage && media.Width != nil && media.Height != nil &&
+			*media.Width >= 1 && *media.Width <= 20_000 && *media.Height >= 1 && *media.Height <= 20_000
+		validPDF := isPDF && transfer.FormatVersion >= 7 && media.ByteSize <= 25<<20 &&
+			media.Width == nil && media.Height == nil &&
+			(media.PageCount == nil || *media.PageCount > 0)
+		isAudio := media.MediaType == "audio/mpeg" || media.MediaType == "audio/mp4" ||
+			media.MediaType == "audio/ogg" || media.MediaType == "audio/wav"
+		isVideo := media.MediaType == "video/mp4" || media.MediaType == "video/webm"
+		maxTimedBytes := int64(100 << 20)
+		if isAudio {
+			maxTimedBytes = 50 << 20
+		}
+		validTimedMedia := transfer.FormatVersion >= 8 && (isAudio || isVideo) &&
+			media.Width == nil && media.Height == nil && media.PageCount == nil &&
+			media.ByteSize <= maxTimedBytes &&
+			(media.DurationMS == nil || *media.DurationMS >= 0)
 		if media.ID == "" || mediaIDs[media.ID] || archivePaths[media.Path] ||
 			!validTransferMediaPath(media.Path) || len(media.SHA256) != 64 || media.ByteSize < 1 ||
-			media.ByteSize > 12<<20 || (media.MediaType != "image/png" &&
-			media.MediaType != "image/jpeg" && media.MediaType != "image/gif") ||
-			len([]rune(media.OriginalName)) > 255 || media.Width < 1 || media.Width > 20_000 ||
-			media.Height < 1 || media.Height > 20_000 {
+			(!validTimedMedia && !validPDF && (media.ByteSize > 12<<20 || !validDimensions)) ||
+			len([]rune(media.OriginalName)) > 255 {
 			return invalid("invalid media entry")
 		}
 		if media.SourcePath != nil {
@@ -1233,6 +1444,32 @@ func ValidateProjectTransfer(transfer ProjectTransfer) error {
 		mediaIDs[media.ID] = true
 		archivePaths[media.Path] = true
 	}
+	if transfer.FormatVersion < 8 && transfer.CanvasSchema != nil {
+		return invalid("canvas schema requires format version 8")
+	}
+	if transfer.CanvasSchema != nil {
+		if transfer.CanvasSchema.CurrentRevision < 1 || len(transfer.CanvasSchema.Revisions) == 0 ||
+			len(transfer.CanvasSchema.Revisions) > 10_000 {
+			return invalid("invalid canvas schema history")
+		}
+		maxSchemaRevision := 0
+		seenSchemaRevisions := map[int]bool{}
+		for _, revision := range transfer.CanvasSchema.Revisions {
+			if revision.Revision < 1 || revision.BaseRevision != revision.Revision-1 ||
+				revision.Schema.Revision != revision.Revision || seenSchemaRevisions[revision.Revision] ||
+				strings.TrimSpace(revision.Source) == "" || len(revision.Source) > 80 ||
+				canvasdocument.ValidateTypeSchema(revision.Schema) != nil {
+				return invalid("invalid canvas schema revision")
+			}
+			seenSchemaRevisions[revision.Revision] = true
+			if revision.Revision > maxSchemaRevision {
+				maxSchemaRevision = revision.Revision
+			}
+		}
+		if maxSchemaRevision != transfer.CanvasSchema.CurrentRevision {
+			return invalid("canvas schema current revision does not match history")
+		}
+	}
 	if transfer.FormatVersion >= 4 && transfer.Project.ExportProfile.Metadata.CoverAssetID != nil &&
 		!mediaIDs[*transfer.Project.ExportProfile.Metadata.CoverAssetID] {
 		return invalid("export profile cover is missing")
@@ -1242,6 +1479,58 @@ func ValidateProjectTransfer(transfer ProjectTransfer) error {
 			if !mediaIDs[assetID] {
 				return invalid("document image asset is missing")
 			}
+		}
+	}
+	if transfer.FormatVersion < 6 &&
+		(len(transfer.Canvases) > 0 || len(transfer.CanvasRevisions) > 0) {
+		return invalid("canvases require format version 6")
+	}
+	canvases := map[string]ProjectTransferCanvas{}
+	for _, item := range transfer.Canvases {
+		if item.ID == "" || canvases[item.ID].ID != "" ||
+			len([]rune(strings.TrimSpace(item.Title))) < 1 ||
+			len([]rune(item.Title)) > 160 || item.CurrentRevision < 1 ||
+			math.IsNaN(item.Position) || math.IsInf(item.Position, 0) ||
+			item.Position < -1e12 || item.Position > 1e12 {
+			return invalid("invalid canvas")
+		}
+		canvases[item.ID] = item
+	}
+	canvasRevisionKeys := map[string]bool{}
+	maxCanvasRevision := map[string]int{}
+	for _, revision := range transfer.CanvasRevisions {
+		references, err := canvasdocument.Validate(revision.Content)
+		key := fmt.Sprintf("%s:%d", revision.CanvasID, revision.Revision)
+		if canvases[revision.CanvasID].ID == "" || revision.Revision < 1 ||
+			revision.BaseRevision < 0 || revision.BaseRevision >= revision.Revision ||
+			revision.SchemaVersion != references.SchemaVersion || err != nil ||
+			canvasRevisionKeys[key] || strings.TrimSpace(revision.Source) == "" ||
+			len(revision.Source) > 80 {
+			return invalid("invalid canvas revision")
+		}
+		for _, nodeID := range references.DocumentIDs {
+			if nodes[nodeID].ID == "" {
+				return invalid("canvas document reference is missing")
+			}
+		}
+		for _, mediaID := range references.MediaIDs {
+			if !mediaIDs[mediaID] {
+				return invalid("canvas media reference is missing")
+			}
+		}
+		for _, nestedCanvasID := range references.CanvasIDs {
+			if canvases[nestedCanvasID].ID == "" {
+				return invalid("nested canvas reference is missing")
+			}
+		}
+		canvasRevisionKeys[key] = true
+		if revision.Revision > maxCanvasRevision[revision.CanvasID] {
+			maxCanvasRevision[revision.CanvasID] = revision.Revision
+		}
+	}
+	for _, item := range transfer.Canvases {
+		if item.CurrentRevision != maxCanvasRevision[item.ID] {
+			return invalid("canvas current revision does not match revision history")
 		}
 	}
 	terms := map[string]bool{}
@@ -1412,6 +1701,133 @@ func transferMediaIDs(items []ProjectTransferMedia) []string {
 	return result
 }
 
+func transferCanvasIDs(items []ProjectTransferCanvas) []string {
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		result = append(result, item.ID)
+	}
+	return result
+}
+
+func remapCanvasResources(
+	raw json.RawMessage,
+	nodeIDs map[string]string,
+	mediaIDs map[string]string,
+	canvasIDs map[string]string,
+	referenceFields map[string]map[string]string,
+) (json.RawMessage, error) {
+	var document map[string]any
+	if err := json.Unmarshal(raw, &document); err != nil {
+		return nil, fmt.Errorf("%w: invalid canvas content", ErrInvalidProjectTransfer)
+	}
+	nodes, _ := document["nodes"].([]any)
+	for _, value := range nodes {
+		node, _ := value.(map[string]any)
+		extension, _ := node["x-writers-studio"].(map[string]any)
+		if card, ok := extension["card"].(map[string]any); ok {
+			if promotedID, ok := card["promotedDocumentId"].(string); ok && promotedID != "" {
+				mapped, exists := nodeIDs[promotedID]
+				if !exists {
+					return nil, fmt.Errorf("%w: promoted canvas document is missing", ErrInvalidProjectTransfer)
+				}
+				card["promotedDocumentId"] = mapped
+			}
+			typeID, _ := card["typeId"].(string)
+			fields, _ := card["fields"].(map[string]any)
+			for fieldID, kind := range referenceFields[typeID] {
+				value, exists := fields[fieldID]
+				if !exists || value == nil || value == "" {
+					continue
+				}
+				id, ok := value.(string)
+				if !ok {
+					return nil, fmt.Errorf("%w: canvas typed reference is invalid", ErrInvalidProjectTransfer)
+				}
+				mapped, exists := canvasReferenceMapping(kind, id, nodeIDs, mediaIDs, canvasIDs)
+				if !exists {
+					return nil, fmt.Errorf("%w: canvas typed reference is missing", ErrInvalidProjectTransfer)
+				}
+				fields[fieldID] = mapped
+			}
+		}
+		if node["type"] != "file" {
+			continue
+		}
+		resource, _ := extension["resource"].(map[string]any)
+		kind, _ := resource["kind"].(string)
+		id, _ := resource["id"].(string)
+		var mapped, prefix string
+		var exists bool
+		switch kind {
+		case "document":
+			mapped, exists = nodeIDs[id]
+			prefix = "writers-studio://documents/"
+		case "media":
+			mapped, exists = mediaIDs[id]
+			prefix = "writers-studio://media/"
+		case "canvas":
+			mapped, exists = canvasIDs[id]
+			prefix = "writers-studio://canvases/"
+		default:
+			return nil, fmt.Errorf("%w: invalid canvas resource kind", ErrInvalidProjectTransfer)
+		}
+		if !exists {
+			return nil, fmt.Errorf("%w: canvas resource is missing", ErrInvalidProjectTransfer)
+		}
+		resource["id"] = mapped
+		node["file"] = prefix + mapped
+	}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return nil, err
+	}
+	return encoded, nil
+}
+
+func canvasReferenceFieldKinds(schema *ProjectTransferCanvasSchema) map[string]map[string]string {
+	result := map[string]map[string]string{}
+	if schema == nil {
+		return result
+	}
+	for _, revision := range schema.Revisions {
+		if revision.Revision != schema.CurrentRevision {
+			continue
+		}
+		for _, cardType := range revision.Schema.CardTypes {
+			for _, field := range cardType.Fields {
+				if field.Type != "document" && field.Type != "media" && field.Type != "canvas" {
+					continue
+				}
+				if result[cardType.ID] == nil {
+					result[cardType.ID] = map[string]string{}
+				}
+				result[cardType.ID][field.ID] = field.Type
+			}
+		}
+		break
+	}
+	return result
+}
+
+func canvasReferenceMapping(
+	kind, id string,
+	nodeIDs, mediaIDs, canvasIDs map[string]string,
+) (string, bool) {
+	switch kind {
+	case "document":
+		value, exists := nodeIDs[id]
+		return value, exists
+	case "media":
+		value, exists := mediaIDs[id]
+		return value, exists
+	case "canvas":
+		value, exists := canvasIDs[id]
+		return value, exists
+	default:
+		return "", false
+	}
+}
+
 func remapDocumentMedia(raw json.RawMessage, mediaIDs map[string]string) (json.RawMessage, error) {
 	if len(raw) == 0 || len(mediaIDs) == 0 {
 		return raw, nil
@@ -1576,6 +1992,20 @@ func mediaExtension(mediaType string) string {
 		return ".jpg"
 	case "image/gif":
 		return ".gif"
+	case "application/pdf":
+		return ".pdf"
+	case "audio/mpeg":
+		return ".mp3"
+	case "audio/mp4":
+		return ".m4a"
+	case "audio/ogg":
+		return ".ogg"
+	case "audio/wav":
+		return ".wav"
+	case "video/mp4":
+		return ".mp4"
+	case "video/webm":
+		return ".webm"
 	default:
 		return ".png"
 	}

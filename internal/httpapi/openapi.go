@@ -113,11 +113,25 @@ func openAPIOperations() []openAPIOperation {
 		{Method: http.MethodGet, Path: "/api/projects/{projectID}/transfer", Tag: "Projects", Summary: "Скачать переносимую копию проекта", OperationID: "downloadProjectTransfer", SuccessStatus: http.StatusOK, ResponseMedia: "application/vnd.writers-studio.project+zip"},
 		jsonOperation(http.MethodPatch, "/api/projects/{projectID}/status", "Projects", "Изменить статус проекта", "updateProjectStatus", "ProjectStatusRequest", "Object", http.StatusOK),
 		jsonOperation(http.MethodDelete, "/api/projects/{projectID}/purge", "Projects", "Удалить проект безвозвратно", "purgeProject", "ConfirmationRequest", "Object", http.StatusOK),
+		jsonOperation(http.MethodGet, "/api/projects/{projectID}/canvases", "Canvases", "Получить доски проекта", "listCanvases", "", "Object", http.StatusOK),
+		jsonOperation(http.MethodPost, "/api/projects/{projectID}/canvases", "Canvases", "Создать доску", "createCanvas", "CreateCanvasRequest", "Object", http.StatusCreated),
+		{Method: http.MethodPost, Path: "/api/projects/{projectID}/canvases/import", Tag: "Canvases", Summary: "Импортировать JSON Canvas", OperationID: "importCanvas", RequestSchema: "Binary", ResponseSchema: "Object", SuccessStatus: http.StatusCreated, RequestMedia: "application/json", ResponseMedia: "application/json"},
+		jsonOperation(http.MethodPost, "/api/projects/{projectID}/link-previews", "Canvases", "Безопасно получить preview ссылок", "getLinkPreviews", "LinkPreviewRequest", "Object", http.StatusOK),
+		jsonOperation(http.MethodGet, "/api/projects/{projectID}/canvas-schema", "Canvases", "Получить каталог типов карточек и связей", "getCanvasSchema", "", "Object", http.StatusOK),
+		jsonOperation(http.MethodPut, "/api/projects/{projectID}/canvas-schema", "Canvases", "Сохранить ревизию каталога типов", "saveCanvasSchema", "CanvasSchemaRequest", "Object", http.StatusCreated),
+		jsonOperation(http.MethodGet, "/api/canvases/{canvasID}", "Canvases", "Получить доску и ресурсы", "getCanvas", "", "Object", http.StatusOK),
+		jsonOperation(http.MethodPatch, "/api/canvases/{canvasID}", "Canvases", "Обновить доску", "updateCanvas", "UpdateCanvasRequest", "Object", http.StatusOK),
+		jsonOperation(http.MethodDelete, "/api/canvases/{canvasID}", "Canvases", "Переместить доску в корзину", "trashCanvas", "", "Object", http.StatusOK),
+		jsonOperation(http.MethodPost, "/api/canvases/{canvasID}/duplicate", "Canvases", "Дублировать доску", "duplicateCanvas", "", "Object", http.StatusCreated),
+		jsonOperation(http.MethodPost, "/api/canvases/{canvasID}/restore", "Canvases", "Восстановить доску", "restoreCanvas", "", "Object", http.StatusOK),
+		{Method: http.MethodGet, Path: "/api/canvases/{canvasID}/export", Tag: "Canvases", Summary: "Скачать JSON Canvas", OperationID: "exportCanvas", SuccessStatus: http.StatusOK, ResponseMedia: "application/json"},
+		jsonOperation(http.MethodPut, "/api/canvases/{canvasID}/revisions", "Canvases", "Сохранить ревизию доски", "saveCanvasRevision", "SaveCanvasRevisionRequest", "Object", http.StatusCreated),
+		jsonOperation(http.MethodPost, "/api/canvases/{canvasID}/promotions", "Canvases", "Атомарно превратить Canvas-идею в документ", "promoteCanvasNode", "CanvasPromotionRequest", "Object", http.StatusCreated),
 
 		jsonOperation(http.MethodPost, "/api/projects/{projectID}/nodes", "Documents", "Создать узел", "createNode", "CreateNodeRequest", "Object", http.StatusCreated),
-		{Method: http.MethodPost, Path: "/api/projects/{projectID}/media", Tag: "Media", Summary: "Загрузить изображение проекта", OperationID: "uploadProjectMedia", RequestSchema: "Binary", ResponseSchema: "Object", SuccessStatus: http.StatusCreated, RequestMedia: "application/octet-stream", ResponseMedia: "application/json"},
-		jsonOperation(http.MethodGet, "/api/projects/{projectID}/media", "Media", "Получить изображения проекта", "listProjectMedia", "", "Object", http.StatusOK),
-		{Method: http.MethodGet, Path: "/api/media/{mediaID}/content", Tag: "Media", Summary: "Получить изображение проекта", OperationID: "getProjectMediaContent", SuccessStatus: http.StatusOK, ResponseMedia: "image/*"},
+		{Method: http.MethodPost, Path: "/api/projects/{projectID}/media", Tag: "Media", Summary: "Загрузить медиафайл проекта", OperationID: "uploadProjectMedia", RequestSchema: "Binary", ResponseSchema: "Object", SuccessStatus: http.StatusCreated, RequestMedia: "application/octet-stream", ResponseMedia: "application/json"},
+		jsonOperation(http.MethodGet, "/api/projects/{projectID}/media", "Media", "Получить медиафайлы проекта", "listProjectMedia", "", "Object", http.StatusOK),
+		{Method: http.MethodGet, Path: "/api/media/{mediaID}/content", Tag: "Media", Summary: "Получить содержимое медиафайла", OperationID: "getProjectMediaContent", SuccessStatus: http.StatusOK, ResponseMedia: "application/octet-stream"},
 		jsonOperation(http.MethodGet, "/api/nodes/{nodeID}", "Documents", "Получить узел", "getNode", "", "Object", http.StatusOK),
 		jsonOperation(http.MethodPatch, "/api/nodes/{nodeID}", "Documents", "Обновить узел", "updateNode", "UpdateNodeRequest", "Object", http.StatusOK),
 		jsonOperation(http.MethodPost, "/api/nodes/{nodeID}/duplicate", "Documents", "Дублировать узел", "duplicateNode", "", "Object", http.StatusCreated),
@@ -331,6 +345,12 @@ func openAPIParameters(spec openAPIOperation) []any {
 	switch spec.OperationID {
 	case "listProjects":
 		parameters = append(parameters, queryParameter("status", false, enumSchema("active", "archived", "trash"), "Фильтр состояния"))
+	case "listCanvases":
+		parameters = append(parameters, queryParameter("includeTrashed", false, map[string]any{"type": "boolean", "default": false}, "Включить доски из корзины"))
+	case "importCanvas":
+		parameters = append(parameters, queryParameter("title", false, stringSchema(), "Название импортированной доски"))
+	case "exportCanvas":
+		parameters = append(parameters, queryParameter("format", false, enumSchema("canvas"), "Формат JSON Canvas"))
 	case "searchProject":
 		parameters = append(parameters,
 			queryParameter("q", true, stringSchema(), "Строка поиска"),
@@ -365,7 +385,7 @@ func queryParameter(name string, required bool, schema map[string]any, descripti
 
 func openAPITags() []any {
 	names := []string{
-		"Meta", "Authentication", "Speech", "Projects", "Documents",
+		"Meta", "Authentication", "Speech", "Projects", "Canvases", "Documents",
 		"Search and replace", "Annotations", "Dictionary", "Dictation",
 		"Media", "Preferences and account", "Exports", "Assistant providers",
 		"Assistant context", "Assistant runs",
@@ -414,6 +434,41 @@ func openAPISchemas() map[string]any {
 		}),
 		"ConfirmationRequest": objectSchema([]string{"confirmation"}, map[string]any{
 			"confirmation": stringSchema(),
+		}),
+		"CreateCanvasRequest": objectSchema([]string{"title"}, map[string]any{
+			"title": map[string]any{"type": "string", "minLength": 1, "maxLength": 160},
+		}),
+		"LinkPreviewRequest": objectSchema([]string{"urls"}, map[string]any{
+			"urls": map[string]any{
+				"type": "array", "minItems": 1, "maxItems": maxLinkPreviewURLs,
+				"items": map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
+			},
+		}),
+		"UpdateCanvasRequest": objectSchema(nil, map[string]any{
+			"title":    map[string]any{"type": "string", "minLength": 1, "maxLength": 160},
+			"position": map[string]any{"type": "number"},
+		}),
+		"CanvasDocument": map[string]any{
+			"type": "object", "description": "JSON Canvas 1.0 с namespaced расширениями Writer's Studio",
+			"properties": map[string]any{
+				"nodes":            arraySchema(map[string]any{"type": "object", "additionalProperties": true}),
+				"edges":            arraySchema(map[string]any{"type": "object", "additionalProperties": true}),
+				"x-writers-studio": map[string]any{"type": "object", "additionalProperties": true},
+			},
+			"required": []string{"nodes", "edges"}, "additionalProperties": true,
+		},
+		"SaveCanvasRevisionRequest": objectSchema([]string{"baseRevision", "content"}, map[string]any{
+			"baseRevision": integerSchema(), "content": refSchema("CanvasDocument"), "source": stringSchema(),
+		}),
+		"CanvasSchemaRequest": objectSchema([]string{"baseRevision", "cardTypes", "relationTypes"}, map[string]any{
+			"baseRevision":  integerSchema(),
+			"cardTypes":     arraySchema(map[string]any{"type": "object", "additionalProperties": true}),
+			"relationTypes": arraySchema(map[string]any{"type": "object", "additionalProperties": true}),
+			"source":        stringSchema(),
+		}),
+		"CanvasPromotionRequest": objectSchema([]string{"baseRevision", "nodeId", "title", "kind"}, map[string]any{
+			"baseRevision": integerSchema(), "nodeId": stringSchema(), "title": stringSchema(),
+			"kind": stringSchema(), "parentId": uuidSchema(),
 		}),
 		"CreateNodeRequest": objectSchema([]string{"kind", "title"}, map[string]any{
 			"parentId": uuidSchema(), "kind": stringSchema(), "title": stringSchema(),
@@ -502,7 +557,9 @@ func openAPISchemas() map[string]any {
 		}),
 		"CreateRunRequest": objectSchema([]string{"targetKind", "inputMode", "silenceCheckpointMs"}, map[string]any{
 			"title":      stringSchema(),
-			"targetKind": enumSchema("project", "node"), "targetNodeId": uuidSchema(),
+			"targetKind": enumSchema("project", "node", "canvas"), "targetNodeId": uuidSchema(),
+			"targetCanvasId": uuidSchema(), "canvasSelectionIds": arraySchema(uuidSchema()),
+			"canvasViewport":       map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "number"}},
 			"inputMode":            enumSchema("chat", "voice"),
 			"silenceCheckpointMs":  map[string]any{"type": "integer", "enum": []int{0, 3000, 5000, 8000}},
 			"providerConnectionId": uuidSchema(),

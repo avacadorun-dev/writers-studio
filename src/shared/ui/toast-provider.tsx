@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastContext.Provider value={value}>
-      <ToastPrimitive.Provider swipeDirection="right">
+      <ToastPrimitive.Provider swipeDirection="down">
         {children}
         {toasts.map((toast) => (
           <ToastPrimitive.Root
@@ -43,7 +43,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 setToasts((current) => current.filter((item) => item.id !== toast.id));
               }
             }}
-            className="grid w-[min(420px,calc(100vw-32px))] grid-cols-[1fr_auto] gap-x-4 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-inverse)] px-4 py-3 text-[var(--ink-on-inverse)] shadow-[0_10px_24px_var(--shadow-color)]"
+            className="grid w-full grid-cols-[1fr_auto] gap-x-4 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-inverse)] px-4 py-3 text-[var(--ink-on-inverse)] shadow-[0_10px_24px_var(--shadow-color)]"
           >
             <ToastPrimitive.Title className="text-sm font-medium">
               {toast.title}
@@ -64,7 +64,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             ) : null}
           </ToastPrimitive.Root>
         ))}
-        <ToastPrimitive.Viewport className="fixed right-4 bottom-4 z-[100] grid gap-2 outline-none" />
+        <ToastPrimitive.Viewport
+          data-testid="toast-viewport"
+          className="fixed bottom-4 left-1/2 z-[100] grid w-[min(420px,calc(100vw-32px))] -translate-x-1/2 gap-2 outline-none"
+        />
       </ToastPrimitive.Provider>
     </ToastContext.Provider>
   );

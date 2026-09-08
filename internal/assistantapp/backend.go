@@ -2,9 +2,13 @@ package assistantapp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,16 +19,22 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/editor"
+	"writers.studio/internal/objectstore"
 	"writers.studio/internal/projectmcp"
+	"writers.studio/internal/projectmedia"
 	"writers.studio/internal/store"
 )
 
 type ProjectBackend struct {
-	store   *store.Store
-	mu      sync.Mutex
-	pending map[string][]assistant.ChangeOperation
+	store              *store.Store
+	objects            objectstore.Store
+	createProjectMedia func(context.Context, string, store.CreateProjectMediaInput) (domain.ProjectMedia, error)
+	getProjectMedia    func(context.Context, string, string) (domain.ProjectMedia, error)
+	mu                 sync.Mutex
+	pending            map[string][]assistant.ChangeOperation
 }
 
 const (
@@ -37,10 +47,19 @@ const (
 	longFormTailRunes      = 800
 )
 
-func NewProjectBackend(dataStore *store.Store) *ProjectBackend {
-	return &ProjectBackend{
-		store: dataStore, pending: make(map[string][]assistant.ChangeOperation),
+func NewProjectBackend(dataStore *store.Store, objectStores ...objectstore.Store) *ProjectBackend {
+	var objects objectstore.Store
+	if len(objectStores) > 0 {
+		objects = objectStores[0]
 	}
+	backend := &ProjectBackend{
+		store: dataStore, objects: objects, pending: make(map[string][]assistant.ChangeOperation),
+	}
+	if dataStore != nil {
+		backend.createProjectMedia = dataStore.CreateProjectMedia
+		backend.getProjectMedia = dataStore.GetProjectMedia
+	}
+	return backend
 }
 
 func (b *ProjectBackend) Call(
@@ -80,6 +99,9 @@ func (b *ProjectBackend) call(
 	}
 	if policy.Authority == assistant.AuthorityRead {
 		return b.callRead(ctx, execution, name, arguments)
+	}
+	if policy.Authority == assistant.AuthorityDirectLow {
+		return b.callDirect(ctx, execution, name, arguments)
 	}
 	if policy.Authority == assistant.AuthorityNativeOnly {
 		return b.prepareNativeFlow(ctx, execution, name, arguments)
@@ -131,6 +153,87 @@ func (b *ProjectBackend) call(
 		"targetId":       first.TargetID,
 		"riskLevel":      first.RiskLevel,
 		"notice":         "Canonical project state is unchanged until Apply.",
+	}, nil
+}
+
+func (b *ProjectBackend) callDirect(
+	ctx context.Context,
+	execution projectmcp.ExecutionContext,
+	name string,
+	arguments map[string]any,
+) (map[string]any, error) {
+	if name != "project.upload_image" {
+		return nil, errors.New("unsupported direct project tool")
+	}
+	if b.objects == nil || b.createProjectMedia == nil {
+		return nil, errors.New("project image storage is unavailable")
+	}
+	encoded := stringArg(arguments, "dataBase64")
+	if encoded == "" {
+		return nil, errors.New("image dataBase64 must not be empty")
+	}
+	if len(encoded) > projectmedia.MaxBase64Length {
+		return nil, projectmedia.ErrImageTooLarge
+	}
+	data, err := base64.StdEncoding.Strict().DecodeString(encoded)
+	if err != nil {
+		data, err = base64.RawStdEncoding.Strict().DecodeString(encoded)
+	}
+	if err != nil {
+		return nil, errors.New("image dataBase64 is not valid base64")
+	}
+	metadata, err := projectmedia.InspectImage(data)
+	if err != nil {
+		return nil, err
+	}
+	declaredMediaType := strings.ToLower(strings.TrimSpace(stringArg(arguments, "mediaType")))
+	if declaredMediaType != metadata.MediaType {
+		return nil, fmt.Errorf(
+			"image mediaType %q does not match decoded bytes %q",
+			declaredMediaType,
+			metadata.MediaType,
+		)
+	}
+	storageKey := path.Join(
+		"media", execution.ProjectID, uuid.NewString()+metadata.Extension,
+	)
+	if err := b.objects.Put(ctx, storageKey, metadata.MediaType, data); err != nil {
+		return nil, fmt.Errorf("store project image: %w", err)
+	}
+	checksum := sha256.Sum256(data)
+	width, height := metadata.Width, metadata.Height
+	media, err := b.createProjectMedia(
+		ctx,
+		execution.OwnerUserID,
+		store.CreateProjectMediaInput{
+			ProjectID: execution.ProjectID, MediaType: metadata.MediaType,
+			OriginalName: projectmedia.SafeFileName(
+				stringArg(arguments, "filename"), metadata.Extension,
+			),
+			SHA256: hex.EncodeToString(checksum[:]), ByteSize: int64(len(data)),
+			Width: &width, Height: &height, StorageKey: storageKey,
+		},
+	)
+	if err != nil {
+		cleanupErr := b.objects.Delete(ctx, storageKey)
+		if cleanupErr != nil {
+			return nil, fmt.Errorf("create project image metadata: %w; cleanup object: %v", err, cleanupErr)
+		}
+		return nil, err
+	}
+	return map[string]any{
+		"uploaded": true,
+		"assetId":  media.ID,
+		"media": map[string]any{
+			"id": media.ID, "projectId": media.ProjectID, "mediaType": media.MediaType,
+			"originalName": media.OriginalName, "sha256": media.SHA256,
+			"byteSize": media.ByteSize, "width": media.Width, "height": media.Height,
+			"contentUrl": media.ContentURL,
+		},
+		"imageBlock": map[string]any{
+			"type": "image", "assetId": media.ID, "alt": "", "caption": "",
+		},
+		"notice": "The asset is stored immediately; use assetId in a canonical image block.",
 	}, nil
 }
 
@@ -1144,6 +1247,19 @@ func validateMutationScope(
 	execution projectmcp.ExecutionContext,
 	operations []assistant.ChangeOperation,
 ) error {
+	if execution.TargetCanvasID != nil {
+		for _, operation := range operations {
+			if operation.TargetKind != "canvas" || operation.TargetID == nil ||
+				*operation.TargetID != *execution.TargetCanvasID {
+				return fmt.Errorf(
+					"%w: canvas-scoped run may only change target canvas %s",
+					assistant.ErrMutationOutsideScope,
+					*execution.TargetCanvasID,
+				)
+			}
+		}
+		return nil
+	}
 	if execution.TargetNodeID == nil {
 		return nil
 	}
@@ -1565,6 +1681,14 @@ func (b *ProjectBackend) callRead(
 			return nil, err
 		}
 		return map[string]any{"revision": revision, "structure": structure}, nil
+	case "project.list_media":
+		media, err := b.store.ListProjectMedia(
+			ctx, execution.OwnerUserID, execution.ProjectID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"media": media}, nil
 	case "project.list_recent":
 		nodes, err := b.store.ListDocumentNodes(
 			ctx, execution.OwnerUserID, execution.ProjectID, false,
@@ -1590,6 +1714,43 @@ func (b *ProjectBackend) callRead(
 			execution,
 			boundedInt(arguments["limit"], 30, 1, 100),
 		)
+	case "canvas.list":
+		items, err := b.store.ListCanvases(
+			ctx, execution.OwnerUserID, execution.ProjectID, false,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"canvases": items}, nil
+	case "canvas.get":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return nil, err
+		}
+		return toMap("canvas", workspace)
+	case "canvas.search":
+		results, err := b.store.SearchProject(
+			ctx, execution.OwnerUserID, execution.ProjectID,
+			stringArg(arguments, "query"), "canvas",
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"results": results}, nil
+	case "canvas.analyze_graph":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return nil, err
+		}
+		analysis, err := canvasdocument.AnalyzeGraph(workspace.Revision.Content)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"canvasId": workspace.Canvas.ID,
+			"revision": workspace.Revision.Revision,
+			"analysis": analysis,
+		}, nil
 	case "tree.list":
 		nodes, err := b.store.ListDocumentNodes(
 			ctx, execution.OwnerUserID, execution.ProjectID, false,
@@ -1615,7 +1776,17 @@ func (b *ProjectBackend) callRead(
 		if err != nil {
 			return nil, err
 		}
-		return toMap("document", node)
+		blocks, err := assistantBlocksFromDocument(node.Content)
+		if err != nil {
+			return nil, err
+		}
+		result, err := toMap("document", node)
+		if err != nil {
+			return nil, err
+		}
+		document, _ := result["document"].(map[string]any)
+		document["blocks"] = blocks
+		return result, nil
 	case "document.find_exact":
 		node, err := b.ownedNode(ctx, execution, stringArg(arguments, "nodeId"))
 		if err != nil {
@@ -2164,7 +2335,104 @@ func (b *ProjectBackend) buildMutation(
 		ID: uuid.NewString(), GroupKey: groupKeyForTool(name), Selected: true,
 		ToolName: name, Arguments: mustJSON(arguments), RiskLevel: policy.RiskLevel,
 	}
+	if mutationAcceptsCanonicalContent(name) {
+		if err := b.validateContentImageAssets(ctx, execution, arguments["content"]); err != nil {
+			return operation, err
+		}
+	}
 	switch name {
+	case "canvas.propose_patch":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return operation, err
+		}
+		baseRevision := intArg(arguments, "baseRevision")
+		if workspace.Revision.Revision != baseRevision {
+			return operation, assistant.ErrStaleChangeSet
+		}
+		operations, err := canvasPatchOperationsArg(arguments["operations"])
+		if err != nil {
+			return operation, err
+		}
+		proposed, err := canvasdocument.ApplyPatch(workspace.Revision.Content, operations)
+		if err != nil {
+			return operation, err
+		}
+		references, err := canvasdocument.Validate(proposed)
+		if err != nil {
+			return operation, err
+		}
+		if err := b.store.ValidateCanvasResources(
+			ctx, execution.OwnerUserID, execution.ProjectID, references,
+		); err != nil {
+			return operation, err
+		}
+		operation.TargetKind = "canvas"
+		operation.TargetID = &workspace.Canvas.ID
+		operation.BaseRevision = &baseRevision
+		operation.BeforeSnapshot = append(json.RawMessage(nil), workspace.Revision.Content...)
+		operation.ProposedSnapshot = proposed
+		operation.Trace = mustJSON(map[string]any{
+			"canvasTitle":    workspace.Canvas.Title,
+			"operationCount": len(operations),
+		})
+	case "canvas.promote_cards":
+		workspace, err := b.ownedCanvas(ctx, execution, stringArg(arguments, "canvasId"))
+		if err != nil {
+			return operation, err
+		}
+		baseRevision := intArg(arguments, "baseRevision")
+		if workspace.Revision.Revision != baseRevision {
+			return operation, assistant.ErrStaleChangeSet
+		}
+		items, err := objectSliceArg(arguments, "items")
+		if err != nil || len(items) == 0 || len(items) > 50 {
+			return operation, errors.New("canvas promotion items are invalid")
+		}
+		content := append(json.RawMessage(nil), workspace.Revision.Content...)
+		traceItems := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			title := stringArg(item, "title")
+			kind := stringArg(item, "kind")
+			parentID := nullableStringArg(item, "parentId")
+			if title == "" || len([]rune(title)) > 200 || kind == "" {
+				return operation, errors.New("canvas promotion document metadata is invalid")
+			}
+			if err := b.store.ValidateNodePlacement(
+				ctx, execution.OwnerUserID, execution.ProjectID, kind, parentID,
+			); err != nil {
+				return operation, err
+			}
+			documentID := uuid.NewString()
+			promoted, err := canvasdocument.PromoteNode(
+				content, stringArg(item, "nodeId"), workspace.Canvas.ID, documentID,
+			)
+			if err != nil {
+				return operation, err
+			}
+			content = promoted.Content
+			traceItems = append(traceItems, map[string]any{
+				"nodeId": stringArg(item, "nodeId"), "documentId": documentID,
+				"title": title, "kind": kind, "parentId": parentID,
+			})
+		}
+		references, err := canvasdocument.Validate(content)
+		if err != nil {
+			return operation, err
+		}
+		if err := b.store.ValidateCanvasResources(
+			ctx, execution.OwnerUserID, execution.ProjectID, references,
+		); err != nil {
+			return operation, err
+		}
+		operation.TargetKind = "canvas"
+		operation.TargetID = &workspace.Canvas.ID
+		operation.BaseRevision = &baseRevision
+		operation.BeforeSnapshot = append(json.RawMessage(nil), workspace.Revision.Content...)
+		operation.ProposedSnapshot = content
+		operation.Trace = mustJSON(map[string]any{
+			"canvasTitle": workspace.Canvas.Title, "items": traceItems,
+		})
 	case "document.insert", "document.replace_range", "document.append", "document.append_chunk",
 		"document.apply_marks", "note.update":
 		node, err := b.ownedNode(ctx, execution, stringArg(arguments, "nodeId"))
@@ -2517,6 +2785,55 @@ func (b *ProjectBackend) buildMutation(
 	return operation, nil
 }
 
+func mutationAcceptsCanonicalContent(name string) bool {
+	switch name {
+	case "document.insert", "document.append", "note.update", "tree.create_node",
+		"document.create_draft", "note.create":
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *ProjectBackend) validateContentImageAssets(
+	ctx context.Context,
+	execution projectmcp.ExecutionContext,
+	content any,
+) error {
+	normalized, err := normalizeAssistantContent(content)
+	if err != nil {
+		return err
+	}
+	var root editor.Node
+	if err := json.Unmarshal(normalized, &root); err != nil {
+		return err
+	}
+	assetIDs := make(map[string]bool)
+	var walk func(editor.Node)
+	walk = func(node editor.Node) {
+		if node.Type == "imageBlock" {
+			if assetID, ok := node.Attrs["assetId"].(string); ok && assetID != "" {
+				assetIDs[assetID] = true
+			}
+		}
+		for _, child := range node.Content {
+			walk(child)
+		}
+	}
+	walk(root)
+	if len(assetIDs) > 0 && b.getProjectMedia == nil {
+		return errors.New("project media validation is unavailable")
+	}
+	for assetID := range assetIDs {
+		media, lookupErr := b.getProjectMedia(ctx, execution.OwnerUserID, assetID)
+		if lookupErr != nil || media.ProjectID != execution.ProjectID ||
+			!strings.HasPrefix(media.MediaType, "image/") {
+			return fmt.Errorf("image asset %q is unavailable in the open project", assetID)
+		}
+	}
+	return nil
+}
+
 func (b *ProjectBackend) ownedNode(
 	ctx context.Context,
 	execution projectmcp.ExecutionContext,
@@ -2530,6 +2847,21 @@ func (b *ProjectBackend) ownedNode(
 		return domain.DocumentNode{}, pgx.ErrNoRows
 	}
 	return node, nil
+}
+
+func (b *ProjectBackend) ownedCanvas(
+	ctx context.Context,
+	execution projectmcp.ExecutionContext,
+	canvasID string,
+) (domain.CanvasWorkspace, error) {
+	workspace, err := b.store.GetCanvasWorkspace(ctx, execution.OwnerUserID, canvasID)
+	if err != nil {
+		return domain.CanvasWorkspace{}, err
+	}
+	if workspace.Canvas.ProjectID != execution.ProjectID || workspace.Canvas.TrashedAt != nil {
+		return domain.CanvasWorkspace{}, pgx.ErrNoRows
+	}
+	return workspace, nil
 }
 
 func (b *ProjectBackend) documentAtRevision(
@@ -2902,7 +3234,7 @@ func documentFromPlainText(text string, sourceReference string) (json.RawMessage
 			Attrs: map[string]any{
 				"blockId": uuid.NewString(), "sourceRefs": references,
 			},
-			Content: []editor.Node{{Type: "text", Text: value}},
+			Content: assistantInlineNodes(value),
 		})
 	}
 	if len(content) == 0 {
@@ -2912,7 +3244,7 @@ func documentFromPlainText(text string, sourceReference string) (json.RawMessage
 	if err != nil {
 		return nil, err
 	}
-	return encoded, editor.Validate(encoded)
+	return editor.NormalizeInlineCodeMarks(encoded)
 }
 
 func buildDocumentProposal(
@@ -2920,6 +3252,15 @@ func buildDocumentProposal(
 	current json.RawMessage,
 	arguments map[string]any,
 ) (json.RawMessage, error) {
+	var err error
+	current, err = editor.NormalizeFencedCodeBlocks(current)
+	if err != nil {
+		return nil, err
+	}
+	current, err = editor.NormalizeInlineCodeMarks(current)
+	if err != nil {
+		return nil, err
+	}
 	if name == "document.apply_marks" {
 		return applyDocumentMarks(current, arguments)
 	}
@@ -2935,12 +3276,29 @@ func buildDocumentProposal(
 		return nil, err
 	}
 	if root.Type == "doc" {
-		if name == "document.append" {
+		switch name {
+		case "document.append":
 			var existing editor.Node
 			if err := json.Unmarshal(current, &existing); err != nil {
 				return nil, err
 			}
 			existing.Content = append(existing.Content, root.Content...)
+			result, _ := json.Marshal(existing)
+			return editor.NormalizeSchemaVersion(result)
+		case "document.insert":
+			var existing editor.Node
+			if err := json.Unmarshal(current, &existing); err != nil {
+				return nil, err
+			}
+			position := intArg(arguments, "position")
+			if position < 0 || position > len(existing.Content) {
+				return nil, errors.New("document insertion position is out of bounds")
+			}
+			inserted := append([]editor.Node(nil), root.Content...)
+			existing.Content = append(
+				existing.Content[:position],
+				append(inserted, existing.Content[position:]...)...,
+			)
 			result, _ := json.Marshal(existing)
 			return editor.NormalizeSchemaVersion(result)
 		}
@@ -2975,7 +3333,7 @@ func buildDocumentProposal(
 		return nil, errors.New("unsupported document proposal")
 	}
 	result, _ := json.Marshal(existing)
-	return editor.NormalizeSchemaVersion(result)
+	return editor.NormalizeInlineCodeMarks(result)
 }
 
 type documentRangeEdit struct {
@@ -3066,7 +3424,7 @@ func replaceDocumentRanges(
 	if err != nil {
 		return nil, err
 	}
-	return editor.NormalizeSchemaVersion(result)
+	return editor.NormalizeInlineCodeMarks(result)
 }
 
 func inlineNodeText(nodes []editor.Node) string {
@@ -3074,6 +3432,10 @@ func inlineNodeText(nodes []editor.Node) string {
 	var appendNodes func([]editor.Node)
 	appendNodes = func(current []editor.Node) {
 		for _, node := range current {
+			if node.Type == "inlineMath" {
+				builder.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
+				continue
+			}
 			builder.WriteString(node.Text)
 			appendNodes(node.Content)
 		}
@@ -3295,8 +3657,29 @@ type assistantContentEnvelope struct {
 }
 
 type assistantContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type        string              `json:"type"`
+	Language    *string             `json:"language,omitempty"`
+	Text        string              `json:"text,omitempty"`
+	Kind        string              `json:"kind,omitempty"`
+	Code        string              `json:"code,omitempty"`
+	Caption     string              `json:"caption,omitempty"`
+	AssetID     string              `json:"assetId,omitempty"`
+	Alt         string              `json:"alt,omitempty"`
+	Latex       string              `json:"latex,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Rows        []assistantTableRow `json:"rows,omitempty"`
+	Items       []string            `json:"items,omitempty"`
+}
+
+type assistantTableRow struct {
+	Cells []assistantTableCell `json:"cells"`
+}
+
+type assistantTableCell struct {
+	Text    string `json:"text"`
+	Header  bool   `json:"header"`
+	Colspan int    `json:"colspan"`
+	Rowspan int    `json:"rowspan"`
 }
 
 func normalizeAssistantContent(value any) (json.RawMessage, error) {
@@ -3315,24 +3698,84 @@ func normalizeAssistantContent(value any) (json.RawMessage, error) {
 			if blockType == "" {
 				blockType = "paragraph"
 			}
-			if blockType != "paragraph" && blockType != "heading" &&
-				blockType != "blockquote" {
-				return nil, fmt.Errorf("unsupported assistant block type %q", blockType)
+			if blockType == "paragraph" {
+				if fenced, ok := editor.ParseFencedCodeBlock(block.Text); ok {
+					language := fenced.Language
+					block = assistantContentBlock{Type: "code", Text: fenced.Text}
+					if language != "" {
+						block.Language = &language
+					}
+					blockType = "code"
+				}
 			}
 			attrs := map[string]any{
-				"blockId": uuid.NewString(), "sourceRefs": []string{"assistant"},
+				"blockId": uuid.NewString(),
 			}
-			if blockType == "heading" {
-				attrs["level"] = 2
+			if blockType == "paragraph" || blockType == "heading" || blockType == "blockquote" {
+				attrs["sourceRefs"] = []string{"assistant"}
 			}
-			node := editor.Node{Type: blockType, Attrs: attrs}
-			if block.Text != "" {
-				node.Content = []editor.Node{{Type: "text", Text: block.Text}}
+			var node editor.Node
+			switch blockType {
+			case "paragraph", "heading", "blockquote":
+				if blockType == "heading" {
+					attrs["level"] = 2
+				}
+				node = editor.Node{Type: blockType, Attrs: attrs}
+				if block.Text != "" {
+					node.Content = assistantInlineNodes(block.Text)
+				}
+			case "code":
+				blockType = "codeBlock"
+				if block.Language != nil && *block.Language != "" {
+					attrs["language"] = *block.Language
+				}
+				node = editor.Node{Type: blockType, Attrs: attrs}
+				if block.Text != "" {
+					node.Content = []editor.Node{{Type: "text", Text: block.Text}}
+				}
+			case "callout":
+				attrs["kind"] = block.Kind
+				node = editor.Node{
+					Type: "callout", Attrs: attrs,
+					Content: []editor.Node{assistantTextParagraph(block.Text)},
+				}
+			case "mermaid":
+				attrs["code"] = block.Code
+				attrs["caption"] = block.Caption
+				node = editor.Node{Type: "mermaidBlock", Attrs: attrs}
+			case "math":
+				attrs["latex"] = block.Latex
+				attrs["description"] = block.Description
+				node = editor.Node{Type: "mathBlock", Attrs: attrs}
+			case "image":
+				attrs["assetId"] = block.AssetID
+				attrs["src"] = "/api/media/" + block.AssetID + "/content"
+				attrs["alt"] = block.Alt
+				attrs["caption"] = block.Caption
+				node = editor.Node{Type: "imageBlock", Attrs: attrs}
+			case "table":
+				node = assistantTableNode(attrs, block.Rows)
+			case "bullet_list", "ordered_list":
+				nodeType := "bulletList"
+				if blockType == "ordered_list" {
+					nodeType = "orderedList"
+				}
+				node = assistantListNode(nodeType, attrs, block.Items)
+			case "scene_break":
+				node = editor.Node{Type: "sceneBreak", Attrs: attrs}
+			case "horizontal_rule":
+				node = editor.Node{Type: "horizontalRule", Attrs: attrs}
+			default:
+				return nil, fmt.Errorf("unsupported assistant block type %q", blockType)
 			}
 			nodes = append(nodes, node)
 		}
 		encoded, _ = json.Marshal(editor.Node{Type: "doc", Content: nodes})
-		return editor.NormalizeSchemaVersion(encoded)
+		encoded, err := editor.NormalizeSchemaVersion(encoded)
+		if err != nil {
+			return nil, err
+		}
+		return editor.NormalizeInlineCodeMarks(encoded)
 	}
 	if envelope.Type == "" && len(envelope.Content) == 0 {
 		return nil, errors.New("assistant content must contain a document or blocks")
@@ -3343,14 +3786,319 @@ func normalizeAssistantContent(value any) (json.RawMessage, error) {
 			return nil, err
 		}
 		ensureAssistantBlockMetadata(&single)
-		encoded, _ = json.Marshal(single)
+		encoded, _ = json.Marshal(editor.Node{Type: "doc", Content: []editor.Node{single}})
+		normalized, err := editor.NormalizeInlineCodeMarks(encoded)
+		if err != nil {
+			return nil, err
+		}
+		var document editor.Node
+		if err := json.Unmarshal(normalized, &document); err != nil {
+			return nil, err
+		}
+		encoded, _ = json.Marshal(document.Content[0])
 		return encoded, nil
 	}
 	for index := range envelope.Content {
 		ensureAssistantBlockMetadata(&envelope.Content[index])
 	}
 	encoded, _ = json.Marshal(editor.Node{Type: "doc", Content: envelope.Content})
+	encoded, err := editor.NormalizeSchemaVersion(encoded)
+	if err != nil {
+		return nil, err
+	}
+	encoded, err = editor.NormalizeFencedCodeBlocks(encoded)
+	if err != nil {
+		return nil, err
+	}
+	encoded, err = editor.NormalizeInlineCodeMarks(encoded)
+	if err != nil {
+		return nil, err
+	}
 	return editor.NormalizeSchemaVersion(encoded)
+}
+
+func assistantTextParagraph(text string) editor.Node {
+	paragraph := editor.Node{Type: "paragraph", Attrs: map[string]any{
+		"blockId": uuid.NewString(), "sourceRefs": []string{"assistant"},
+	}}
+	if text != "" {
+		paragraph.Content = assistantInlineNodes(text)
+	}
+	return paragraph
+}
+
+func assistantInlineNodes(text string) []editor.Node {
+	nodes, _ := editor.ParseInlineCodeNodes(text, nil)
+	result := make([]editor.Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Type != "text" || assistantNodeHasMark(node, "code") {
+			result = append(result, node)
+			continue
+		}
+		result = append(result, assistantInlineMathNodes(node.Text, node.Marks)...)
+	}
+	return result
+}
+
+func assistantInlineMathNodes(text string, marks []editor.Mark) []editor.Node {
+	result := make([]editor.Node, 0, 3)
+	for len(text) > 0 {
+		start := strings.IndexByte(text, '$')
+		if start < 0 || (start > 0 && text[start-1] == '\\') {
+			result = append(result, editor.Node{Type: "text", Text: text, Marks: marks})
+			break
+		}
+		endOffset := strings.IndexByte(text[start+1:], '$')
+		if endOffset < 1 {
+			result = append(result, editor.Node{Type: "text", Text: text, Marks: marks})
+			break
+		}
+		end := start + 1 + endOffset
+		latex := text[start+1 : end]
+		if strings.ContainsAny(latex, "\r\n") {
+			result = append(result, editor.Node{Type: "text", Text: text[:end+1], Marks: marks})
+			text = text[end+1:]
+			continue
+		}
+		if start > 0 {
+			result = append(result, editor.Node{Type: "text", Text: text[:start], Marks: marks})
+		}
+		result = append(result, editor.Node{
+			Type: "inlineMath", Attrs: map[string]any{"latex": latex, "description": ""},
+		})
+		text = text[end+1:]
+	}
+	return result
+}
+
+func assistantTableNode(attrs map[string]any, rows []assistantTableRow) editor.Node {
+	table := editor.Node{Type: "table", Attrs: attrs, Content: make([]editor.Node, 0, len(rows))}
+	for _, row := range rows {
+		rowNode := editor.Node{Type: "tableRow", Content: make([]editor.Node, 0, len(row.Cells))}
+		for _, cell := range row.Cells {
+			cellType := "tableCell"
+			if cell.Header {
+				cellType = "tableHeader"
+			}
+			cellAttrs := map[string]any{"colspan": cell.Colspan, "rowspan": cell.Rowspan}
+			rowNode.Content = append(rowNode.Content, editor.Node{
+				Type: cellType, Attrs: cellAttrs,
+				Content: []editor.Node{assistantTextParagraph(cell.Text)},
+			})
+		}
+		table.Content = append(table.Content, rowNode)
+	}
+	return table
+}
+
+func assistantListNode(nodeType string, attrs map[string]any, items []string) editor.Node {
+	list := editor.Node{Type: nodeType, Attrs: attrs, Content: make([]editor.Node, 0, len(items))}
+	for _, item := range items {
+		list.Content = append(list.Content, editor.Node{
+			Type: "listItem", Content: []editor.Node{assistantTextParagraph(item)},
+		})
+	}
+	return list
+}
+
+func assistantBlocksFromDocument(raw json.RawMessage) ([]assistantContentBlock, error) {
+	if err := editor.Validate(raw); err != nil {
+		return nil, err
+	}
+	var root editor.Node
+	_ = json.Unmarshal(raw, &root)
+	blocks := make([]assistantContentBlock, 0, len(root.Content))
+	for _, node := range root.Content {
+		blockType := node.Type
+		if blockType == "codeBlock" {
+			block := assistantContentBlock{Type: "code", Text: inlineNodeText(node.Content)}
+			if language, ok := node.Attrs["language"].(string); ok && language != "" {
+				block.Language = &language
+			}
+			blocks = append(blocks, block)
+			continue
+		}
+		if blockType == "callout" {
+			blocks = append(blocks, assistantContentBlock{
+				Type: "callout", Kind: stringAttr(node.Attrs, "kind"),
+				Text: assistantBlockText(node.Content),
+			})
+			continue
+		}
+		if blockType == "mermaidBlock" {
+			blocks = append(blocks, assistantContentBlock{
+				Type: "mermaid", Code: stringAttr(node.Attrs, "code"),
+				Caption: stringAttr(node.Attrs, "caption"),
+			})
+			continue
+		}
+		if blockType == "mathBlock" {
+			blocks = append(blocks, assistantContentBlock{
+				Type: "math", Latex: stringAttr(node.Attrs, "latex"),
+				Description: stringAttr(node.Attrs, "description"),
+			})
+			continue
+		}
+		if blockType == "imageBlock" {
+			blocks = append(blocks, assistantContentBlock{
+				Type: "image", AssetID: stringAttr(node.Attrs, "assetId"),
+				Alt: stringAttr(node.Attrs, "alt"), Caption: stringAttr(node.Attrs, "caption"),
+			})
+			continue
+		}
+		if blockType == "table" {
+			blocks = append(blocks, assistantTableBlock(node))
+			continue
+		}
+		if blockType == "bulletList" || blockType == "orderedList" {
+			items := make([]string, 0, len(node.Content))
+			for _, item := range node.Content {
+				if item.Type == "listItem" {
+					items = append(items, assistantBlockText(item.Content))
+				}
+			}
+			typeName := "bullet_list"
+			if blockType == "orderedList" {
+				typeName = "ordered_list"
+			}
+			blocks = append(blocks, assistantContentBlock{Type: typeName, Items: items})
+			continue
+		}
+		if blockType == "sceneBreak" || blockType == "horizontalRule" {
+			typeName := "scene_break"
+			if blockType == "horizontalRule" {
+				typeName = "horizontal_rule"
+			}
+			blocks = append(blocks, assistantContentBlock{Type: typeName})
+			continue
+		}
+		if blockType != "paragraph" && blockType != "heading" && blockType != "blockquote" {
+			continue
+		}
+		text := inlineNodeText(node.Content)
+		if blockType == "paragraph" {
+			if fenced, ok := editor.ParseFencedCodeBlock(text); ok {
+				block := assistantContentBlock{Type: "code", Text: fenced.Text}
+				if fenced.Language != "" {
+					language := fenced.Language
+					block.Language = &language
+				}
+				blocks = append(blocks, block)
+				continue
+			}
+		}
+		blocks = append(blocks, assistantContentBlock{
+			Type: blockType, Text: assistantBlockText(node.Content),
+		})
+	}
+	return blocks, nil
+}
+
+func assistantTableBlock(node editor.Node) assistantContentBlock {
+	block := assistantContentBlock{Type: "table", Rows: make([]assistantTableRow, 0, len(node.Content))}
+	for _, row := range node.Content {
+		if row.Type != "tableRow" {
+			continue
+		}
+		resultRow := assistantTableRow{Cells: make([]assistantTableCell, 0, len(row.Content))}
+		for _, cell := range row.Content {
+			if cell.Type != "tableCell" && cell.Type != "tableHeader" {
+				continue
+			}
+			resultRow.Cells = append(resultRow.Cells, assistantTableCell{
+				Text: assistantBlockText(cell.Content), Header: cell.Type == "tableHeader",
+				Colspan: numericIntAttr(cell.Attrs, "colspan", 1),
+				Rowspan: numericIntAttr(cell.Attrs, "rowspan", 1),
+			})
+		}
+		block.Rows = append(block.Rows, resultRow)
+	}
+	return block
+}
+
+func assistantBlockText(nodes []editor.Node) string {
+	var output strings.Builder
+	var code strings.Builder
+	flushCode := func() {
+		if code.Len() == 0 {
+			return
+		}
+		output.WriteString(assistantInlineCode(code.String()))
+		code.Reset()
+	}
+	var appendNodes func([]editor.Node)
+	appendNodes = func(current []editor.Node) {
+		for _, node := range current {
+			switch node.Type {
+			case "text":
+				if assistantNodeHasMark(node, "code") {
+					code.WriteString(node.Text)
+				} else {
+					flushCode()
+					output.WriteString(node.Text)
+				}
+			case "hardBreak":
+				flushCode()
+				output.WriteByte('\n')
+			case "inlineMath":
+				flushCode()
+				output.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
+			default:
+				appendNodes(node.Content)
+			}
+		}
+	}
+	appendNodes(nodes)
+	flushCode()
+	return output.String()
+}
+
+func assistantNodeHasMark(node editor.Node, markType string) bool {
+	for _, mark := range node.Marks {
+		if mark.Type == markType {
+			return true
+		}
+	}
+	return false
+}
+
+func assistantInlineCode(value string) string {
+	longest := 0
+	current := 0
+	for _, character := range value {
+		if character == '`' {
+			current++
+			longest = max(longest, current)
+			continue
+		}
+		current = 0
+	}
+	return strings.Repeat("`", max(1, longest+1)) + value +
+		strings.Repeat("`", max(1, longest+1))
+}
+
+func stringAttr(attrs map[string]any, key string) string {
+	value, _ := attrs[key].(string)
+	return value
+}
+
+func numericIntAttr(attrs map[string]any, key string, fallback int) int {
+	value, exists := attrs[key]
+	if !exists {
+		return fallback
+	}
+	switch number := value.(type) {
+	case float64:
+		return int(number)
+	case int:
+		return number
+	case json.Number:
+		parsed, err := strconv.Atoi(number.String())
+		if err == nil {
+			return parsed
+		}
+	}
+	return fallback
 }
 
 func ensureAssistantBlockMetadata(node *editor.Node) {
@@ -3378,7 +4126,7 @@ func ensureAssistantBlockMetadata(node *editor.Node) {
 func isAssistantIdentifiedBlock(nodeType string) bool {
 	switch nodeType {
 	case "paragraph", "heading", "blockquote", "codeBlock", "callout", "table",
-		"imageBlock", "mermaidBlock":
+		"imageBlock", "mermaidBlock", "mathBlock":
 		return true
 	default:
 		return false
@@ -3619,6 +4367,8 @@ func groupKeyForTool(name string) string {
 	switch domain {
 	case "document", "tree", "note", "draft":
 		return "document"
+	case "canvas":
+		return "canvas"
 	case "dictionary":
 		return "dictionary"
 	case "project_memory":
@@ -3781,6 +4531,30 @@ func objectSliceArg(arguments map[string]any, name string) ([]map[string]any, er
 	default:
 		return nil, errors.New("value is not an object array")
 	}
+}
+
+func canvasPatchOperationsArg(value any) ([]canvasdocument.PatchOperation, error) {
+	items, err := objectSliceArg(map[string]any{"operations": value}, "operations")
+	if err != nil {
+		return nil, errors.New("canvas patch operations are invalid")
+	}
+	operations := make([]canvasdocument.PatchOperation, 0, len(items))
+	for _, item := range items {
+		operation := canvasdocument.PatchOperation{
+			Op: stringArg(item, "op"), Kind: stringArg(item, "kind"), ID: stringArg(item, "id"),
+		}
+		value := stringArg(item, "valueJson")
+		if operation.Op != "delete" {
+			if !json.Valid([]byte(value)) {
+				return nil, errors.New("canvas patch valueJson is invalid")
+			}
+			operation.Value = json.RawMessage(value)
+		} else if value != "" {
+			return nil, errors.New("canvas delete patch valueJson must be empty")
+		}
+		operations = append(operations, operation)
+	}
+	return operations, nil
 }
 
 func sliceContainsFold(values []string, query string) bool {

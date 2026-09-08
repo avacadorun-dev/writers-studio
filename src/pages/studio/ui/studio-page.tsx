@@ -12,7 +12,7 @@ import {
   SearchCode,
   SpellCheck2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AssistantLivePreview,
   type AssistantSelectionAttachment,
@@ -23,10 +23,13 @@ import {
   createDocumentAnnotation,
   createVersion,
   type DictionaryTerm,
+  type DocumentNode,
   getNode,
   getProjectOutline,
   listDictionary,
   listDocumentAnnotations,
+  type ProjectWorkspace,
+  updateNode,
 } from "~entities/project";
 import { AssistantReviewPage } from "~pages/assistant-review";
 import { AssistantSessionPage } from "~pages/assistant-session";
@@ -42,7 +45,14 @@ import {
   useActionDialog,
   useToast,
 } from "~shared/ui";
-import { AssistantNewChatPanel, AssistantThreadSwitcher } from "~widgets/assistant-threads";
+import {
+  AssistantDockShell,
+  type AssistantDockView,
+  AssistantNewChatPanel,
+  AssistantThreadSwitcher,
+  loadAssistantDockState,
+  saveAssistantDockState,
+} from "~widgets/assistant-threads";
 import { DictationPreflight } from "~widgets/dictation-preflight";
 import { ManuscriptAnnotationsPanel } from "~widgets/manuscript-annotations";
 import { ManuscriptEditor } from "~widgets/manuscript-editor";
@@ -61,8 +71,6 @@ interface StudioPageProps {
   assistantReviewId?: string;
   annotationId?: string;
 }
-
-type AssistantPanelView = "session" | "threads" | "new";
 
 function AnnotationComposerDialog({
   pending,
@@ -215,13 +223,16 @@ export function StudioPage({
     return savedState === null ? window.innerWidth < 1280 : savedState === "true";
   });
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [activeAssistantRunId, setActiveAssistantRunId] = useState(assistantRunId);
+  const [activeAssistantRunId, setActiveAssistantRunId] = useState(
+    () => assistantRunId ?? loadAssistantDockState(projectId).runId,
+  );
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(
     Boolean(assistantRunId || assistant),
   );
-  const [assistantPanelView, setAssistantPanelView] = useState<AssistantPanelView>(
-    assistantRunId ? "session" : "new",
+  const [assistantPanelView, setAssistantPanelView] = useState<AssistantDockView>(() =>
+    assistantRunId ? "session" : loadAssistantDockState(projectId).view,
   );
+  const assistantReturnFocusRef = useRef<HTMLElement | null>(null);
   const [activeAssistantReviewId, setActiveAssistantReviewId] = useState(assistantReviewId);
   const [assistantSelection, setAssistantSelection] = useState<AssistantSelectionAttachment>();
   const [assistantSelectionOwner, setAssistantSelectionOwner] = useState<string>();
@@ -262,11 +273,56 @@ export function StudioPage({
     queryFn: () => listDictionary(projectId),
     enabled: pendingAnnotation?.kind === "dictionary_link",
   });
+  const renameNodeMutation = useMutation({
+    mutationFn: (title: string) => updateNode(nodeId, { title }),
+    onMutate: async (title) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["project", projectId] }),
+        queryClient.cancelQueries({ queryKey: ["node", nodeId] }),
+      ]);
+      const previousProject = queryClient.getQueryData<ProjectWorkspace>(["project", projectId]);
+      const previousNode = queryClient.getQueryData<{ node: DocumentNode }>(["node", nodeId]);
+      queryClient.setQueryData<ProjectWorkspace>(["project", projectId], (current) =>
+        current
+          ? {
+              ...current,
+              nodes: current.nodes.map((item) => (item.id === nodeId ? { ...item, title } : item)),
+            }
+          : current,
+      );
+      queryClient.setQueryData<{ node: DocumentNode }>(["node", nodeId], (current) =>
+        current ? { ...current, node: { ...current.node, title } } : current,
+      );
+      return { previousProject, previousNode };
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["node", nodeId] }),
+      ]);
+      showToast({ title: "Название сохранено" });
+    },
+    onError: (error, _title, context) => {
+      if (context?.previousProject) {
+        queryClient.setQueryData(["project", projectId], context.previousProject);
+      }
+      if (context?.previousNode) {
+        queryClient.setQueryData(["node", nodeId], context.previousNode);
+      }
+      showToast({ title: "Не удалось переименовать", description: error.message });
+    },
+  });
   useEffect(() => {
     if (!annotationId) return;
     setSelectedAnnotationId(annotationId);
     setAnnotationPanelOpen(true);
   }, [annotationId]);
+  useEffect(() => {
+    saveAssistantDockState(projectId, {
+      runId: activeAssistantRunId,
+      view: assistantPanelView,
+    });
+  }, [activeAssistantRunId, assistantPanelView, projectId]);
   useEffect(() => {
     if (assistantRunId) {
       setActiveAssistantRunId(assistantRunId);
@@ -460,7 +516,13 @@ export function StudioPage({
   }
   const nodeSummary = project.data.nodes.find((item) => item.id === nodeId && !item.trashedAt);
   const node = nodeSummary
-    ? { ...activeDocument.data.node, ...nodeSummary, content: activeDocument.data.node.content }
+    ? {
+        ...activeDocument.data.node,
+        ...nodeSummary,
+        content: activeDocument.data.node.content,
+        currentRevision: activeDocument.data.node.currentRevision,
+        updatedAt: activeDocument.data.node.updatedAt,
+      }
     : activeDocument.data.node;
   if (!nodeSummary || node.trashedAt || node.projectId !== projectId) {
     return (
@@ -492,14 +554,16 @@ export function StudioPage({
 
   return (
     <RequireSession>
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         <StudioHeader
           project={project.data.project}
           nodeId={nodeId}
           nodeTitle={node.title}
           saveState={saveState}
+          onRenameNode={(title) => renameNodeMutation.mutate(title)}
           onDictate={openPreflight}
           onAssistant={() => {
+            assistantReturnFocusRef.current = document.activeElement as HTMLElement | null;
             setAnnotationPanelOpen(false);
             setAssistantPanelOpen(true);
             setAssistantPanelView(
@@ -538,6 +602,7 @@ export function StudioPage({
             highlight={highlight}
             onSaveState={setSaveState}
             onDictate={openPreflight}
+            onRenameNode={(title) => renameNodeMutation.mutate(title)}
             assistantSelection={assistantSelection}
             assistantPreview={
               activeAssistantPreview?.preview?.targetNodeId === nodeId
@@ -551,6 +616,7 @@ export function StudioPage({
                 return;
               }
               const owner = activeAssistantRunId ?? "new";
+              assistantReturnFocusRef.current = document.activeElement as HTMLElement | null;
               setAssistantSelectionOwner(owner);
               setAnnotationPanelOpen(false);
               setAssistantPanelOpen(true);
@@ -603,11 +669,7 @@ export function StudioPage({
             )
           ) : null}
           {assistantPanelOpen ? (
-            <div
-              className={cn(
-                "fixed inset-x-0 top-14 bottom-0 z-40 md:left-auto md:right-0 md:w-[360px] md:shadow-[-18px_0_40px_var(--shadow-color)] xl:static xl:z-auto xl:block xl:w-[360px] xl:shrink-0 xl:shadow-none",
-              )}
-            >
+            <AssistantDockShell returnFocusRef={assistantReturnFocusRef}>
               {assistantPanelView === "session" && activeAssistantRunId ? (
                 <AssistantSessionPage
                   key={activeAssistantRunId}
@@ -692,7 +754,7 @@ export function StudioPage({
                   }}
                 />
               )}
-            </div>
+            </AssistantDockShell>
           ) : null}
         </div>
         {dictate ? (

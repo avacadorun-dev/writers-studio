@@ -1,6 +1,6 @@
 # «Студия автора»
 
-Рабочий voice-first MVP для создания длинных текстов: локально надёжная запись, live-текст, финальная расшифровка, проверка по аудио, полноценный manuscript-редактор, версии, поиск, замена и экспорт.
+Рабочая среда для создания длинных текстов: Canvas-доски для замысла, локально надёжная запись, live-текст, финальная расшифровка, проверка по аудио, полноценный manuscript-редактор, версии, поиск, замена и экспорт.
 
 Статус реализации: dictation MVP и его AC-01…AC-55 реализованы и сведены с
 проверками в [TRACEABILITY.md](./docs/implementation/TRACEABILITY.md). Assistant
@@ -20,8 +20,9 @@ history с полноценным Undo. Действия над выделени
 Редактор документов v2 добавляет таблицы, блоки и строчный код, изображения
 проекта, Mermaid-схемы и callout-блоки во всех типах проектов, включая
 `game_design` и заметки. Старые документы остаются на schema v1, пока автор не
-вставит новый rich-блок; `.wstudio` v3 переносит изображения и продолжает
-принимать архивы v1/v2. Контракт и гарантии совместимости описаны в
+вставит новый rich-блок; перенос изображений появился в `.wstudio` v3. Текущий
+формат `.wstudio` v6 также переносит Canvas-доски и продолжает принимать архивы
+v1–v5. Контракт и гарантии совместимости описаны в
 [RICH_DOCUMENT_EDITOR.md](./docs/specification/RICH_DOCUMENT_EDITOR.md).
 Известные release/design gaps перечислены в traceability. Финальный
 Docker-прогон и актуальные coverage-данные описаны в
@@ -30,6 +31,7 @@ Docker-прогон и актуальные coverage-данные описаны
 ## Архитектура
 
 - React 19 + TypeScript + Vite PWA.
+- React Flow (`@xyflow/react`) и JSON Canvas-compatible snapshots для досок.
 - Tiptap 3 / ProseMirror с source references на уровне блоков.
 - Go modular monolith: HTTP API, WebSocket live gateway и background worker в одном процессе.
 - PostgreSQL для проектов, revisions, transcript artifacts, jobs и пользовательских настроек.
@@ -256,6 +258,7 @@ bun run check
 bun run type-check
 bun run test
 bun run test:coverage
+bun run test:canvas:coverage
 bun run build
 go test ./...
 ```

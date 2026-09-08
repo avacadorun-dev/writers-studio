@@ -4,6 +4,11 @@ export {
   useActionDialog,
 } from "./action-dialog-provider";
 export { AssistantMarkdown, sanitizeAssistantMarkdown } from "./assistant-markdown";
+export {
+  AssistantMessage,
+  type AssistantMessageContent,
+  classifyAssistantMessage,
+} from "./assistant-message";
 export { Banner } from "./banner";
 export { BrandMark } from "./brand-mark";
 export { Button, buttonVariants } from "./button";
@@ -21,3 +26,4 @@ export { SaveStatus } from "./save-status";
 export { Spinner } from "./spinner";
 export { Switch } from "./switch";
 export { ToastProvider, useToast } from "./toast-provider";
+export { UiTooltip } from "./tooltip";

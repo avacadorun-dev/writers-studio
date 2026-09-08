@@ -12,6 +12,15 @@ export interface EditorSnapshot {
   synced: boolean;
 }
 
+export interface CanvasSnapshot {
+  canvasId: string;
+  projectId: string;
+  baseRevision: number;
+  content: Record<string, unknown>;
+  savedAt: number;
+  synced: boolean;
+}
+
 export interface LocalRecording {
   localId: string;
   serverSessionId?: string;
@@ -46,6 +55,10 @@ interface RecoverySchema extends DBSchema {
     key: string;
     value: EditorSnapshot;
   };
+  canvasSnapshots: {
+    key: string;
+    value: CanvasSnapshot;
+  };
   recordings: {
     key: string;
     value: LocalRecording;
@@ -60,23 +73,93 @@ interface RecoverySchema extends DBSchema {
   };
 }
 
+interface CanvasRecoverySchema extends DBSchema {
+  canvasSnapshots: {
+    key: string;
+    value: CanvasSnapshot;
+  };
+}
+
+export const LOCAL_RECOVERY_TIMEOUT_MS = 1_500;
+
 let databasePromise: Promise<IDBPDatabase<RecoverySchema>> | undefined;
+let canvasDatabasePromise: Promise<IDBPDatabase<CanvasRecoverySchema>> | undefined;
+
+export async function withLocalRecoveryTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs = LOCAL_RECOVERY_TIMEOUT_MS,
+): Promise<T> {
+  let timeout: number | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timeout = window.setTimeout(
+          () => reject(new Error("Локальное хранилище восстановления не ответило вовремя")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 function database(): Promise<IDBPDatabase<RecoverySchema>> {
   if (!databasePromise) {
-    databasePromise = openDB<RecoverySchema>("writers-studio-recovery", 1, {
-      upgrade(db) {
-        db.createObjectStore("editorSnapshots", { keyPath: "nodeId" });
-        const recordings = db.createObjectStore("recordings", { keyPath: "localId" });
-        recordings.createIndex("by-status", "status");
-        const chunks = db.createObjectStore("audioChunks", {
-          keyPath: ["localId", "sequence"],
-        });
-        chunks.createIndex("by-recording", "localId");
+    let opening: Promise<IDBPDatabase<RecoverySchema>>;
+    opening = openDB<RecoverySchema>("writers-studio-recovery", 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore("editorSnapshots", { keyPath: "nodeId" });
+          const recordings = db.createObjectStore("recordings", { keyPath: "localId" });
+          recordings.createIndex("by-status", "status");
+          const chunks = db.createObjectStore("audioChunks", {
+            keyPath: ["localId", "sequence"],
+          });
+          chunks.createIndex("by-recording", "localId");
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore("canvasSnapshots", { keyPath: "canvasId" });
+        }
       },
+      blocking() {
+        void opening.then((db) => db.close()).catch(() => undefined);
+        if (databasePromise === opening) databasePromise = undefined;
+      },
+      terminated() {
+        if (databasePromise === opening) databasePromise = undefined;
+      },
+    }).catch((error: unknown) => {
+      if (databasePromise === opening) databasePromise = undefined;
+      throw error;
     });
+    databasePromise = opening;
   }
   return databasePromise;
+}
+
+function canvasDatabase(): Promise<IDBPDatabase<CanvasRecoverySchema>> {
+  if (!canvasDatabasePromise) {
+    let opening: Promise<IDBPDatabase<CanvasRecoverySchema>>;
+    opening = openDB<CanvasRecoverySchema>("writers-studio-canvas-recovery", 1, {
+      upgrade(db) {
+        db.createObjectStore("canvasSnapshots", { keyPath: "canvasId" });
+      },
+      blocking() {
+        void opening.then((db) => db.close()).catch(() => undefined);
+        if (canvasDatabasePromise === opening) canvasDatabasePromise = undefined;
+      },
+      terminated() {
+        if (canvasDatabasePromise === opening) canvasDatabasePromise = undefined;
+      },
+    }).catch((error: unknown) => {
+      if (canvasDatabasePromise === opening) canvasDatabasePromise = undefined;
+      throw error;
+    });
+    canvasDatabasePromise = opening;
+  }
+  return canvasDatabasePromise;
 }
 
 export async function saveEditorSnapshot(snapshot: EditorSnapshot): Promise<void> {
@@ -99,6 +182,42 @@ export async function markEditorSnapshotSynced(
     return;
   }
   await db.put("editorSnapshots", { ...snapshot, baseRevision, synced: true });
+}
+
+export async function saveCanvasSnapshot(snapshot: CanvasSnapshot): Promise<void> {
+  await withLocalRecoveryTimeout(
+    canvasDatabase().then((db) => db.put("canvasSnapshots", snapshot)),
+  );
+}
+
+export async function getCanvasSnapshot(canvasId: string): Promise<CanvasSnapshot | undefined> {
+  const snapshot = await withLocalRecoveryTimeout(
+    canvasDatabase().then((db) => db.get("canvasSnapshots", canvasId)),
+  );
+  if (snapshot) return snapshot;
+
+  // Canvas recovery originally lived in version 2 of the shared database. A
+  // short best-effort migration preserves those snapshots without letting an
+  // old tab that still holds version 1 block the Canvas UI.
+  const legacy = await withLocalRecoveryTimeout(
+    database().then((db) => db.get("canvasSnapshots", canvasId)),
+    250,
+  ).catch(() => undefined);
+  if (legacy) await saveCanvasSnapshot(legacy).catch(() => undefined);
+  return legacy;
+}
+
+export async function markCanvasSnapshotSynced(
+  canvasId: string,
+  baseRevision: number,
+): Promise<void> {
+  await withLocalRecoveryTimeout(
+    canvasDatabase().then(async (db) => {
+      const snapshot = await db.get("canvasSnapshots", canvasId);
+      if (!snapshot) return;
+      await db.put("canvasSnapshots", { ...snapshot, baseRevision, synced: true });
+    }),
+  );
 }
 
 export async function saveLocalRecording(recording: LocalRecording): Promise<void> {
@@ -154,5 +273,13 @@ export async function clearLocalRecoveryData(): Promise<void> {
     db.close();
     databasePromise = undefined;
   }
-  await deleteDB("writers-studio-recovery");
+  if (canvasDatabasePromise) {
+    const db = await canvasDatabasePromise;
+    db.close();
+    canvasDatabasePromise = undefined;
+  }
+  await Promise.all([
+    deleteDB("writers-studio-recovery"),
+    deleteDB("writers-studio-canvas-recovery"),
+  ]);
 }

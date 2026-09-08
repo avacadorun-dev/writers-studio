@@ -189,7 +189,7 @@ export function getNode(nodeId: string): Promise<{ node: DocumentNode }> {
   return apiRequest(`/api/nodes/${nodeId}`);
 }
 
-export function uploadProjectImage(
+export function uploadProjectMedia(
   projectId: string,
   file: File,
 ): Promise<{ media: ProjectMedia }> {
@@ -202,6 +202,8 @@ export function uploadProjectImage(
     body: file,
   });
 }
+
+export const uploadProjectImage = uploadProjectMedia;
 
 export function listProjectMedia(projectId: string): Promise<{ media: ProjectMedia[] }> {
   return apiRequest(`/api/projects/${projectId}/media`);

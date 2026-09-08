@@ -124,24 +124,29 @@ func renderPublicationNode(output *strings.Builder, node editor.Node, resolveIma
 		output.WriteString("</li>")
 	case "hardBreak":
 		output.WriteString("<br />")
+	case "inlineMath":
+		latex, _ := node.Attrs["latex"].(string)
+		description, _ := node.Attrs["description"].(string)
+		label := description
+		if strings.TrimSpace(label) == "" {
+			label = "Формула: " + latex
+		}
+		output.WriteString(`<span class="inline-math-source" role="math" aria-label="` + html.EscapeString(label) + `">$` + html.EscapeString(latex) + `$</span>`)
 	case "horizontalRule":
 		output.WriteString("<hr />")
 	case "sceneBreak":
 		output.WriteString(publicationSceneBreakHTML())
 	case "codeBlock":
 		language, _ := node.Attrs["language"].(string)
-		output.WriteString(`<pre class="code-block" data-language="` + html.EscapeString(language) + `"><code>`)
-		children()
-		output.WriteString("</code></pre>")
+		renderPublicationCodeListing(output, language, codeNodeText(node.Content), "")
 	case "callout":
-		kind, _ := node.Attrs["kind"].(string)
+		kind := normalizedCalloutKind(node.Attrs["kind"])
 		output.WriteString(`<aside class="callout callout-` + html.EscapeString(kind) + `">`)
+		output.WriteString(`<div class="callout-label">` + html.EscapeString(calloutLabel(kind)) + `</div>`)
 		children()
 		output.WriteString("</aside>")
 	case "table":
-		output.WriteString("<table><tbody>")
-		children()
-		output.WriteString("</tbody></table>")
+		renderPublicationTable(output, node, resolveImage)
 	case "tableRow":
 		output.WriteString("<tr>")
 		children()
@@ -174,14 +179,98 @@ func renderPublicationNode(output *strings.Builder, node editor.Node, resolveIma
 	case "mermaidBlock":
 		code, _ := node.Attrs["code"].(string)
 		caption, _ := node.Attrs["caption"].(string)
-		output.WriteString(`<figure class="mermaid-source"><pre><code>` + html.EscapeString(code) + `</code></pre>`)
+		renderPublicationCodeListing(output, "mermaid", code, "mermaid-source")
 		if caption != "" {
-			output.WriteString("<figcaption>" + html.EscapeString(caption) + "</figcaption>")
+			output.WriteString(`<p class="diagram-caption">` + html.EscapeString(caption) + `</p>`)
 		}
-		output.WriteString("</figure>")
+	case "mathBlock":
+		latex, _ := node.Attrs["latex"].(string)
+		description, _ := node.Attrs["description"].(string)
+		label := description
+		if strings.TrimSpace(label) == "" {
+			label = "Формула: " + latex
+		}
+		output.WriteString(`<figure class="math-source" role="math" aria-label="` + html.EscapeString(label) + `"><pre>$$\n` + html.EscapeString(latex) + `\n$$</pre></figure>`)
 	default:
 		children()
 	}
+}
+
+func renderPublicationCodeListing(output *strings.Builder, language, source, extraClass string) {
+	class := "code-listing"
+	if extraClass != "" {
+		class += " " + extraClass
+	}
+	output.WriteString(`<figure class="` + html.EscapeString(class) + `"><figcaption class="code-language">`)
+	output.WriteString(html.EscapeString(codeLanguageLabel(language)))
+	output.WriteString(`</figcaption><pre class="code-block" data-language="`)
+	output.WriteString(html.EscapeString(language))
+	output.WriteString(`"><code>`)
+	output.WriteString(highlightedCodeHTML(language, source))
+	output.WriteString("</code></pre></figure>")
+}
+
+func calloutLabel(kind string) string {
+	switch normalizedCalloutKind(kind) {
+	case "idea":
+		return "Идея"
+	case "warning":
+		return "Предупреждение"
+	case "todo":
+		return "TODO"
+	default:
+		return "Информация"
+	}
+}
+
+func normalizedCalloutKind(value any) string {
+	kind, _ := value.(string)
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "idea":
+		return "idea"
+	case "warning":
+		return "warning"
+	case "todo":
+		return "todo"
+	default:
+		return "info"
+	}
+}
+
+func renderPublicationTable(output *strings.Builder, table editor.Node, resolveImage imageResolver) {
+	rows := make([]editor.Node, 0, len(table.Content))
+	for _, row := range table.Content {
+		if row.Type == "tableRow" {
+			rows = append(rows, row)
+		}
+	}
+	output.WriteString("<table>")
+	header := len(rows) > 0 && publicationHeaderRow(rows[0])
+	if header {
+		output.WriteString("<thead>")
+		renderPublicationNode(output, rows[0], resolveImage)
+		output.WriteString("</thead>")
+		rows = rows[1:]
+	}
+	output.WriteString("<tbody>")
+	for _, row := range rows {
+		renderPublicationNode(output, row, resolveImage)
+	}
+	output.WriteString("</tbody></table>")
+}
+
+func publicationHeaderRow(row editor.Node) bool {
+	seen := false
+	for _, cell := range row.Content {
+		if cell.Type != "tableHeader" && cell.Type != "tableCell" {
+			continue
+		}
+		seen = true
+		if cell.Type != "tableHeader" {
+			return false
+		}
+	}
+	return seen
 }
 
 func publicationCSS(snapshot Snapshot, assets map[string][]byte, fontTarget string) string {
@@ -199,10 +288,12 @@ func publicationCSS(snapshot Snapshot, assets map[string][]byte, fontTarget stri
 	separator := sceneSeparatorText(style.SceneSeparator)
 	return embeddedFontCSS(snapshot.Profile.Style.FontFamily, assets, fontTarget) + fmt.Sprintf(`
 @page { size: %s; margin: %dmm; }
+@page cover { size: %s; margin: 0; }
 :root { color-scheme: light; }
 html, body { margin: 0; padding: 0; }
 body { color: #1f211f; background: #fff; font-family: %q, Georgia, serif; font-size: %.1fpt; line-height: %.2f; text-align: %s; hyphens: auto; }
-main { max-width: 44em; margin: 0 auto; }
+main { position: relative; z-index: 1; max-width: 44em; margin: 0 auto; background: #fff; }
+.cover-page + main::before { content: ""; position: absolute; z-index: -1; top: -1mm; left: 50%%; width: 100vw; height: 2mm; transform: translateX(-50%%); background: #fff; }
 p { margin: %s; text-indent: %s; orphans: 2; widows: 2; }
 h1, h2, h3 { text-align: left; line-height: 1.2; page-break-after: avoid; break-after: avoid; }
 h1 { margin: 0 0 2em; font-size: 1.65em; }
@@ -211,8 +302,8 @@ h2 { margin: 1.6em 0 .7em; font-size: 1.35em; }
 .title-page h1 { margin-bottom: .5em; text-align: center; font-size: 2.3em; }
 .title-page .subtitle { font-size: 1.25em; }
 .title-page .author { margin-top: 3em; }
-.cover-page { min-height: 92vh; display: flex; align-items: center; justify-content: center; page-break-after: always; break-after: page; }
-.cover { display: block; max-width: 100%%; max-height: 92vh; margin: 0 auto; object-fit: contain; }
+.cover-page { page: cover; position: relative; width: 100%%; height: 100vh; margin: 0; padding: 0; page-break-after: always; break-after: page; }
+.cover { position: absolute; inset: -.5mm; display: block; width: calc(100%% + 1mm); height: calc(100%% + 1mm); margin: 0; object-fit: cover; }
 .toc { page-break-after: always; break-after: page; }
 .toc a { color: inherit; text-decoration: none; }
 .chapter { %s }
@@ -220,15 +311,38 @@ h2 { margin: 1.6em 0 .7em; font-size: 1.35em; }
 .scene-break span::before { content: %q; letter-spacing: .25em; }
 blockquote { margin: 1.2em 2em; padding-left: 1em; border-left: .18em solid #a7aaa4; }
 pre, code { font-family: "IBM Plex Mono", ui-monospace, monospace; }
-pre { white-space: pre-wrap; padding: 1em; background: #f3f2ee; }
-.callout { margin: 1.2em 0; padding: .8em 1em; border-left: .25em solid #627a70; background: #f3f6f4; }
-table { width: 100%%; margin: 1em 0; border-collapse: collapse; font-size: .9em; }
-th, td { padding: .4em .55em; border: 1px solid #aaa; vertical-align: top; }
+`+inlineCodePublicationCSS()+`
+pre { white-space: pre-wrap; }
+figure.code-listing { margin: 1.15em 0; border: 1px solid #d8d6cf; border-radius: .38em; overflow: hidden; background: #f6f5f2; text-align: left; break-inside: auto; page-break-inside: auto; }
+.code-language { margin: 0; padding: .42em 1em; border-bottom: 1px solid #d8d6cf; background: #e9e8e3; color: #545852; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 7.5pt; font-weight: 600; letter-spacing: .075em; line-height: 1.25; text-transform: uppercase; break-after: avoid; page-break-after: avoid; }
+pre.code-block { margin: 0; padding: .82em 1em .9em; border: 0; border-radius: 0; background: #f6f5f2; color: #24292f; font-size: 8.5pt; line-height: 1.42; tab-size: 4; overflow-wrap: anywhere; word-break: normal; orphans: 3; widows: 3; break-inside: auto; page-break-inside: auto; }
+pre.code-block code { font: inherit; white-space: inherit; }
+.diagram-caption { margin: -.7em 0 1.1em; text-align: center; text-indent: 0; font-size: .82em; font-style: italic; color: #5b5e59; }
+.callout { margin: 1.2em 0; padding: .72em .95em .78em; border: 1px solid #c8d5cf; border-left: .28em solid #497568; border-radius: .28em; background: #f2f7f5; break-inside: avoid; page-break-inside: avoid; }
+.callout-label { margin: 0 0 .38em; color: #315d51; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .72em; font-weight: 600; letter-spacing: .055em; line-height: 1.2; text-transform: uppercase; }
+.callout p { margin: 0; text-indent: 0; }
+.callout-idea { border-color: #d9cda4; border-left-color: #9a7720; background: #fbf8eb; }
+.callout-idea .callout-label { color: #765b13; }
+.callout-warning { border-color: #e4bbb6; border-left-color: #b74c42; background: #fdf3f1; }
+.callout-warning .callout-label { color: #913b33; }
+.callout-todo { border-color: #c9c2df; border-left-color: #735da8; background: #f7f4fc; }
+.callout-todo .callout-label { color: #5b458e; }
+table { width: 100%%; margin: 1.1em 0; border: 1px solid #9fa49e; border-collapse: collapse; border-spacing: 0; font-size: .84em; line-height: 1.35; table-layout: auto; break-inside: auto; page-break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th, td { padding: .48em .62em; border: 1px solid #b7bbb5; vertical-align: top; overflow-wrap: anywhere; }
+th { background: #e8ece9; color: #2f3833; font-weight: 600; text-align: left; }
+tbody tr:nth-child(even) td { background: #f7f8f6; }
+th p, td p { margin: 0; text-indent: 0; orphans: 2; widows: 2; }
 figure { margin: 1.5em 0; text-align: center; }
 figure img { max-width: 100%%; max-height: 80vh; object-fit: contain; }
 figcaption { margin-top: .45em; font-size: .85em; color: #5b5e59; }
 a { color: #265d4f; }
-	`, page, style.MarginMM, publicationFont(style.FontFamily), float64(style.FontSizePT), style.LineHeight, style.TextAlign, paragraphMargin, firstLine, chapterBreakCSS(snapshot.Profile.ChapterPageBreak), separator)
+	`, page, style.MarginMM, page, publicationFont(style.FontFamily), float64(style.FontSizePT), style.LineHeight, style.TextAlign, paragraphMargin, firstLine, chapterBreakCSS(snapshot.Profile.ChapterPageBreak), separator)
+}
+
+func inlineCodePublicationCSS() string {
+	return `p code, li code, blockquote code, td code, th code, .callout code { padding: .08em .3em; border-radius: .22em; background: #efeee9; color: #263c36; font-size: .88em; white-space: pre-wrap; word-spacing: normal; letter-spacing: normal; hyphens: none; }`
 }
 
 func embeddedFontCSS(fontFamily string, assets map[string][]byte, target string) string {

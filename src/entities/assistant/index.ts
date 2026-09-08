@@ -33,6 +33,10 @@ export {
   undoAssistantChangeSet,
   updateProjectMemory,
 } from "./api/assistant-api";
+export {
+  assistantChangedDocumentIds,
+  refreshAssistantChangedDocuments,
+} from "./model/change-set-refresh";
 export type {
   AssistantCapabilities,
   AssistantChangeOperation,

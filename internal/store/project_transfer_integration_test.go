@@ -5,11 +5,13 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"writers.studio/internal/assistant"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 )
 
@@ -67,6 +69,24 @@ func TestProjectTransferDatabaseRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := dataStore.CreateNamedVersion(ctx, user.ID, sourceNode.ID, "Перед переносом", "Контрольная версия"); err != nil {
+		t.Fatal(err)
+	}
+	canvas, err := dataStore.CreateCanvas(ctx, user.ID, workspace.Project.ID, "Сюжет")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvasContent := json.RawMessage(fmt.Sprintf(
+		`{"nodes":[{"id":"document-card","type":"file","x":0,"y":0,"width":280,"height":180,"file":"writers-studio://documents/%s","x-writers-studio":{"resource":{"kind":"document","id":"%s"}}}],"edges":[]}`,
+		sourceNode.ID, sourceNode.ID,
+	))
+	references, err := canvasdocument.Validate(canvasContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dataStore.SaveCanvasRevision(ctx, user.ID, canvas.ID, SaveCanvasRevisionInput{
+		BaseRevision: 1, SchemaVersion: canvasdocument.SchemaVersion,
+		Content: canvasContent, Source: "manual", References: references,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	term, err := dataStore.CreateDictionaryTerm(ctx, user.ID, workspace.Project.ID, "Элиас", "character", "ru", []string{"Эл"})
@@ -135,6 +155,16 @@ func TestProjectTransferDatabaseRoundTrip(t *testing.T) {
 	if imported.Project.Status != "active" || imported.Project.Title != workspace.Project.Title ||
 		len(imported.Nodes) != 1 || imported.Nodes[0].PlainText != "Переносимый текст" {
 		t.Fatalf("imported workspace mismatch: %#v", imported)
+	}
+	importedCanvases, err := dataStore.ListCanvases(ctx, user.ID, result.ProjectID, true)
+	if err != nil || len(importedCanvases) != 1 || importedCanvases[0].ID == canvas.ID ||
+		importedCanvases[0].CurrentRevision != 2 {
+		t.Fatalf("imported canvases = %#v, err = %v", importedCanvases, err)
+	}
+	importedCanvas, err := dataStore.GetCanvasWorkspace(ctx, user.ID, importedCanvases[0].ID)
+	if err != nil || len(importedCanvas.Documents) != 1 ||
+		importedCanvas.Documents[0].ID != imported.Nodes[0].ID {
+		t.Fatalf("imported canvas workspace = %#v, err = %v", importedCanvas, err)
 	}
 	importedAssistantSettings, err := dataStore.GetProjectAssistantSettings(
 		ctx,

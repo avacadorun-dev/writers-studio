@@ -129,9 +129,9 @@ func (renderer wordNodeRenderer) renderBlocks(output *strings.Builder, nodes []e
 		case "sceneBreak":
 			renderer.renderParagraph(output, []editor.Node{{Type: "text", Text: renderer.sceneSeparator()}}, "SceneBreak", 0, 0)
 		case "codeBlock":
-			renderer.renderParagraph(output, flattenWordText(node.Content), "CodeBlock", 0, 0)
+			renderer.renderCodeBlock(output, node)
 		case "callout":
-			renderer.renderStyledChildren(output, node.Content, "Callout")
+			renderer.renderCallout(output, node)
 		case "table":
 			renderer.renderTable(output, node)
 		case "imageBlock":
@@ -139,16 +139,75 @@ func (renderer wordNodeRenderer) renderBlocks(output *strings.Builder, nodes []e
 		case "mermaidBlock":
 			code, _ := node.Attrs["code"].(string)
 			caption, _ := node.Attrs["caption"].(string)
-			renderer.renderParagraph(output, []editor.Node{{Type: "text", Text: code}}, "CodeBlock", 0, 0)
+			renderer.renderCodeBlock(output, editor.Node{
+				Type: "codeBlock", Attrs: map[string]any{"language": "mermaid"},
+				Content: []editor.Node{{Type: "text", Text: code}},
+			})
 			if caption != "" {
 				renderer.renderParagraph(output, []editor.Node{{Type: "text", Text: caption}}, "Caption", 0, 0)
 			}
+		case "mathBlock":
+			latex, _ := node.Attrs["latex"].(string)
+			renderer.renderParagraph(
+				output,
+				[]editor.Node{{Type: "text", Text: "Формула: " + latex}},
+				"Quote",
+				0,
+				0,
+			)
 		case "text", "hardBreak":
 			renderer.renderParagraph(output, []editor.Node{node}, "", listNumberID, listLevel)
 		default:
 			renderer.renderBlocks(output, node.Content, listNumberID, listLevel)
 		}
 	}
+}
+
+func (renderer wordNodeRenderer) renderCallout(output *strings.Builder, node editor.Node) {
+	kind := normalizedCalloutKind(node.Attrs["kind"])
+	style := map[string]string{
+		"idea": "CalloutIdea", "warning": "CalloutWarning", "todo": "CalloutTodo",
+	}[kind]
+	if style == "" {
+		style = "CalloutInfo"
+	}
+	renderer.renderParagraph(
+		output, []editor.Node{{Type: "text", Text: calloutLabel(kind)}}, style+"Label", 0, 0,
+	)
+	renderer.renderStyledChildren(output, node.Content, style)
+}
+
+func (renderer wordNodeRenderer) renderCodeBlock(output *strings.Builder, node editor.Node) {
+	language, _ := node.Attrs["language"].(string)
+	renderer.renderParagraph(
+		output,
+		[]editor.Node{{Type: "text", Text: codeLanguageLabel(language)}},
+		"CodeLanguage",
+		0,
+		0,
+	)
+	output.WriteString(`<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr>`)
+	for _, token := range highlightCode(language, codeNodeText(node.Content)) {
+		writeWordTextRun(output, token.Text, wordSyntaxProperties(token))
+	}
+	output.WriteString(`</w:p>`)
+}
+
+func wordSyntaxProperties(token syntaxToken) string {
+	properties := `<w:rFonts w:ascii="IBM Plex Mono" w:hAnsi="IBM Plex Mono"/>`
+	if token.Colour != "" {
+		properties += `<w:color w:val="` + strings.ToUpper(strings.TrimPrefix(token.Colour, "#")) + `"/>`
+	}
+	if token.Bold {
+		properties += `<w:b/>`
+	}
+	if token.Italic {
+		properties += `<w:i/>`
+	}
+	if token.Underline {
+		properties += `<w:u w:val="single"/>`
+	}
+	return properties
 }
 
 func (renderer wordNodeRenderer) renderList(output *strings.Builder, items []editor.Node, numberID, level int) {
@@ -259,18 +318,19 @@ func (renderer wordNodeRenderer) renderInline(output *strings.Builder, node edit
 		if linkID != "" {
 			output.WriteString(`<w:hyperlink r:id="` + linkID + `" w:history="1">`)
 		}
-		output.WriteString("<w:r>")
-		if properties != "" {
-			output.WriteString("<w:rPr>" + properties + "</w:rPr>")
-		}
-		output.WriteString(`<w:t xml:space="preserve">`)
-		_ = xml.EscapeText(output, []byte(node.Text))
-		output.WriteString("</w:t></w:r>")
+		writeWordTextRun(output, node.Text, properties)
 		if linkID != "" {
 			output.WriteString("</w:hyperlink>")
 		}
 	case "hardBreak":
 		output.WriteString("<w:r><w:br/></w:r>")
+	case "inlineMath":
+		latex, _ := node.Attrs["latex"].(string)
+		writeWordTextRun(
+			output,
+			"[Формула: "+latex+"]",
+			`<w:rFonts w:ascii="IBM Plex Mono" w:hAnsi="IBM Plex Mono"/>`,
+		)
 	default:
 		for _, child := range node.Content {
 			renderer.renderInline(output, child)
@@ -278,31 +338,82 @@ func (renderer wordNodeRenderer) renderInline(output *strings.Builder, node edit
 	}
 }
 
+func writeWordTextRun(output *strings.Builder, text, properties string) {
+	output.WriteString("<w:r>")
+	if properties != "" {
+		output.WriteString("<w:rPr>" + properties + "</w:rPr>")
+	}
+	for lineIndex, line := range strings.Split(text, "\n") {
+		if lineIndex > 0 {
+			output.WriteString("<w:br/>")
+		}
+		for tabIndex, part := range strings.Split(line, "\t") {
+			if tabIndex > 0 {
+				output.WriteString("<w:tab/>")
+			}
+			if part == "" {
+				continue
+			}
+			output.WriteString(`<w:t xml:space="preserve">`)
+			_ = xml.EscapeText(output, []byte(part))
+			output.WriteString("</w:t>")
+		}
+	}
+	output.WriteString("</w:r>")
+}
+
 func (renderer wordNodeRenderer) renderTable(output *strings.Builder, table editor.Node) {
-	output.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="A7AAA4"/><w:left w:val="single" w:sz="4" w:color="A7AAA4"/><w:bottom w:val="single" w:sz="4" w:color="A7AAA4"/><w:right w:val="single" w:sz="4" w:color="A7AAA4"/><w:insideH w:val="single" w:sz="4" w:color="A7AAA4"/><w:insideV w:val="single" w:sz="4" w:color="A7AAA4"/></w:tblBorders></w:tblPr>`)
+	widths := renderer.tableColumnWidths(table)
+	tableWidth := 0
+	for _, width := range widths {
+		tableWidth += width
+	}
+	fmt.Fprintf(output, `<w:tbl><w:tblPr><w:tblW w:w="%d" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="90" w:type="dxa"/><w:left w:w="110" w:type="dxa"/><w:bottom w:w="90" w:type="dxa"/><w:right w:w="110" w:type="dxa"/></w:tblCellMar><w:tblBorders><w:top w:val="single" w:sz="5" w:color="9FA49E"/><w:left w:val="single" w:sz="5" w:color="9FA49E"/><w:bottom w:val="single" w:sz="5" w:color="9FA49E"/><w:right w:val="single" w:sz="5" w:color="9FA49E"/><w:insideH w:val="single" w:sz="4" w:color="B7BBB5"/><w:insideV w:val="single" w:sz="4" w:color="B7BBB5"/></w:tblBorders></w:tblPr><w:tblGrid>`, tableWidth)
+	for _, width := range widths {
+		fmt.Fprintf(output, `<w:gridCol w:w="%d"/>`, width)
+	}
+	output.WriteString(`</w:tblGrid>`)
+	rowIndex := 0
 	for _, row := range table.Content {
 		if row.Type != "tableRow" {
 			continue
 		}
-		output.WriteString("<w:tr>")
+		headerRow := rowIndex == 0 && publicationHeaderRow(row)
+		output.WriteString("<w:tr><w:trPr><w:cantSplit/>")
+		if headerRow {
+			output.WriteString(`<w:tblHeader/>`)
+		}
+		output.WriteString("</w:trPr>")
+		column := 0
 		for _, cell := range row.Content {
 			if cell.Type != "tableCell" && cell.Type != "tableHeader" {
 				continue
 			}
+			colspan := numericPublicationAttr(cell.Attrs, "colspan", 1)
+			if colspan < 1 {
+				colspan = 1
+			}
+			cellWidth := 0
+			for index := column; index < column+colspan && index < len(widths); index++ {
+				cellWidth += widths[index]
+			}
 			output.WriteString("<w:tc><w:tcPr>")
-			if colspan := numericPublicationAttr(cell.Attrs, "colspan", 1); colspan > 1 {
+			fmt.Fprintf(output, `<w:tcW w:w="%d" w:type="dxa"/><w:vAlign w:val="center"/>`, cellWidth)
+			if colspan > 1 {
 				fmt.Fprintf(output, `<w:gridSpan w:val="%d"/>`, colspan)
 			}
 			if cell.Type == "tableHeader" {
 				output.WriteString(`<w:shd w:fill="E8ECE9"/>`)
+			} else if rowIndex%2 == 0 {
+				output.WriteString(`<w:shd w:fill="F7F8F6"/>`)
 			}
 			output.WriteString("</w:tcPr>")
 			if len(cell.Content) == 0 {
-				output.WriteString("<w:p/>")
+				output.WriteString(`<w:p><w:pPr><w:pStyle w:val="TableBody"/></w:pPr></w:p>`)
 			} else {
 				for _, child := range cell.Content {
 					if child.Type == "paragraph" {
-						style := ""
+						style := "TableBody"
 						if cell.Type == "tableHeader" {
 							style = "TableHeader"
 						}
@@ -313,10 +424,74 @@ func (renderer wordNodeRenderer) renderTable(output *strings.Builder, table edit
 				}
 			}
 			output.WriteString("</w:tc>")
+			column += colspan
 		}
 		output.WriteString("</w:tr>")
+		rowIndex++
 	}
 	output.WriteString("</w:tbl>")
+}
+
+func (renderer wordNodeRenderer) tableColumnWidths(table editor.Node) []int {
+	columnCount := 0
+	weights := []int{}
+	for _, row := range table.Content {
+		if row.Type != "tableRow" {
+			continue
+		}
+		column := 0
+		for _, cell := range row.Content {
+			if cell.Type != "tableCell" && cell.Type != "tableHeader" {
+				continue
+			}
+			span := numericPublicationAttr(cell.Attrs, "colspan", 1)
+			if span < 1 {
+				span = 1
+			}
+			for len(weights) < column+span {
+				weights = append(weights, 4)
+			}
+			weight := len([]rune(strings.TrimSpace(codeNodeText(cell.Content)))) / span
+			if weight < 4 {
+				weight = 4
+			}
+			if weight > 30 {
+				weight = 30
+			}
+			for index := column; index < column+span; index++ {
+				if weight > weights[index] {
+					weights[index] = weight
+				}
+			}
+			column += span
+		}
+		if column > columnCount {
+			columnCount = column
+		}
+	}
+	if columnCount == 0 {
+		return nil
+	}
+	weights = weights[:columnCount]
+	pageWidth, _ := wordPageSize(renderer.profile.Style.PageSize)
+	available := pageWidth - 2*renderer.profile.Style.MarginMM*57
+	if available < columnCount*720 {
+		available = columnCount * 720
+	}
+	base := 540
+	remaining := available - base*columnCount
+	totalWeight := 0
+	for _, weight := range weights {
+		totalWeight += weight
+	}
+	widths := make([]int, columnCount)
+	used := 0
+	for index, weight := range weights {
+		widths[index] = base + remaining*weight/totalWeight
+		used += widths[index]
+	}
+	widths[len(widths)-1] += available - used
+	return widths
 }
 
 func (renderer wordNodeRenderer) renderImage(output *strings.Builder, node editor.Node) {
@@ -338,32 +513,4 @@ func (renderer wordNodeRenderer) renderImage(output *strings.Builder, node edito
 
 func (renderer wordNodeRenderer) sceneSeparator() string {
 	return sceneSeparatorText(renderer.profile.Style.SceneSeparator)
-}
-
-func flattenWordText(nodes []editor.Node) []editor.Node {
-	var result strings.Builder
-	var visit func(editor.Node)
-	visit = func(node editor.Node) {
-		if node.Type == "text" {
-			result.WriteString(node.Text)
-		}
-		if node.Type == "hardBreak" {
-			result.WriteByte('\n')
-		}
-		for _, child := range node.Content {
-			visit(child)
-		}
-	}
-	for _, node := range nodes {
-		visit(node)
-	}
-	parts := strings.Split(result.String(), "\n")
-	inline := make([]editor.Node, 0, len(parts)*2)
-	for index, part := range parts {
-		if index > 0 {
-			inline = append(inline, editor.Node{Type: "hardBreak"})
-		}
-		inline = append(inline, editor.Node{Type: "text", Text: part})
-	}
-	return inline
 }

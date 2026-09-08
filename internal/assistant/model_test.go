@@ -20,6 +20,7 @@ func validProvider() ProviderRef {
 func TestRunValidation(t *testing.T) {
 	t.Parallel()
 	nodeID := "node"
+	canvasID := "canvas"
 	tests := []struct {
 		name string
 		run  Run
@@ -40,6 +41,21 @@ func TestRunValidation(t *testing.T) {
 				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
 			},
 			ok: true,
+		},
+		{
+			name: "canvas chat run",
+			run: Run{
+				ProjectID: "project", TargetKind: TargetCanvas, TargetCanvasID: &canvasID,
+				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
+			},
+			ok: true,
+		},
+		{
+			name: "canvas target missing",
+			run: Run{
+				ProjectID: "project", TargetKind: TargetCanvas,
+				InputMode: InputChat, SilenceCheckpointMS: 0, Provider: validProvider(),
+			},
 		},
 		{
 			name: "node target missing",
@@ -294,7 +310,8 @@ func TestToolClassificationCoversCatalog(t *testing.T) {
 		if policy.Authority == AuthorityNeverExposed {
 			t.Fatalf("catalog tool %q has no policy", name)
 		}
-		if policy.Authority != AuthorityRead && !policy.RequiresReview {
+		if policy.Authority != AuthorityRead && policy.Authority != AuthorityDirectLow &&
+			!policy.RequiresReview {
 			t.Fatalf("mutation %q does not require review", name)
 		}
 	}
@@ -312,6 +329,11 @@ func TestToolClassificationCoversCatalog(t *testing.T) {
 	native := ClassifyTool("export.prepare")
 	if native.Authority != AuthorityNativeOnly || !native.RequiresReview {
 		t.Fatal("native-only tool has the wrong policy")
+	}
+	direct := ClassifyTool("project.upload_image")
+	if direct.Authority != AuthorityDirectLow || direct.RequiresReview ||
+		direct.RiskLevel != RiskLow {
+		t.Fatal("direct image upload has the wrong policy")
 	}
 }
 

@@ -113,11 +113,136 @@ func TestMCPServerValidatesStrictArgumentsAndErrors(t *testing.T) {
 	}
 }
 
+func TestMCPDocumentSchemasAcceptNativeCodeWithOptionalLanguage(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{}
+	session, err := NewSession(context.Background(), ExecutionContext{
+		OwnerUserID: "owner", ProjectID: "project", RunID: "run", TurnID: "turn",
+	}, backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	for name, content := range map[string]string{
+		"without language": `{"blocks":[{"type":"code","text":"\tplain  \n"}]}`,
+		"with Go":          `{"blocks":[{"type":"code","language":"go","text":"package main\n"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			arguments := json.RawMessage(`{"nodeId":"node","baseRevision":1,"content":` + content + `}`)
+			if _, err := session.Call(context.Background(), "document.append", arguments); err != nil {
+				t.Fatalf("native code rejected by tools/list schema: %v", err)
+			}
+		})
+	}
+	if _, err := session.Call(
+		context.Background(),
+		"document.append",
+		json.RawMessage(`{"nodeId":"node","baseRevision":1,"content":{"blocks":[{"type":"code","language":42,"text":"bad"}]}}`),
+	); err == nil {
+		t.Fatal("invalid code language passed MCP schema validation")
+	}
+}
+
+func TestMCPToolsListExplicitlyDescribesCanonicalInlineCode(t *testing.T) {
+	t.Parallel()
+	var appendTool *ToolSpec
+	for _, tool := range PublicCatalog() {
+		if tool.Name == "document.append" {
+			copy := tool
+			appendTool = &copy
+			break
+		}
+	}
+	if appendTool == nil {
+		t.Fatal("document.append is missing from tools/list")
+	}
+	encoded, err := json.Marshal(appendTool.Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := string(encoded)
+	for _, expected := range []string{
+		"native inline code", "matching Markdown backticks", "optional language",
+	} {
+		if !strings.Contains(schema, expected) {
+			t.Fatalf("document.append schema does not declare %q: %s", expected, schema)
+		}
+	}
+}
+
+func TestMCPImageUploadSchemaIsExplicitAndBounded(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{}
+	session, err := NewSession(context.Background(), ExecutionContext{
+		OwnerUserID: "owner", ProjectID: "project", RunID: "run", TurnID: "turn",
+	}, backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	valid := json.RawMessage(`{"filename":"cover.png","mediaType":"image/png","dataBase64":"iVBORw0KGgo="}`)
+	if _, err := session.Call(context.Background(), "project.upload_image", valid); err != nil {
+		t.Fatalf("valid upload arguments rejected by tools/list schema: %v", err)
+	}
+	for _, invalid := range []string{
+		`{"filename":"cover.svg","mediaType":"image/svg+xml","dataBase64":"PHN2Zz4="}`,
+		`{"filename":"cover.png","mediaType":"image/png"}`,
+		`{"filename":"cover.png","mediaType":"image/png","dataBase64":"x","sourceUrl":"https://example.test/x"}`,
+	} {
+		if _, err := session.Call(
+			context.Background(), "project.upload_image", json.RawMessage(invalid),
+		); err == nil {
+			t.Fatalf("invalid upload schema passed: %s", invalid)
+		}
+	}
+}
+
+func TestMCPDocumentSchemasDeclareEveryCanonicalRichBlock(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{}
+	session, err := NewSession(context.Background(), ExecutionContext{
+		OwnerUserID: "owner", ProjectID: "project", RunID: "run", TurnID: "turn",
+	}, backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	blocks := []string{
+		`{"type":"callout","kind":"info","text":"Справка"}`,
+		`{"type":"callout","kind":"idea","text":"Идея"}`,
+		`{"type":"callout","kind":"warning","text":"Риск"}`,
+		`{"type":"callout","kind":"todo","text":"Проверить"}`,
+		`{"type":"mermaid","code":"flowchart LR\nA--\u003eB","caption":"Поток"}`,
+		`{"type":"image","assetId":"11111111-1111-1111-1111-111111111111","alt":"Карта","caption":"Мир"}`,
+		`{"type":"table","rows":[{"cells":[{"text":"Колонка","header":true,"colspan":1,"rowspan":1}]},{"cells":[{"text":"Значение","header":false,"colspan":1,"rowspan":1}]}]}`,
+		`{"type":"bullet_list","items":["Первый","Второй"]}`,
+		`{"type":"ordered_list","items":["Шаг 1","Шаг 2"]}`,
+		`{"type":"scene_break"}`,
+		`{"type":"horizontal_rule"}`,
+	}
+	for _, block := range blocks {
+		arguments := json.RawMessage(`{"nodeId":"node","baseRevision":1,"content":{"blocks":[` + block + `]}}`)
+		if _, err := session.Call(context.Background(), "document.append", arguments); err != nil {
+			t.Fatalf("canonical rich block rejected by tools/list schema: block=%s err=%v", block, err)
+		}
+	}
+	for _, invalid := range []string{
+		`{"type":"callout","kind":"danger","text":"x"}`,
+		`{"type":"mermaid","code":"flowchart LR"}`,
+		`{"type":"table","rows":[{"cells":[{"text":"x","header":false,"colspan":0,"rowspan":1}]}]}`,
+	} {
+		arguments := json.RawMessage(`{"nodeId":"node","baseRevision":1,"content":{"blocks":[` + invalid + `]}}`)
+		if _, err := session.Call(context.Background(), "document.append", arguments); err == nil {
+			t.Fatalf("invalid canonical block passed MCP schema: %s", invalid)
+		}
+	}
+}
+
 func TestCatalogMatchesPolicyAndStrictSchema(t *testing.T) {
 	t.Parallel()
 	catalog := PublicCatalog()
-	if len(catalog) != 69 {
-		t.Fatalf("public Assistant MCP baseline changed: got %d tools, want 69", len(catalog))
+	if len(catalog) != 77 {
+		t.Fatalf("public Assistant MCP baseline changed: got %d tools, want 77", len(catalog))
 	}
 	allowed := assistant.AllowedToolNames()
 	if len(catalog) != len(allowed) {
@@ -157,7 +282,7 @@ func TestRemoteCatalogIsStrictSupersetOfInternalCatalog(t *testing.T) {
 	t.Parallel()
 	internal := PublicCatalog()
 	remote := RemoteCatalog()
-	if len(internal) != 69 {
+	if len(internal) != 77 {
 		t.Fatalf("internal tool baseline changed: got %d", len(internal))
 	}
 	if len(remote) <= len(internal) {

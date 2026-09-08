@@ -770,7 +770,7 @@ export function AssistantContextPage({
                         ) : null}
                         {record.alwaysRelevant ? (
                           <span
-                            className="rounded-full bg-[var(--accent-soft)] px-2 py-1"
+                            className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[var(--accent-ink)]"
                             title="Эта запись входит в ограниченный prompt-контекст каждого поручения"
                           >
                             всегда

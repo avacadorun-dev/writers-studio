@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -21,6 +22,7 @@ var (
 		"hardBreak": true, "horizontalRule": true, "sceneBreak": true, "text": true,
 		"codeBlock": true, "table": true, "tableRow": true, "tableHeader": true,
 		"tableCell": true, "imageBlock": true, "mermaidBlock": true, "callout": true,
+		"inlineMath": true, "mathBlock": true,
 	}
 	allowedMarks = map[string]bool{
 		"italic": true, "bold": true, "underline": true, "strike": true, "link": true,
@@ -30,8 +32,10 @@ var (
 	uuidPattern         = regexp.MustCompile(`^[a-fA-F0-9-]{36}$`)
 )
 
-const CurrentSchemaVersion = 3
+const CurrentSchemaVersion = 4
 const richSchemaVersion = 2
+const deepHeadingSchemaVersion = 3
+const mathSchemaVersion = 4
 
 type Node struct {
 	Type    string         `json:"type"`
@@ -44,6 +48,14 @@ type Node struct {
 type Mark struct {
 	Type  string         `json:"type"`
 	Attrs map[string]any `json:"attrs,omitempty"`
+}
+
+// FencedCodeBlock is the lossless payload extracted from a Markdown fenced
+// block. Text intentionally is not trimmed or normalized: callers use it to
+// migrate legacy paragraphs without changing code whitespace.
+type FencedCodeBlock struct {
+	Language string
+	Text     string
 }
 
 const legacyBlockIDPrefix = "__writers_studio_legacy_block_"
@@ -98,10 +110,25 @@ func Validate(raw json.RawMessage) error {
 	if version < richSchemaVersion && requiresRichSchema(root) {
 		return fmt.Errorf("%w: rich blocks require schema version %d", ErrInvalidDocument, richSchemaVersion)
 	}
-	if version < CurrentSchemaVersion && requiresDeepHeadingSchema(root) {
-		return fmt.Errorf("%w: headings 4..6 require schema version %d", ErrInvalidDocument, CurrentSchemaVersion)
+	if version < deepHeadingSchemaVersion && requiresDeepHeadingSchema(root) {
+		return fmt.Errorf("%w: headings 4..6 require schema version %d", ErrInvalidDocument, deepHeadingSchemaVersion)
+	}
+	if version < mathSchemaVersion && requiresMathSchema(root) {
+		return fmt.Errorf("%w: formulas require schema version %d", ErrInvalidDocument, mathSchemaVersion)
 	}
 	return validateNode(root, true)
+}
+
+func requiresMathSchema(node Node) bool {
+	if node.Type == "inlineMath" || node.Type == "mathBlock" {
+		return true
+	}
+	for _, child := range node.Content {
+		if requiresMathSchema(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func requiresDeepHeadingSchema(node Node) bool {
@@ -154,8 +181,8 @@ func SchemaVersion(raw json.RawMessage) (int, error) {
 	return version, nil
 }
 
-// NormalizeSchemaVersion upgrades only documents that use rich blocks or deep
-// headings. Plain schema-v1 documents are returned unchanged so opening or
+// NormalizeSchemaVersion upgrades only documents that use rich blocks, deep
+// headings or formulas. Plain schema-v1 documents are returned unchanged so opening or
 // editing an existing project does not perform a bulk format conversion.
 func NormalizeSchemaVersion(raw json.RawMessage) (json.RawMessage, error) {
 	var root Node
@@ -170,9 +197,13 @@ func NormalizeSchemaVersion(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, err
 	}
 	targetVersion := version
-	if requiresDeepHeadingSchema(root) && targetVersion < CurrentSchemaVersion {
-		targetVersion = CurrentSchemaVersion
-	} else if requiresRichSchema(root) && targetVersion < richSchemaVersion {
+	if requiresMathSchema(root) && targetVersion < mathSchemaVersion {
+		targetVersion = mathSchemaVersion
+	}
+	if requiresDeepHeadingSchema(root) && targetVersion < deepHeadingSchemaVersion {
+		targetVersion = deepHeadingSchemaVersion
+	}
+	if requiresRichSchema(root) && targetVersion < richSchemaVersion {
 		targetVersion = richSchemaVersion
 	}
 	if targetVersion == version {
@@ -187,6 +218,269 @@ func NormalizeSchemaVersion(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, fmt.Errorf("%w: encode normalized document", ErrInvalidDocument)
 	}
 	return result, Validate(result)
+}
+
+// ParseFencedCodeBlock recognizes a complete Markdown fenced block. Exactly
+// one line ending that separates the code from the closing fence is removed;
+// every line ending, tab, space and empty line inside the code is preserved.
+func ParseFencedCodeBlock(value string) (FencedCodeBlock, bool) {
+	firstLineEnd := strings.IndexByte(value, '\n')
+	if firstLineEnd < 0 {
+		return FencedCodeBlock{}, false
+	}
+	openingLine := strings.TrimSuffix(value[:firstLineEnd], "\r")
+	if openingLine == "" || (openingLine[0] != '`' && openingLine[0] != '~') {
+		return FencedCodeBlock{}, false
+	}
+	fenceCharacter := openingLine[0]
+	fenceLength := 0
+	for fenceLength < len(openingLine) && openingLine[fenceLength] == fenceCharacter {
+		fenceLength++
+	}
+	if fenceLength < 3 {
+		return FencedCodeBlock{}, false
+	}
+	info := strings.TrimSpace(openingLine[fenceLength:])
+	language := ""
+	if info != "" {
+		language = strings.Fields(info)[0]
+		if !codeLanguagePattern.MatchString(language) {
+			return FencedCodeBlock{}, false
+		}
+	}
+
+	remainder := value[firstLineEnd+1:]
+	// A final line ending belongs to the Markdown container, not the fence.
+	remainder = strings.TrimSuffix(remainder, "\n")
+	remainder = strings.TrimSuffix(remainder, "\r")
+	closingStart := strings.LastIndexByte(remainder, '\n')
+	bodyEnd := 0
+	closingLine := remainder
+	if closingStart >= 0 {
+		bodyEnd = closingStart
+		if bodyEnd > 0 && remainder[bodyEnd-1] == '\r' {
+			bodyEnd--
+		}
+		closingLine = remainder[closingStart+1:]
+	}
+	closingLine = strings.TrimSuffix(closingLine, "\r")
+	trimmedClosing := strings.TrimLeft(closingLine, " \t")
+	if len(closingLine)-len(trimmedClosing) > 3 {
+		return FencedCodeBlock{}, false
+	}
+	closingFenceLength := 0
+	for closingFenceLength < len(trimmedClosing) &&
+		trimmedClosing[closingFenceLength] == fenceCharacter {
+		closingFenceLength++
+	}
+	if closingFenceLength < fenceLength ||
+		strings.TrimSpace(trimmedClosing[closingFenceLength:]) != "" {
+		return FencedCodeBlock{}, false
+	}
+	body := ""
+	if closingStart >= 0 {
+		body = remainder[:bodyEnd]
+	}
+	return FencedCodeBlock{Language: language, Text: body}, true
+}
+
+// NormalizeFencedCodeBlocks migrates legacy top-level paragraphs that consist
+// entirely of a Markdown fenced block into native codeBlock nodes.
+func NormalizeFencedCodeBlocks(raw json.RawMessage) (json.RawMessage, error) {
+	var root Node
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return nil, fmt.Errorf("%w: malformed JSON", ErrInvalidDocument)
+	}
+	if root.Type != "doc" {
+		return nil, fmt.Errorf("%w: root type must be doc", ErrInvalidDocument)
+	}
+	changed := false
+	for index := range root.Content {
+		block := &root.Content[index]
+		if block.Type != "paragraph" {
+			continue
+		}
+		fenced, ok := ParseFencedCodeBlock(inlineText(*block))
+		if !ok {
+			continue
+		}
+		attrs := map[string]any{}
+		if blockID, exists := block.Attrs["blockId"]; exists {
+			attrs["blockId"] = blockID
+		}
+		if fenced.Language != "" {
+			attrs["language"] = fenced.Language
+		}
+		*block = Node{Type: "codeBlock", Attrs: attrs}
+		if fenced.Text != "" {
+			block.Content = []Node{{Type: "text", Text: fenced.Text}}
+		}
+		changed = true
+	}
+	if !changed {
+		return raw, Validate(raw)
+	}
+	if root.Attrs == nil {
+		root.Attrs = map[string]any{}
+	}
+	version := 1
+	if current, ok := numericAttr(root.Attrs["schemaVersion"]); ok {
+		version = current
+	}
+	if version < richSchemaVersion {
+		root.Attrs["schemaVersion"] = richSchemaVersion
+	}
+	result, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("%w: encode fenced code migration", ErrInvalidDocument)
+	}
+	return result, Validate(result)
+}
+
+// ParseInlineCodeNodes converts Markdown-style backtick spans into canonical
+// code marks. Delimiters may contain more than one backtick, which lets inline
+// code itself contain shorter backtick runs. Text inside the span is never
+// trimmed or otherwise normalized.
+func ParseInlineCodeNodes(value string, marks []Mark) ([]Node, bool) {
+	if value == "" || hasMark(marks, "code") {
+		return []Node{{Type: "text", Text: value, Marks: marks}}, false
+	}
+	result := make([]Node, 0, 3)
+	cursor := 0
+	search := 0
+	changed := false
+	for search < len(value) {
+		opening := strings.IndexByte(value[search:], '`')
+		if opening < 0 {
+			break
+		}
+		opening += search
+		openingLength := backtickRunLength(value, opening)
+		closing := matchingBacktickRun(value, opening+openingLength, openingLength)
+		if closing < 0 {
+			search = opening + openingLength
+			continue
+		}
+		if opening > cursor {
+			result = append(result, Node{
+				Type: "text", Text: value[cursor:opening], Marks: cloneMarks(marks),
+			})
+		}
+		codeMarks := cloneMarks(marks)
+		codeMarks = append(codeMarks, Mark{Type: "code"})
+		result = append(result, Node{
+			Type: "text", Text: value[opening+openingLength : closing], Marks: codeMarks,
+		})
+		cursor = closing + openingLength
+		search = cursor
+		changed = true
+	}
+	if !changed {
+		return []Node{{Type: "text", Text: value, Marks: marks}}, false
+	}
+	if cursor < len(value) {
+		result = append(result, Node{
+			Type: "text", Text: value[cursor:], Marks: cloneMarks(marks),
+		})
+	}
+	return result, true
+}
+
+// NormalizeInlineCodeMarks migrates literal Markdown backtick spans throughout
+// prose containers. Native code blocks and text that already has a code mark
+// are left byte-for-byte unchanged.
+func NormalizeInlineCodeMarks(raw json.RawMessage) (json.RawMessage, error) {
+	var root Node
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return nil, fmt.Errorf("%w: malformed JSON", ErrInvalidDocument)
+	}
+	if root.Type != "doc" {
+		return nil, fmt.Errorf("%w: root type must be doc", ErrInvalidDocument)
+	}
+	if !normalizeInlineCodeChildren(&root) {
+		return NormalizeSchemaVersion(raw)
+	}
+	result, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("%w: encode inline code migration", ErrInvalidDocument)
+	}
+	return NormalizeSchemaVersion(result)
+}
+
+func normalizeInlineCodeChildren(node *Node) bool {
+	if node.Type == "codeBlock" {
+		return false
+	}
+	changed := false
+	children := make([]Node, 0, len(node.Content))
+	for _, child := range node.Content {
+		if child.Type == "text" {
+			parts, parsed := ParseInlineCodeNodes(child.Text, child.Marks)
+			if parsed {
+				for index := range parts {
+					parts[index].Attrs = child.Attrs
+				}
+				children = append(children, parts...)
+				changed = true
+				continue
+			}
+		} else if normalizeInlineCodeChildren(&child) {
+			changed = true
+		}
+		if len(children) > 0 && children[len(children)-1].Type == "text" &&
+			child.Type == "text" &&
+			reflect.DeepEqual(children[len(children)-1].Marks, child.Marks) &&
+			reflect.DeepEqual(children[len(children)-1].Attrs, child.Attrs) {
+			children[len(children)-1].Text += child.Text
+			changed = true
+			continue
+		}
+		children = append(children, child)
+	}
+	if changed {
+		node.Content = children
+	}
+	return changed
+}
+
+func backtickRunLength(value string, start int) int {
+	end := start
+	for end < len(value) && value[end] == '`' {
+		end++
+	}
+	return end - start
+}
+
+func matchingBacktickRun(value string, start, expectedLength int) int {
+	for start < len(value) {
+		candidate := strings.IndexByte(value[start:], '`')
+		if candidate < 0 {
+			return -1
+		}
+		candidate += start
+		length := backtickRunLength(value, candidate)
+		if length == expectedLength {
+			return candidate
+		}
+		start = candidate + length
+	}
+	return -1
+}
+
+func hasMark(marks []Mark, markType string) bool {
+	for _, mark := range marks {
+		if mark.Type == markType {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneMarks(marks []Mark) []Mark {
+	if len(marks) == 0 {
+		return nil
+	}
+	return append([]Mark(nil), marks...)
 }
 
 func validateNode(node Node, root bool) error {
@@ -236,6 +530,14 @@ func validateNode(node Node, root bool) error {
 		if !codeOK || attributeHasNonStringValue(node.Attrs, "caption", captionOK) ||
 			strings.TrimSpace(code) == "" || len(code) > 100_000 || len(caption) > 1_000 {
 			return fmt.Errorf("%w: invalid Mermaid block", ErrInvalidDocument)
+		}
+	}
+	if node.Type == "inlineMath" || node.Type == "mathBlock" {
+		latex, latexOK := optionalStringAttr(node.Attrs, "latex")
+		description, descriptionOK := optionalStringAttr(node.Attrs, "description")
+		if !latexOK || attributeHasNonStringValue(node.Attrs, "description", descriptionOK) ||
+			len(latex) > 10_000 || len(description) > 1_000 || len(node.Content) > 0 {
+			return fmt.Errorf("%w: invalid formula", ErrInvalidDocument)
 		}
 	}
 	if node.Type == "tableCell" || node.Type == "tableHeader" {
@@ -361,6 +663,8 @@ func appendInlineText(builder *strings.Builder, node Node) {
 		builder.WriteString(node.Text)
 	case "hardBreak":
 		builder.WriteByte('\n')
+	case "inlineMath":
+		builder.WriteString("[Формула: " + stringAttr(node.Attrs, "latex") + "]")
 	}
 	for _, child := range node.Content {
 		appendInlineText(builder, child)
@@ -428,6 +732,8 @@ func appendText(builder *strings.Builder, node Node) {
 		builder.WriteString(node.Text)
 	case "hardBreak":
 		builder.WriteByte('\n')
+	case "inlineMath":
+		builder.WriteString("[Формула: " + stringAttr(node.Attrs, "latex") + "]")
 	case "sceneBreak":
 		builder.WriteString("\n\n* * *\n\n")
 	case "horizontalRule":
@@ -445,6 +751,8 @@ func appendText(builder *strings.Builder, node Node) {
 			builder.WriteByte('\n')
 		}
 		builder.WriteString(stringAttr(node.Attrs, "code"))
+	case "mathBlock":
+		builder.WriteString("Формула: " + stringAttr(node.Attrs, "latex"))
 	}
 	for _, child := range node.Content {
 		appendText(builder, child)
@@ -455,7 +763,7 @@ func appendText(builder *strings.Builder, node Node) {
 	case "tableRow":
 		builder.WriteByte('\n')
 	case "paragraph", "heading", "blockquote", "listItem", "codeBlock", "callout", "table",
-		"imageBlock", "mermaidBlock":
+		"imageBlock", "mermaidBlock", "mathBlock":
 		builder.WriteString("\n\n")
 	}
 }
@@ -531,7 +839,7 @@ func Markdown(raw json.RawMessage) (string, error) {
 	}
 	var builder strings.Builder
 	appendMarkdown(&builder, root)
-	return strings.TrimSpace(builder.String()), nil
+	return strings.TrimRight(builder.String(), "\r\n"), nil
 }
 
 func appendMarkdown(builder *strings.Builder, node Node) {
@@ -551,12 +859,14 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 					text = "[" + text + "](" + href + ")"
 				}
 			case "code":
-				text = "`" + strings.ReplaceAll(text, "`", "\\`") + "`"
+				text = markdownInlineCode(text)
 			case "underline":
 				text = "<u>" + text + "</u>"
 			}
 		}
 		builder.WriteString(text)
+	case "inlineMath":
+		builder.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
 	case "heading":
 		level, _ := numericAttr(node.Attrs["level"])
 		builder.WriteString(strings.Repeat("#", max(1, level)))
@@ -577,10 +887,7 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 	case "codeBlock":
 		language := stringAttr(node.Attrs, "language")
 		code := inlineText(node)
-		fence := "```"
-		if strings.Contains(code, fence) {
-			fence = "````"
-		}
+		fence := markdownCodeFence(code)
 		builder.WriteString(fence + language + "\n" + code + "\n" + fence + "\n\n")
 		return
 	case "imageBlock":
@@ -598,6 +905,9 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 			builder.WriteString("\n*" + caption + "*\n")
 		}
 		builder.WriteByte('\n')
+		return
+	case "mathBlock":
+		builder.WriteString("$$\n" + stringAttr(node.Attrs, "latex") + "\n$$\n\n")
 		return
 	case "table":
 		appendMarkdownTable(builder, node)
@@ -626,6 +936,35 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 	case "paragraph", "heading", "blockquote", "listItem":
 		builder.WriteString("\n\n")
 	}
+}
+
+func markdownCodeFence(code string) string {
+	longest := 0
+	current := 0
+	for _, character := range code {
+		if character == '`' {
+			current++
+			longest = max(longest, current)
+			continue
+		}
+		current = 0
+	}
+	return strings.Repeat("`", max(3, longest+1))
+}
+
+func markdownInlineCode(code string) string {
+	longest := 0
+	current := 0
+	for _, character := range code {
+		if character == '`' {
+			current++
+			longest = max(longest, current)
+			continue
+		}
+		current = 0
+	}
+	fence := strings.Repeat("`", max(1, longest+1))
+	return fence + code + fence
 }
 
 func appendMarkdownQuote(builder *strings.Builder, header string, value string) {

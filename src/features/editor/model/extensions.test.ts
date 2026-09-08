@@ -64,6 +64,71 @@ describe("Writer's Studio Tiptap schema", () => {
     editor.destroy();
   });
 
+  test("inserts inline and block formulas in schema v4 and preserves source through undo", () => {
+    const editor = new Editor({
+      extensions: editorExtensions,
+      content: {
+        type: "doc",
+        attrs: { schemaVersion: 1 },
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Энергия: " }] }],
+      },
+    });
+
+    editor.commands.setTextSelection(9);
+    expect(
+      editor.commands.insertInlineMath({ latex: "E = mc^2", description: "Энергия" }),
+    ).toBeTrue();
+    expect(
+      editor.commands.insertMathBlock({ latex: "\\sum_{i=1}^n i", description: "Сумма" }),
+    ).toBeTrue();
+
+    const document = editor.getJSON();
+    expect(document.attrs?.schemaVersion).toBe(4);
+    expect(document.content?.[0]?.content?.[1]).toMatchObject({
+      type: "inlineMath",
+      attrs: { latex: "E = mc^2", description: "Энергия" },
+    });
+    const block = document.content?.find((node) => node.type === "mathBlock");
+    expect(block?.attrs?.latex).toBe("\\sum_{i=1}^n i");
+    expect(typeof block?.attrs?.blockId).toBe("string");
+
+    expect(editor.commands.undo()).toBeTrue();
+    expect(editor.getJSON().content?.some((node) => node.type === "mathBlock")).toBeFalse();
+    expect(editor.commands.redo()).toBeTrue();
+    expect(editor.getJSON().content?.[0]?.content?.[1]).toMatchObject({
+      type: "inlineMath",
+      attrs: { latex: "E = mc^2" },
+    });
+    expect(editor.getJSON().content?.find((node) => node.type === "mathBlock")?.attrs?.latex).toBe(
+      "\\sum_{i=1}^n i",
+    );
+    editor.destroy();
+  });
+
+  test("keeps code ranges in preformatted mode without prose input rules", () => {
+    const source = "1. not a list  \n\tindented\n\nfinal";
+    const editor = new Editor({
+      extensions: editorExtensions,
+      content: {
+        type: "doc",
+        attrs: { schemaVersion: 2 },
+        content: [
+          {
+            type: "codeBlock",
+            attrs: { language: "go" },
+            content: [{ type: "text", text: source }],
+          },
+        ],
+      },
+    });
+    expect(editor.schema.nodes.codeBlock.spec.code).toBeTrue();
+    expect(
+      (editor.getJSON().content?.[0]?.content?.[0] as { text?: string } | undefined)?.text,
+    ).toBe(source);
+    expect(editor.getJSON().content?.some((node) => node.type.endsWith("List"))).toBeFalse();
+    editor.destroy();
+  });
+
   test("preserves provenance and assigns a new block identity when splitting", () => {
     const editor = new Editor({
       extensions: editorExtensions,
@@ -99,6 +164,63 @@ describe("Writer's Studio Tiptap schema", () => {
     expect(editor.getText()).toBe("Авторский текст");
     expect(editor.commands.undo()).toBeTrue();
     expect(editor.getText()).toBe("");
+    editor.destroy();
+  });
+
+  test("normalizes inline code regardless of which backtick is typed last", () => {
+    const reverse = new Editor({
+      extensions: editorExtensions,
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "код`", marks: [{ type: "bold" }] }],
+          },
+        ],
+      },
+    });
+    reverse.commands.setTextSelection(1);
+    reverse.commands.insertContent("`");
+    expect(reverse.getText()).toBe("код");
+    expect(reverse.getJSON().content?.[0]?.content?.[0]?.marks?.map((mark) => mark.type)).toEqual([
+      "code",
+    ]);
+    expect(reverse.commands.undo()).toBeTrue();
+    expect(reverse.getText()).toBe("код`");
+    reverse.destroy();
+
+    const conventional = new Editor({
+      extensions: editorExtensions,
+      content: { type: "doc", content: [{ type: "paragraph" }] },
+    });
+    conventional.commands.insertContent("`код`");
+    expect(conventional.getText()).toBe("код");
+    expect(conventional.getJSON().content?.[0]?.content?.[0]?.marks?.[0]?.type).toBe("code");
+    conventional.destroy();
+  });
+
+  test("does not normalize escaped, mismatched, unclosed or code-block backticks", () => {
+    const editor = new Editor({
+      extensions: editorExtensions,
+      content: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "\\`escaped` ``mismatch` `open" }] },
+          { type: "codeBlock", content: [{ type: "text", text: "`literal`" }] },
+        ],
+      },
+    });
+    editor.commands.setTextSelection(editor.state.doc.child(0).nodeSize - 1);
+    editor.commands.insertContent("x");
+    expect(editor.getText()).toContain("\\`escaped` ``mismatch` `openx");
+    const codeText = editor.getJSON().content?.[1]?.content?.[0] as { text?: string } | undefined;
+    expect(codeText?.text).toBe("`literal`");
+    expect(
+      editor
+        .getJSON()
+        .content?.[0]?.content?.some((node) => node.marks?.some((mark) => mark.type === "code")),
+    ).toBeFalse();
     editor.destroy();
   });
 

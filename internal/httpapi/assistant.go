@@ -17,6 +17,7 @@ import (
 
 	"writers.studio/internal/assistant"
 	"writers.studio/internal/assistantapp"
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/llm"
 	"writers.studio/internal/store"
@@ -723,6 +724,9 @@ type createRunRequest struct {
 	Title                string                               `json:"title"`
 	TargetKind           assistant.TargetKind                 `json:"targetKind"`
 	TargetNodeID         *string                              `json:"targetNodeId"`
+	TargetCanvasID       *string                              `json:"targetCanvasId"`
+	CanvasSelectionIDs   []string                             `json:"canvasSelectionIds"`
+	CanvasViewport       map[string]float64                   `json:"canvasViewport"`
 	InputMode            assistant.InputMode                  `json:"inputMode"`
 	SilenceCheckpointMS  int                                  `json:"silenceCheckpointMs"`
 	ProviderConnectionID *string                              `json:"providerConnectionId"`
@@ -787,6 +791,37 @@ func (s *Server) handleCreateAssistantRun(
 		return
 	}
 	readContext := map[string]any{"createdFrom": "assistant_picker"}
+	if input.TargetKind == assistant.TargetCanvas {
+		if input.TargetCanvasID == nil {
+			writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_context", "Не выбрана доска")
+			return
+		}
+		workspace, canvasErr := s.store.GetCanvasWorkspace(
+			request.Context(), user.ID, *input.TargetCanvasID,
+		)
+		if canvasErr != nil || workspace.Canvas.ProjectID != chi.URLParam(request, "projectID") ||
+			workspace.Canvas.TrashedAt != nil {
+			handleStoreError(response, pgx.ErrNoRows)
+			return
+		}
+		if canvasErr := canvasdocument.ValidateSelection(
+			workspace.Revision.Content, input.CanvasSelectionIDs,
+		); canvasErr != nil {
+			writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_context", "Выбор на доске устарел")
+			return
+		}
+		readContext["canvasBaseRevision"] = workspace.Revision.Revision
+	}
+	if len(input.CanvasSelectionIDs) > 0 {
+		if len(input.CanvasSelectionIDs) > 500 {
+			writeError(response, http.StatusUnprocessableEntity, "invalid_canvas_context", "Слишком много выбранных элементов")
+			return
+		}
+		readContext["canvasSelectionIds"] = input.CanvasSelectionIDs
+	}
+	if len(input.CanvasViewport) > 0 {
+		readContext["canvasViewport"] = input.CanvasViewport
+	}
 	if input.WriterPreferences != nil {
 		readContext["writerPreferences"] = input.WriterPreferences.Normalized()
 	}
@@ -795,7 +830,8 @@ func (s *Server) handleCreateAssistantRun(
 		OwnerUserID: user.ID, ProjectID: chi.URLParam(request, "projectID"),
 		Title:      title,
 		TargetKind: input.TargetKind, TargetNodeID: input.TargetNodeID,
-		InputMode: input.InputMode, SilenceCheckpointMS: input.SilenceCheckpointMS,
+		TargetCanvasID: input.TargetCanvasID,
+		InputMode:      input.InputMode, SilenceCheckpointMS: input.SilenceCheckpointMS,
 		Provider: provider, GuideRevision: guideRevision,
 		ReadContext: readContext,
 	}

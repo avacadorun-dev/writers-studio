@@ -162,8 +162,8 @@ func TestFolderAndZIPImportsIgnoreAppleDoubleMarkdown(t *testing.T) {
 	var output bytes.Buffer
 	writer := zip.NewWriter(&output)
 	for name, content := range map[string][]byte{
-		"Vault/Note.md":             []byte("# Real note"),
-		"Vault/._Note.md":           appleDouble,
+		"Vault/Note.md":            []byte("# Real note"),
+		"Vault/._Note.md":          appleDouble,
 		"Vault/__MACOSX/._Note.md": appleDouble,
 	} {
 		entry, createErr := writer.Create(name)
@@ -216,6 +216,53 @@ func TestMarkdownSemanticRoundTripKeepsListsAndCallouts(t *testing.T) {
 	for _, kind := range []string{`"type":"orderedList"`, `"type":"bulletList"`, `"type":"callout"`} {
 		if !strings.Contains(encoded, kind) {
 			t.Fatalf("round-trip lost %s: %s", kind, encoded)
+		}
+	}
+}
+
+func TestMarkdownCodeRoundTripPreservesLanguageAndWhitespace(t *testing.T) {
+	t.Parallel()
+	code := "package main  \n\nfunc main() {\n\tprintln(\"hello\")\n}\n"
+	raw, err := json.Marshal(editor.Node{
+		Type: "doc", Attrs: map[string]any{"schemaVersion": 2},
+		Content: []editor.Node{{
+			Type: "codeBlock", Attrs: map[string]any{"language": "go", "blockId": "go-code"},
+			Content: []editor.Node{{Type: "text", Text: code}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown, err := editor.Markdown(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := ParseMarkdown("main.md", []byte(markdown), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document editor.Node
+	if err := json.Unmarshal(parsed.Content, &document); err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Content) != 1 || document.Content[0].Type != "codeBlock" ||
+		document.Content[0].Attrs["language"] != "go" ||
+		document.Content[0].Content[0].Text != code {
+		t.Fatalf("Markdown code round-trip changed: markdown=%q node=%#v", markdown, document.Content)
+	}
+}
+
+func TestTrimMarkdownFenceLineEndingRemovesOnlyOneDelimiter(t *testing.T) {
+	t.Parallel()
+	for input, expected := range map[string]string{
+		"code\n":       "code",
+		"code\r\n":     "code",
+		"code\n\n":     "code\n",
+		"code\r\n\r\n": "code\r\n",
+		"code":         "code",
+	} {
+		if got := trimMarkdownFenceLineEnding(input); got != expected {
+			t.Fatalf("trimMarkdownFenceLineEnding(%q) = %q, want %q", input, got, expected)
 		}
 	}
 }

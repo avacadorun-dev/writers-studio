@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	canvasdocument "writers.studio/internal/canvas"
 	"writers.studio/internal/domain"
 	"writers.studio/internal/editor"
 )
@@ -977,8 +978,6 @@ func (s *Store) SearchProject(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	lowerQuery := strings.ToLower(strings.TrimSpace(query))
 	results := make([]domain.SearchResult, 0)
 	for rows.Next() {
@@ -1000,7 +999,87 @@ func (s *Store) SearchProject(
 			SourceScope: "document",
 		})
 	}
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	if scope != "all" && scope != "canvas" {
+		return results, nil
+	}
+
+	mediaNames := map[string]string{}
+	mediaRows, err := s.Pool.Query(ctx, `
+		SELECT m.id::text, m.original_name, m.media_type
+		FROM project_media m
+		JOIN projects p ON p.id=m.project_id
+		WHERE m.project_id=$1 AND p.owner_user_id=$2
+	`, projectID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	for mediaRows.Next() {
+		var id, name, mediaType string
+		if err := mediaRows.Scan(&id, &name, &mediaType); err != nil {
+			mediaRows.Close()
+			return nil, err
+		}
+		mediaNames[id] = name + " " + mediaType
+	}
+	if err := mediaRows.Err(); err != nil {
+		mediaRows.Close()
+		return nil, err
+	}
+	mediaRows.Close()
+
+	canvasRows, err := s.Pool.Query(ctx, `
+		SELECT c.id::text, c.title, c.current_revision, r.content
+		FROM canvases c
+		JOIN projects p ON p.id=c.project_id
+		JOIN canvas_revisions r ON r.canvas_id=c.id AND r.revision=c.current_revision
+		WHERE c.project_id=$1 AND p.owner_user_id=$2 AND c.trashed_at IS NULL
+		ORDER BY c.position
+	`, projectID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer canvasRows.Close()
+	for canvasRows.Next() && len(results) < 100 {
+		var canvasID, canvasTitle string
+		var revision int
+		var content json.RawMessage
+		if err := canvasRows.Scan(&canvasID, &canvasTitle, &revision, &content); err != nil {
+			return nil, err
+		}
+		nodes, err := canvasdocument.SearchableNodes(content)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range nodes {
+			text := node.Text
+			if node.Resource != nil && node.Resource.Kind == "media" {
+				text += "\n" + mediaNames[node.Resource.ID]
+			}
+			haystack := strings.ToLower(canvasTitle + "\n" + node.Title + "\n" + text)
+			count := strings.Count(haystack, lowerQuery)
+			if count == 0 {
+				continue
+			}
+			snippet := searchSnippet(text, lowerQuery)
+			if strings.TrimSpace(snippet) == "" {
+				snippet = node.Title
+			}
+			results = append(results, domain.SearchResult{
+				NodeID: node.NodeID, NodeKind: "canvas", Breadcrumb: canvasTitle + " · " + node.Title,
+				Snippet: snippet, MatchCount: count, Revision: revision, SourceScope: "canvas",
+				CanvasID: canvasID, CanvasNodeID: node.NodeID,
+			})
+			if len(results) == 100 {
+				break
+			}
+		}
+	}
+	return results, canvasRows.Err()
 }
 
 func searchSnippet(text, lowerQuery string) string {

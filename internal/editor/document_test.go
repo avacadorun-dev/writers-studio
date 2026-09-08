@@ -29,7 +29,7 @@ func TestValidateRejectsUnknownNodesAndUnsafeLinks(t *testing.T) {
 		},
 		{
 			name:    "unknown schema version",
-			content: `{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"paragraph"}]}`,
+			content: `{"type":"doc","attrs":{"schemaVersion":5},"content":[{"type":"paragraph"}]}`,
 		},
 		{
 			name:    "unsafe image",
@@ -401,8 +401,261 @@ func TestNormalizeSchemaVersionUpgradesOnlyRichDocuments(t *testing.T) {
 		t.Fatal(err)
 	}
 	version, err = SchemaVersion(normalized)
-	if err != nil || version != CurrentSchemaVersion {
+	if err != nil || version != deepHeadingSchemaVersion {
 		t.Fatalf("deep heading schema version = %d, %v", version, err)
+	}
+
+	formula := json.RawMessage(
+		`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"inlineMath","attrs":{"latex":"E=mc^2","description":"Энергия"}}]},{"type":"mathBlock","attrs":{"latex":"x^2+y^2","description":""}}]}`,
+	)
+	normalized, err = NormalizeSchemaVersion(formula)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version, err = SchemaVersion(normalized)
+	if err != nil || version != mathSchemaVersion {
+		t.Fatalf("formula schema version = %d, %v", version, err)
+	}
+}
+
+func TestFormulaValidationAndPortableRendering(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"paragraph","attrs":{"blockId":"intro"},"content":[{"type":"text","text":"Энергия "},{"type":"inlineMath","attrs":{"latex":"E = mc^2","description":"Энергия равна массе на квадрат скорости света"}}]},{"type":"mathBlock","attrs":{"blockId":"equation","latex":"\\frac{-b \\pm \\sqrt{D}}{2a}","description":"Корни квадратного уравнения"}}]}`)
+	if err := Validate(raw); err != nil {
+		t.Fatalf("formula document rejected: %v", err)
+	}
+	plain, err := PlainText(raw)
+	if err != nil || !strings.Contains(plain, "[Формула: E = mc^2]") || !strings.Contains(plain, "Формула: \\frac") {
+		t.Fatalf("formula plain text = %q, %v", plain, err)
+	}
+	markdown, err := Markdown(raw)
+	if err != nil || !strings.Contains(markdown, "$E = mc^2$") || !strings.Contains(markdown, "$$\n\\frac") {
+		t.Fatalf("formula Markdown = %q, %v", markdown, err)
+	}
+
+	invalid := []json.RawMessage{
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":3},"content":[{"type":"mathBlock","attrs":{"latex":"x"}}]}`),
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"mathBlock","attrs":{"latex":7}}]}`),
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"inlineMath","attrs":{"latex":"x"},"content":[{"type":"text","text":"bad"}]}]}`),
+	}
+	for _, document := range invalid {
+		if !errors.Is(Validate(document), ErrInvalidDocument) {
+			t.Fatalf("invalid formula accepted: %s", document)
+		}
+	}
+}
+
+func TestFencedCodeMigrationPreservesCodeBytesAndLanguage(t *testing.T) {
+	t.Parallel()
+	code := "package main  \r\n\r\nfunc main() {\r\n\tprintln(\"hello\")\r\n}\r\n"
+	legacyText := "````go\r\n" + code + "\r\n````\r\n"
+	parsed, ok := ParseFencedCodeBlock(legacyText)
+	if !ok || parsed.Language != "go" || parsed.Text != code {
+		t.Fatalf("ParseFencedCodeBlock() = %#v, %v", parsed, ok)
+	}
+
+	encodedText, err := json.Marshal(legacyText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":1},"content":[` +
+		`{"type":"paragraph","attrs":{"blockId":"legacy","sourceRefs":["mcp"]},` +
+		`"content":[{"type":"text","text":` + string(encodedText) + `}]}]}`)
+	migrated, err := NormalizeFencedCodeBlocks(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document Node
+	if err := json.Unmarshal(migrated, &document); err != nil {
+		t.Fatal(err)
+	}
+	block := document.Content[0]
+	if block.Type != "codeBlock" || block.Attrs["language"] != "go" ||
+		block.Attrs["blockId"] != "legacy" || block.Content[0].Text != code {
+		t.Fatalf("migrated block changed: %#v", block)
+	}
+	if version, err := SchemaVersion(migrated); err != nil || version != richSchemaVersion {
+		t.Fatalf("migrated schema version = %d, %v", version, err)
+	}
+}
+
+func TestFencedCodeParserRejectsPartialOrMalformedFences(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{
+		"```go\nmissing closing fence",
+		"``go\ncode\n``",
+		"```bad/language\ncode\n```",
+		"```go\ncode\n~~~",
+		"text before\n```go\ncode\n```",
+	} {
+		if parsed, ok := ParseFencedCodeBlock(value); ok {
+			t.Fatalf("malformed fence %q parsed as %#v", value, parsed)
+		}
+	}
+	plain := json.RawMessage(`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"not code"}]}]}`)
+	unchanged, err := NormalizeFencedCodeBlocks(plain)
+	if err != nil || string(unchanged) != string(plain) {
+		t.Fatalf("plain document changed: %s, %v", unchanged, err)
+	}
+}
+
+func TestFencedCodeMigrationHandlesEmptyAndAlreadyRichDocuments(t *testing.T) {
+	t.Parallel()
+	if _, err := NormalizeFencedCodeBlocks(json.RawMessage(`{`)); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("malformed JSON error = %v", err)
+	}
+	if _, err := NormalizeFencedCodeBlocks(json.RawMessage(`{"type":"paragraph"}`)); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("non-document root error = %v", err)
+	}
+
+	emptyFence := json.RawMessage(`{
+		"type":"doc","content":[
+			{"type":"heading","attrs":{"level":2}},
+			{"type":"paragraph","content":[{"type":"text","text":"` + "```\\n```" + `"}]}
+		]
+	}`)
+	migrated, err := NormalizeFencedCodeBlocks(emptyFence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document Node
+	if err := json.Unmarshal(migrated, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Content[1].Type != "codeBlock" || len(document.Content[1].Content) != 0 ||
+		document.Attrs["schemaVersion"] != float64(2) {
+		t.Fatalf("empty fence migration = %#v", document)
+	}
+
+	rich := json.RawMessage(`{
+		"type":"doc","attrs":{"schemaVersion":2},"content":[
+			{"type":"paragraph","content":[{"type":"text","text":"` + "```go\\ncode\\n```" + `"}]}
+		]
+	}`)
+	migrated, err = NormalizeFencedCodeBlocks(rich)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version, err := SchemaVersion(migrated); err != nil || version != 2 {
+		t.Fatalf("rich migration version = %d, %v", version, err)
+	}
+}
+
+func TestMarkdownUsesSafeFenceWithoutChangingCodeWhitespace(t *testing.T) {
+	t.Parallel()
+	code := "before ``` middle ```` after\n\tindented  \n"
+	raw, err := json.Marshal(Node{
+		Type: "doc", Attrs: map[string]any{"schemaVersion": 2},
+		Content: []Node{{
+			Type: "codeBlock", Attrs: map[string]any{"language": "go"},
+			Content: []Node{{Type: "text", Text: code}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown, err := Markdown(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(markdown, "`````go\n") ||
+		!strings.Contains(markdown, code+"\n`````") {
+		t.Fatalf("unsafe or lossy fenced Markdown: %q", markdown)
+	}
+}
+
+func TestInlineCodeMigrationPreservesMarksAndLiteralWhitespace(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{
+		"type":"doc","attrs":{"schemaVersion":1},"content":[
+			{"type":"paragraph","content":[
+				{"type":"text","text":"Команды: ` + "`go run`" + `, ` + "``fmt `raw`  ``" + ` и ` + "`go test`" + `.","marks":[{"type":"bold"}]}
+			]},
+			{"type":"callout","attrs":{"kind":"info"},"content":[
+				{"type":"paragraph","content":[{"type":"text","text":"Путь ` + "`a  b\\t c`" + `"}]}
+			]},
+			{"type":"codeBlock","content":[{"type":"text","text":"` + "`println`" + `"}]},
+			{"type":"paragraph","content":[
+				{"type":"text","text":"` + "`already marked`" + `","marks":[{"type":"code"}]},
+				{"type":"text","text":" and ` + "`unclosed" + `"}
+			]}
+		]
+	}`)
+	normalized, err := NormalizeInlineCodeMarks(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document Node
+	if err := json.Unmarshal(normalized, &document); err != nil {
+		t.Fatal(err)
+	}
+	if version, err := SchemaVersion(normalized); err != nil || version != richSchemaVersion {
+		t.Fatalf("inline code schema version = %d, %v", version, err)
+	}
+	first := document.Content[0].Content
+	if len(first) != 7 || first[1].Text != "go run" || first[3].Text != "fmt `raw`  " ||
+		first[5].Text != "go test" {
+		t.Fatalf("inline code split = %#v", first)
+	}
+	for _, index := range []int{1, 3, 5} {
+		if !hasMark(first[index].Marks, "bold") || !hasMark(first[index].Marks, "code") {
+			t.Fatalf("inline code marks at %d = %#v", index, first[index].Marks)
+		}
+	}
+	calloutText := document.Content[1].Content[0].Content
+	if len(calloutText) != 2 || calloutText[1].Text != "a  b\t c" ||
+		!hasMark(calloutText[1].Marks, "code") {
+		t.Fatalf("nested inline code = %#v", calloutText)
+	}
+	if got := document.Content[2].Content[0].Text; got != "`println`" {
+		t.Fatalf("native code block was changed: %q", got)
+	}
+	if got := document.Content[3].Content; len(got) != 2 || got[0].Text != "`already marked`" ||
+		got[1].Text != " and `unclosed" {
+		t.Fatalf("marked or unmatched text changed: %#v", got)
+	}
+}
+
+func TestInlineCodeParserAndMarkdownUseSafeMatchingDelimiters(t *testing.T) {
+	t.Parallel()
+	nodes, changed := ParseInlineCodeNodes("before ``a ` b`` after", nil)
+	if !changed || len(nodes) != 3 || nodes[1].Text != "a ` b" || !hasMark(nodes[1].Marks, "code") {
+		t.Fatalf("ParseInlineCodeNodes() = %#v, %v", nodes, changed)
+	}
+	unmatched, changed := ParseInlineCodeNodes("before `missing", nil)
+	if changed || len(unmatched) != 1 || unmatched[0].Text != "before `missing" {
+		t.Fatalf("unmatched inline code changed: %#v, %v", unmatched, changed)
+	}
+	raw, err := json.Marshal(Node{
+		Type: "doc", Attrs: map[string]any{"schemaVersion": 2},
+		Content: []Node{{Type: "paragraph", Content: []Node{{
+			Type: "text", Text: "a ` b", Marks: []Mark{{Type: "code"}},
+		}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown, err := Markdown(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if markdown != "``a ` b``" {
+		t.Fatalf("inline Markdown delimiter = %q", markdown)
+	}
+}
+
+func TestInlineCodeMigrationRejectsInvalidDocumentsAndKeepsPlainContentStable(t *testing.T) {
+	t.Parallel()
+	if _, err := NormalizeInlineCodeMarks(json.RawMessage(`{`)); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("malformed JSON error = %v", err)
+	}
+	if _, err := NormalizeInlineCodeMarks(json.RawMessage(`{"type":"paragraph"}`)); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("non-document root error = %v", err)
+	}
+	plain := json.RawMessage(`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"обычный текст"}]}]}`)
+	unchanged, err := NormalizeInlineCodeMarks(plain)
+	if err != nil || string(unchanged) != string(plain) {
+		t.Fatalf("plain content changed: %s, %v", unchanged, err)
 	}
 }
 

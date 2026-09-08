@@ -15,6 +15,7 @@ import "@fontsource/sofia-sans/400-italic.css";
 import "@fontsource/sofia-sans/500.css";
 import "@fontsource/sofia-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
+import "katex/dist/katex.min.css";
 import "./shared/styles/globals.css";
 
 import { createRouter, RouterProvider } from "@tanstack/react-router";

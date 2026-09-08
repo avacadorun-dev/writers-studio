@@ -173,7 +173,9 @@ func (s *Store) CreateExport(
 			}
 			mediaRows, err := tx.Query(ctx, `
 				SELECT id::text, media_type, storage_key, original_name, source_path, sha256, width, height
-				FROM project_media WHERE project_id=$1 AND owner_user_id=$2 AND id=ANY($3::uuid[])
+				FROM project_media
+				WHERE project_id=$1 AND owner_user_id=$2 AND id=ANY($3::uuid[])
+					AND media_type LIKE 'image/%'
 			`, projectID, ownerID, ids)
 			if err != nil {
 				return err
@@ -262,7 +264,7 @@ func buildMarkdownTreeSnapshot(
 		SELECT id::text, media_type, storage_key, original_name, source_path,
 			sha256, width, height
 		FROM project_media
-		WHERE project_id=$1 AND owner_user_id=$2
+		WHERE project_id=$1 AND owner_user_id=$2 AND media_type LIKE 'image/%'
 		ORDER BY created_at, id
 	`, projectID, ownerID)
 	if err != nil {

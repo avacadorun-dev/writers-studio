@@ -794,22 +794,26 @@ func insertAssistantRun(
 	}
 	err = query.QueryRow(ctx, `
 		INSERT INTO assistant_runs(
-			id, owner_user_id, project_id, title, target_kind, target_node_id, input_mode,
+			id, owner_user_id, project_id, title, target_kind, target_node_id, target_canvas_id, input_mode,
 			status, silence_checkpoint_ms, provider_kind, provider_connection_id,
 			provider_name, model, dialect, capability_snapshot, guide_revision, read_context,
 			origin, mcp_grant_id, mcp_client_name
 		)
 		SELECT
 			$1, p.owner_user_id, p.id, $4, $5, $6, $7, $8, $9, $10, $11,
-			$12, $13, $14, $15, $16, $17, $18, $19, $20
+			$12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 		FROM projects p
 		WHERE p.id=$2 AND p.owner_user_id=$3 AND p.status <> 'trash'
 			AND (
 				$5 = 'project'
-				OR EXISTS(
+				OR ($5 = 'node' AND EXISTS(
 					SELECT 1 FROM document_nodes n
 					WHERE n.id=$6 AND n.project_id=p.id AND n.trashed_at IS NULL
-				)
+				))
+				OR ($5 = 'canvas' AND EXISTS(
+					SELECT 1 FROM canvases c
+					WHERE c.id=$7 AND c.project_id=p.id AND c.trashed_at IS NULL
+				))
 			)
 		RETURNING started_at, updated_at, last_viewed_at
 	`,
@@ -819,6 +823,7 @@ func insertAssistantRun(
 		run.Title,
 		run.TargetKind,
 		run.TargetNodeID,
+		run.TargetCanvasID,
 		run.InputMode,
 		run.Status,
 		run.SilenceCheckpointMS,
@@ -894,7 +899,7 @@ func (s *Store) GetAssistantRun(
 	err := s.Pool.QueryRow(ctx, `
 		SELECT
 			r.id, r.owner_user_id, r.project_id, r.title, r.target_kind, r.target_node_id,
-			r.input_mode, r.status, r.silence_checkpoint_ms, r.provider_kind,
+			r.target_canvas_id, r.input_mode, r.status, r.silence_checkpoint_ms, r.provider_kind,
 			r.provider_connection_id, r.provider_name, r.model, r.dialect,
 			r.capability_snapshot, r.guide_revision, r.read_context, r.error_code,
 			r.started_at, r.updated_at, r.last_viewed_at, r.origin,
@@ -914,6 +919,7 @@ func (s *Store) GetAssistantRun(
 		&run.Title,
 		&run.TargetKind,
 		&run.TargetNodeID,
+		&run.TargetCanvasID,
 		&run.InputMode,
 		&run.Status,
 		&run.SilenceCheckpointMS,

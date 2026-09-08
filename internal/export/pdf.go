@@ -22,15 +22,7 @@ import (
 var ErrPDFRendererUnavailable = errors.New("pdf renderer unavailable")
 
 func renderPDF(ctx context.Context, snapshot Snapshot, assets map[string][]byte, configuredPath string) ([]byte, error) {
-	chromiumPath := strings.TrimSpace(configuredPath)
-	if chromiumPath == "" {
-		for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable"} {
-			if resolved, err := exec.LookPath(candidate); err == nil {
-				chromiumPath = resolved
-				break
-			}
-		}
-	}
+	chromiumPath := resolveChromiumPath(configuredPath)
 	if chromiumPath == "" {
 		return nil, ErrPDFRendererUnavailable
 	}
@@ -102,6 +94,19 @@ func renderPDF(ctx context.Context, snapshot Snapshot, assets map[string][]byte,
 	return finalizePDF(data, snapshot)
 }
 
+func resolveChromiumPath(configuredPath string) string {
+	chromiumPath := strings.TrimSpace(configuredPath)
+	if chromiumPath != "" {
+		return chromiumPath
+	}
+	for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable"} {
+		if resolved, err := exec.LookPath(candidate); err == nil {
+			return resolved
+		}
+	}
+	return ""
+}
+
 // Network.setBlockedURLs used a wildcard `urls` array before the URLPattern
 // variant was introduced. The runtime image deliberately pins an older,
 // security-supported Chromium, while the generated CDP client tracks tip-of-
@@ -139,13 +144,14 @@ func finalizePDF(data []byte, snapshot Snapshot) ([]byte, error) {
 }
 
 func renderPrintHTML(snapshot Snapshot, publication publication, resolveImage imageResolver, assets map[string][]byte) string {
+	var coverPage strings.Builder
 	var body strings.Builder
 	cover := ""
 	if snapshot.Profile.Metadata.CoverAssetID != nil {
 		cover = resolveImage(*snapshot.Profile.Metadata.CoverAssetID)
 	}
 	if cover != "" {
-		body.WriteString(`<section class="title-page"><img class="cover" src="` + cover + `" alt="Обложка"/></section>`)
+		coverPage.WriteString(`<section class="cover-page"><img class="cover" src="` + cover + `" alt="Обложка"/></section>`)
 	}
 	if snapshot.Profile.TitlePage {
 		body.WriteString(`<section class="title-page"><h1>` + html.EscapeString(publication.Title) + `</h1><p class="subtitle">` + html.EscapeString(publication.Subtitle) + `</p><p class="author">` + html.EscapeString(publication.Author) + `</p></section>`)
@@ -167,5 +173,5 @@ func renderPrintHTML(snapshot Snapshot, publication publication, resolveImage im
 		}
 		body.WriteString(section.HTML + "</section>")
 	}
-	return `<!doctype html><html lang="` + html.EscapeString(publication.Language) + `"><head><meta charset="utf-8"><meta name="author" content="` + html.EscapeString(publication.Author) + `"><title>` + html.EscapeString(publication.Title) + `</title><style>` + publicationCSS(snapshot, assets, "data") + `</style></head><body><main>` + body.String() + `</main></body></html>`
+	return `<!doctype html><html lang="` + html.EscapeString(publication.Language) + `"><head><meta charset="utf-8"><meta name="author" content="` + html.EscapeString(publication.Author) + `"><title>` + html.EscapeString(publication.Title) + `</title><style>` + publicationCSS(snapshot, assets, "data") + `</style></head><body>` + coverPage.String() + `<main>` + body.String() + `</main></body></html>`
 }
