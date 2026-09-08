@@ -27,9 +27,12 @@ import {
   type EditorFontFamily,
   type EditorFontSize,
   type EditorLineHeight,
+  type EditorListItemSpacing,
   type EditorManuscriptWidth,
+  type EditorParagraphSpacing,
   type EditorStyle,
   type EditorTheme,
+  type EditorToolbarMode,
   loadWriterPreferences,
   saveWriterPreferences,
   type WriterPreferences,
@@ -448,6 +451,36 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       <option value={2}>2 — свободный</option>
                     </Select>
                   </Field>
+                  <Field label="Интервал между абзацами">
+                    <Select
+                      value={preferences.paragraphSpacing}
+                      onChange={(event) =>
+                        setPreferences((current) => ({
+                          ...current,
+                          paragraphSpacing: Number(event.target.value) as EditorParagraphSpacing,
+                        }))
+                      }
+                    >
+                      <option value={0.65}>0,65 em — плотный</option>
+                      <option value={0.9}>0,9 em — обычный</option>
+                      <option value={1.1}>1,1 em — свободный</option>
+                    </Select>
+                  </Field>
+                  <Field label="Интервал элементов списка">
+                    <Select
+                      value={preferences.listItemSpacing}
+                      onChange={(event) =>
+                        setPreferences((current) => ({
+                          ...current,
+                          listItemSpacing: Number(event.target.value) as EditorListItemSpacing,
+                        }))
+                      }
+                    >
+                      <option value={0}>Без дополнительного интервала</option>
+                      <option value={0.25}>0,25 em — обычный</option>
+                      <option value={0.5}>0,5 em — свободный</option>
+                    </Select>
+                  </Field>
                   <Field label="Ширина рукописи">
                     <Select
                       value={preferences.manuscriptWidth}
@@ -461,6 +494,24 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       <option value={60}>60 знаков — узкая</option>
                       <option value={70}>70 знаков — обычная</option>
                       <option value={80}>80 знаков — широкая</option>
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Панель форматирования"
+                    hint="Авто раскрывает основные действия, когда редактору хватает ширины."
+                  >
+                    <Select
+                      value={preferences.toolbarMode}
+                      onChange={(event) =>
+                        setPreferences((current) => ({
+                          ...current,
+                          toolbarMode: event.target.value as EditorToolbarMode,
+                        }))
+                      }
+                    >
+                      <option value="auto">Авто</option>
+                      <option value="expanded">Расширенная</option>
+                      <option value="compact">Компактная</option>
                     </Select>
                   </Field>
                   <Field label="Тема">

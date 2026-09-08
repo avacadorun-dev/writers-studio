@@ -124,6 +124,14 @@ func renderPublicationNode(output *strings.Builder, node editor.Node, resolveIma
 		output.WriteString("</li>")
 	case "hardBreak":
 		output.WriteString("<br />")
+	case "inlineMath":
+		latex, _ := node.Attrs["latex"].(string)
+		description, _ := node.Attrs["description"].(string)
+		label := description
+		if strings.TrimSpace(label) == "" {
+			label = "Формула: " + latex
+		}
+		output.WriteString(`<span class="inline-math-source" role="math" aria-label="` + html.EscapeString(label) + `">$` + html.EscapeString(latex) + `$</span>`)
 	case "horizontalRule":
 		output.WriteString("<hr />")
 	case "sceneBreak":
@@ -175,6 +183,14 @@ func renderPublicationNode(output *strings.Builder, node editor.Node, resolveIma
 		if caption != "" {
 			output.WriteString(`<p class="diagram-caption">` + html.EscapeString(caption) + `</p>`)
 		}
+	case "mathBlock":
+		latex, _ := node.Attrs["latex"].(string)
+		description, _ := node.Attrs["description"].(string)
+		label := description
+		if strings.TrimSpace(label) == "" {
+			label = "Формула: " + latex
+		}
+		output.WriteString(`<figure class="math-source" role="math" aria-label="` + html.EscapeString(label) + `"><pre>$$\n` + html.EscapeString(latex) + `\n$$</pre></figure>`)
 	default:
 		children()
 	}

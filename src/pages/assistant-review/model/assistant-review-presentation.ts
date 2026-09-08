@@ -1,4 +1,33 @@
-import type { AssistantChangeOperation, AssistantResolvedTarget } from "~entities/assistant";
+import type {
+  AssistantChangeOperation,
+  AssistantChangeSet,
+  AssistantResolvedTarget,
+} from "~entities/assistant";
+
+export type ReviewPrimaryAction = "apply" | "send-feedback" | "undo" | "return";
+
+export function reviewStatusLabel(state: AssistantChangeSet["state"]): string {
+  return {
+    staged: "Не применено",
+    applied: "Применено",
+    rejected: "Отклонено",
+    stale: "Устарело",
+    failed: "Ошибка",
+    undone: "Отменено",
+  }[state];
+}
+
+export function reviewPrimaryAction(
+  state: AssistantChangeSet["state"],
+  requestingChanges: boolean,
+): { action: ReviewPrimaryAction; label: string } {
+  if (state === "staged" && requestingChanges) {
+    return { action: "send-feedback", label: "Отправить замечания" };
+  }
+  if (state === "staged") return { action: "apply", label: "Применить изменения" };
+  if (state === "applied") return { action: "undo", label: "Отменить набор" };
+  return { action: "return", label: "Вернуться" };
+}
 
 const groupLabels: Record<string, string> = {
   document: "Текст и структура",

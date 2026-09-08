@@ -22,6 +22,7 @@ var (
 		"hardBreak": true, "horizontalRule": true, "sceneBreak": true, "text": true,
 		"codeBlock": true, "table": true, "tableRow": true, "tableHeader": true,
 		"tableCell": true, "imageBlock": true, "mermaidBlock": true, "callout": true,
+		"inlineMath": true, "mathBlock": true,
 	}
 	allowedMarks = map[string]bool{
 		"italic": true, "bold": true, "underline": true, "strike": true, "link": true,
@@ -31,8 +32,10 @@ var (
 	uuidPattern         = regexp.MustCompile(`^[a-fA-F0-9-]{36}$`)
 )
 
-const CurrentSchemaVersion = 3
+const CurrentSchemaVersion = 4
 const richSchemaVersion = 2
+const deepHeadingSchemaVersion = 3
+const mathSchemaVersion = 4
 
 type Node struct {
 	Type    string         `json:"type"`
@@ -107,10 +110,25 @@ func Validate(raw json.RawMessage) error {
 	if version < richSchemaVersion && requiresRichSchema(root) {
 		return fmt.Errorf("%w: rich blocks require schema version %d", ErrInvalidDocument, richSchemaVersion)
 	}
-	if version < CurrentSchemaVersion && requiresDeepHeadingSchema(root) {
-		return fmt.Errorf("%w: headings 4..6 require schema version %d", ErrInvalidDocument, CurrentSchemaVersion)
+	if version < deepHeadingSchemaVersion && requiresDeepHeadingSchema(root) {
+		return fmt.Errorf("%w: headings 4..6 require schema version %d", ErrInvalidDocument, deepHeadingSchemaVersion)
+	}
+	if version < mathSchemaVersion && requiresMathSchema(root) {
+		return fmt.Errorf("%w: formulas require schema version %d", ErrInvalidDocument, mathSchemaVersion)
 	}
 	return validateNode(root, true)
+}
+
+func requiresMathSchema(node Node) bool {
+	if node.Type == "inlineMath" || node.Type == "mathBlock" {
+		return true
+	}
+	for _, child := range node.Content {
+		if requiresMathSchema(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func requiresDeepHeadingSchema(node Node) bool {
@@ -163,8 +181,8 @@ func SchemaVersion(raw json.RawMessage) (int, error) {
 	return version, nil
 }
 
-// NormalizeSchemaVersion upgrades only documents that use rich blocks or deep
-// headings. Plain schema-v1 documents are returned unchanged so opening or
+// NormalizeSchemaVersion upgrades only documents that use rich blocks, deep
+// headings or formulas. Plain schema-v1 documents are returned unchanged so opening or
 // editing an existing project does not perform a bulk format conversion.
 func NormalizeSchemaVersion(raw json.RawMessage) (json.RawMessage, error) {
 	var root Node
@@ -179,9 +197,13 @@ func NormalizeSchemaVersion(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, err
 	}
 	targetVersion := version
-	if requiresDeepHeadingSchema(root) && targetVersion < CurrentSchemaVersion {
-		targetVersion = CurrentSchemaVersion
-	} else if requiresRichSchema(root) && targetVersion < richSchemaVersion {
+	if requiresMathSchema(root) && targetVersion < mathSchemaVersion {
+		targetVersion = mathSchemaVersion
+	}
+	if requiresDeepHeadingSchema(root) && targetVersion < deepHeadingSchemaVersion {
+		targetVersion = deepHeadingSchemaVersion
+	}
+	if requiresRichSchema(root) && targetVersion < richSchemaVersion {
 		targetVersion = richSchemaVersion
 	}
 	if targetVersion == version {
@@ -510,6 +532,14 @@ func validateNode(node Node, root bool) error {
 			return fmt.Errorf("%w: invalid Mermaid block", ErrInvalidDocument)
 		}
 	}
+	if node.Type == "inlineMath" || node.Type == "mathBlock" {
+		latex, latexOK := optionalStringAttr(node.Attrs, "latex")
+		description, descriptionOK := optionalStringAttr(node.Attrs, "description")
+		if !latexOK || attributeHasNonStringValue(node.Attrs, "description", descriptionOK) ||
+			len(latex) > 10_000 || len(description) > 1_000 || len(node.Content) > 0 {
+			return fmt.Errorf("%w: invalid formula", ErrInvalidDocument)
+		}
+	}
 	if node.Type == "tableCell" || node.Type == "tableHeader" {
 		for _, attribute := range []string{"colspan", "rowspan"} {
 			if value, exists := node.Attrs[attribute]; exists {
@@ -633,6 +663,8 @@ func appendInlineText(builder *strings.Builder, node Node) {
 		builder.WriteString(node.Text)
 	case "hardBreak":
 		builder.WriteByte('\n')
+	case "inlineMath":
+		builder.WriteString("[Формула: " + stringAttr(node.Attrs, "latex") + "]")
 	}
 	for _, child := range node.Content {
 		appendInlineText(builder, child)
@@ -700,6 +732,8 @@ func appendText(builder *strings.Builder, node Node) {
 		builder.WriteString(node.Text)
 	case "hardBreak":
 		builder.WriteByte('\n')
+	case "inlineMath":
+		builder.WriteString("[Формула: " + stringAttr(node.Attrs, "latex") + "]")
 	case "sceneBreak":
 		builder.WriteString("\n\n* * *\n\n")
 	case "horizontalRule":
@@ -717,6 +751,8 @@ func appendText(builder *strings.Builder, node Node) {
 			builder.WriteByte('\n')
 		}
 		builder.WriteString(stringAttr(node.Attrs, "code"))
+	case "mathBlock":
+		builder.WriteString("Формула: " + stringAttr(node.Attrs, "latex"))
 	}
 	for _, child := range node.Content {
 		appendText(builder, child)
@@ -727,7 +763,7 @@ func appendText(builder *strings.Builder, node Node) {
 	case "tableRow":
 		builder.WriteByte('\n')
 	case "paragraph", "heading", "blockquote", "listItem", "codeBlock", "callout", "table",
-		"imageBlock", "mermaidBlock":
+		"imageBlock", "mermaidBlock", "mathBlock":
 		builder.WriteString("\n\n")
 	}
 }
@@ -829,6 +865,8 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 			}
 		}
 		builder.WriteString(text)
+	case "inlineMath":
+		builder.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
 	case "heading":
 		level, _ := numericAttr(node.Attrs["level"])
 		builder.WriteString(strings.Repeat("#", max(1, level)))
@@ -867,6 +905,9 @@ func appendMarkdown(builder *strings.Builder, node Node) {
 			builder.WriteString("\n*" + caption + "*\n")
 		}
 		builder.WriteByte('\n')
+		return
+	case "mathBlock":
+		builder.WriteString("$$\n" + stringAttr(node.Attrs, "latex") + "\n$$\n\n")
 		return
 	case "table":
 		appendMarkdownTable(builder, node)

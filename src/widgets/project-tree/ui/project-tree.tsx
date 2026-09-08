@@ -57,7 +57,14 @@ import {
   Upload,
   Workflow,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { createCanvas, importCanvas, listCanvases, restoreCanvas } from "~entities/canvas";
 import {
@@ -71,7 +78,7 @@ import {
   trashNode,
   updateNode,
 } from "~entities/project";
-import { cn } from "~shared/lib";
+import { cn, maximumNodeTitleLength, normalizeNodeTitle } from "~shared/lib";
 import {
   Button,
   DropdownMenu,
@@ -254,7 +261,15 @@ export function ProjectTree({
   const outline = useMemo(() => buildProjectOutline(nodes), [nodes]);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(() => new Set());
   const [treeScrollTop, setTreeScrollTop] = useState(0);
+  const [renamingNodeId, setRenamingNodeId] = useState<string>();
+  const [renameDraft, setRenameDraft] = useState("");
   const treeViewportRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!renamingNodeId) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [renamingNodeId]);
   useEffect(() => {
     const byId = new Map(contentNodes.map((node) => [node.id, node]));
     const expanded = new Set<string>();
@@ -377,12 +392,48 @@ export function ProjectTree({
       }),
   });
   const updateMutation = useMutation({
-    mutationFn: (input: { title?: string; status?: DocumentNode["status"] }) =>
-      updateNode(activeNodeId, input),
-    onSuccess: async () => {
+    mutationFn: (input: { nodeId: string; title?: string; status?: DocumentNode["status"] }) =>
+      updateNode(input.nodeId, { title: input.title, status: input.status }),
+    onMutate: async (input) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["project", projectId] }),
+        queryClient.cancelQueries({ queryKey: ["node", input.nodeId] }),
+      ]);
+      const previousProject = queryClient.getQueryData<ProjectWorkspace>(["project", projectId]);
+      const previousNode = queryClient.getQueryData<{ node: DocumentNode }>(["node", input.nodeId]);
+      queryClient.setQueryData<ProjectWorkspace>(["project", projectId], (current) =>
+        current
+          ? {
+              ...current,
+              nodes: current.nodes.map((node) =>
+                node.id === input.nodeId ? { ...node, ...input } : node,
+              ),
+            }
+          : current,
+      );
+      queryClient.setQueryData<{ node: DocumentNode }>(["node", input.nodeId], (current) =>
+        current ? { ...current, node: { ...current.node, ...input } } : current,
+      );
+      return { previousProject, previousNode };
+    },
+    onSuccess: async (_result, input) => {
       setActionsOpen(false);
-      await invalidate();
-      showToast({ title: "Свойства сохранены" });
+      setRenamingNodeId(undefined);
+      await Promise.all([
+        invalidate(),
+        queryClient.invalidateQueries({ queryKey: ["node", input.nodeId] }),
+      ]);
+      showToast({ title: input.title ? "Название сохранено" : "Свойства сохранены" });
+    },
+    onError: (error, input, context) => {
+      if (context?.previousProject) {
+        queryClient.setQueryData(["project", projectId], context.previousProject);
+      }
+      if (context?.previousNode) {
+        queryClient.setQueryData(["node", input.nodeId], context.previousNode);
+      }
+      setRenamingNodeId(undefined);
+      showToast({ title: "Не удалось переименовать", description: error.message });
     },
   });
   const duplicateMutation = useMutation({
@@ -586,6 +637,19 @@ export function ProjectTree({
     const canAcceptDrop =
       Boolean(draggedNodeId) &&
       canMoveNodeToParent(contentNodes, draggedNodeId ?? "", node.id, structure);
+    const startRename = () => {
+      setRenamingNodeId(node.id);
+      setRenameDraft(node.title);
+    };
+    const finishRename = () => {
+      const title = normalizeNodeTitle(renameDraft, node.title);
+      if (!title) {
+        setRenamingNodeId(undefined);
+        setRenameDraft("");
+        return;
+      }
+      updateMutation.mutate({ nodeId: node.id, title });
+    };
     return (
       <div key={node.id}>
         <SortableTreeRow
@@ -601,6 +665,11 @@ export function ProjectTree({
             dropTargetId === node.id && "outline-2 outline-offset-[-2px] outline-[var(--accent)]",
           )}
           paddingLeft={Math.min(depth, 5) * 14 + 2}
+          onKeyDown={(event) => {
+            if (event.key !== "F2" || !documentIsActive) return;
+            event.preventDefault();
+            startRename();
+          }}
         >
           {children.length > 0 ? (
             <UiTooltip
@@ -639,22 +708,53 @@ export function ProjectTree({
           ) : (
             <span className="block size-6 shrink-0" />
           )}
-          <Link
-            to="/projects/$projectId/studio/$nodeId"
-            params={{ projectId, nodeId: node.id }}
-            className="flex min-w-0 flex-1 items-center gap-2 py-2"
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = "copy";
-              event.dataTransfer.setData(
-                "application/x-writers-studio-document",
-                JSON.stringify({ nodeId: node.id }),
-              );
-            }}
-          >
-            <Icon className="size-4 shrink-0" aria-hidden="true" />
-            <span className="truncate">{node.title}</span>
-          </Link>
+          {renamingNodeId === node.id ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2 py-1">
+              <Icon className="size-4 shrink-0" aria-hidden="true" />
+              <input
+                ref={renameInputRef}
+                value={renameDraft}
+                maxLength={maximumNodeTitleLength}
+                aria-label={`Новое название для «${node.title}»`}
+                className="h-7 min-w-0 flex-1 rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-1.5 text-[13px] outline-none"
+                onFocus={(event) => event.currentTarget.select()}
+                onChange={(event) => setRenameDraft(event.target.value)}
+                onBlur={finishRename}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    finishRename();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    setRenamingNodeId(undefined);
+                    setRenameDraft("");
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <Link
+              to="/projects/$projectId/studio/$nodeId"
+              params={{ projectId, nodeId: node.id }}
+              className="flex min-w-0 flex-1 items-center gap-2 py-2"
+              draggable
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                startRename();
+              }}
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "copy";
+                event.dataTransfer.setData(
+                  "application/x-writers-studio-document",
+                  JSON.stringify({ nodeId: node.id }),
+                );
+              }}
+            >
+              <Icon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{node.title}</span>
+            </Link>
+          )}
           {(nodeType?.allowedChildren?.length ?? 0) > 0 ? (
             <UiTooltip content={`Добавить внутрь «${node.title}»`} side="right">
               <button
@@ -669,6 +769,28 @@ export function ProjectTree({
           ) : (
             <span className="mr-1 block size-7 shrink-0" aria-hidden="true" />
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "mr-0.5 grid size-7 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)] focus:opacity-100 focus-visible:outline-2",
+                  documentIsActive
+                    ? "opacity-100"
+                    : "opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100",
+                )}
+                aria-label={`Действия с «${node.title}»`}
+              >
+                <MoreHorizontal className="size-3.5" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={startRename}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Переименовать
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DocumentStatusMark status={node.status} />
         </SortableTreeRow>
       </div>
@@ -781,7 +903,8 @@ export function ProjectTree({
                         icon: Pencil,
                         confirmLabel: "Сохранить",
                       }).then((title) => {
-                        if (title?.trim()) updateMutation.mutate({ title: title.trim() });
+                        if (title?.trim())
+                          updateMutation.mutate({ nodeId: activeNode.id, title: title.trim() });
                       })
                     }
                   />
@@ -805,6 +928,7 @@ export function ProjectTree({
                       }).then((status) => {
                         if (status)
                           updateMutation.mutate({
+                            nodeId: activeNode.id,
                             status: status as DocumentNode["status"],
                           });
                       })
@@ -1016,6 +1140,7 @@ function SortableTreeRow({
   className,
   paddingLeft,
   children,
+  onKeyDown,
 }: {
   id: string;
   title: string;
@@ -1027,6 +1152,7 @@ function SortableTreeRow({
   className?: string;
   paddingLeft: number;
   children: ReactNode;
+  onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }) {
   const {
     attributes,
@@ -1056,6 +1182,7 @@ function SortableTreeRow({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
+      onKeyDown={onKeyDown}
     >
       {children}
       <button

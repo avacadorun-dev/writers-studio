@@ -115,7 +115,7 @@ test("assistant stages an exact diff, applies it, and undoes the grouped change"
   expect(reviewBounds?.height).toBeLessThan(
     page.viewportSize()?.height ?? Number.POSITIVE_INFINITY,
   );
-  await expect(review.getByText("Пока ничего не изменено")).toBeVisible();
+  await expect(review.getByText("Не применено", { exact: true })).toBeVisible();
   await expect(review.getByText("слабое голубое сияние", { exact: true })).toBeVisible();
   await expect(review.getByText("ровное янтарное свечение", { exact: true })).toBeVisible();
   expect(await nodePlainText(page, nodeId)).toBe(original);
@@ -124,7 +124,9 @@ test("assistant stages an exact diff, applies it, and undoes the grouped change"
   await expect(
     review.getByRole("textbox", { name: "Что нужно исправить в предложении?" }),
   ).toBeVisible();
-  await expect(review.getByRole("button", { name: "Отправить", exact: true })).toBeVisible();
+  await expect(
+    review.getByRole("button", { name: "Отправить замечания", exact: true }),
+  ).toBeVisible();
   await expect(review.getByRole("button", { name: "Применить изменения" })).toBeHidden();
   await review.getByRole("button", { name: "Отмена" }).click();
   await expect(review.getByRole("button", { name: "Применить изменения" })).toBeVisible();
@@ -137,12 +139,12 @@ test("assistant stages an exact diff, applies it, and undoes the grouped change"
   await expect(manuscript).toContainText("ровное янтарное свечение");
   await expect(manuscript).not.toContainText("слабое голубое сияние");
 
-  await review.getByRole("button", { name: "Мгновенно отменить весь набор" }).click();
+  await review.getByRole("button", { name: "Отменить набор" }).click();
   await expect(review.getByText("Отменено", { exact: true })).toBeVisible();
   await expect.poll(() => nodePlainText(page, nodeId)).toBe(original);
   await expect(manuscript).toContainText("слабое голубое сияние");
 
-  await review.getByRole("button", { name: "Вернуться в Studio" }).click();
+  await review.getByRole("button", { name: "Вернуться" }).click();
   await expect(review).toBeHidden();
   const currentRevision = await nodeRevision(page, nodeId);
   await page.getByRole("textbox", { name: "Поручение ассистенту" }).fill(

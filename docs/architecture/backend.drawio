@@ -1,0 +1,482 @@
+<mxfile host="app.diagrams.net" agent="soba" version="24.7.17" type="device">
+  <diagram id="backend-overview" name="Backend Overview">
+    <mxGraphModel dx="1600" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Writer's Studio — Backend (Go Modular Monolith)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=20;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="720" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Один процесс: HTTP API + WebSocket gateway + background worker&#xa;Источник: cmd/server, internal/httpapi, ARC42 §3–5" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=12;fontColor=#6B7280;" vertex="1" parent="1">
+          <mxGeometry x="40" y="56" width="640" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Clients -->
+        <mxCell id="clients" value="Clients" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#F3F4F6;strokeColor=#9CA3AF;fontStyle=1;fontSize=13;startSize=28;rounded=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="180" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" value="React PWA&#xa;Recorder · Editor&#xa;Assistant workspace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontColor=#1E3A8A;fontSize=12;align=center;" vertex="1" parent="clients">
+          <mxGeometry x="48" y="40" width="116" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp_client" value="Remote MCP client&#xa;(LAN/VPN)&#xa;Bearer / OAuth PKCE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontColor=#312E81;fontSize=11;align=center;" vertex="1" parent="clients">
+          <mxGeometry x="48" y="160" width="116" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="static_note" value="SPA static&#xa;served by Go&#xa;on /" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9FAFB;strokeColor=#D1D5DB;fontColor=#4B5563;fontSize=11;align=center;dashed=1;" vertex="1" parent="clients">
+          <mxGeometry x="48" y="280" width="116" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Process boundary -->
+        <mxCell id="process" value="cmd/server — single Go process" style="swimlane;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#059669;fontStyle=1;fontSize=14;startSize=36;rounded=1;arcSize=6;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="260" y="110" width="820" height="760" as="geometry" />
+        </mxCell>
+
+        <!-- HTTP edge -->
+        <mxCell id="httpapi" value="internal/httpapi — chi router" style="swimlane;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;fontStyle=1;fontSize=13;startSize=30;rounded=1;" vertex="1" parent="process">
+          <mxGeometry x="24" y="52" width="380" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" value="Auth / Session&#xa;/api/auth/*&#xa;cookie session" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#60A5FA;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="16" y="48" width="110" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="projects_api" value="Projects · Nodes&#xa;Revisions · Canvas&#xa;Media · Search&#xa;Annotations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#60A5FA;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="140" y="48" width="110" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="dictation_api" value="Dictation API&#xa;chunks · draft&#xa;transfer · retry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#60A5FA;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="264" y="48" width="100" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="rtg" value="Realtime Gateway&#xa;WS /api/dictations/{id}/live&#xa;PCM16 → live STT&#xa;partial/final events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=11;fontStyle=1;" vertex="1" parent="httpapi">
+          <mxGeometry x="16" y="140" width="168" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="assistant_ws" value="Assistant Voice WS&#xa;live run transcript&#xa;until explicit execute" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="200" y="140" width="164" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="assistant_http" value="Assistant HTTP&#xa;runs · change sets&#xa;guide · memory&#xa;providers · review/apply/undo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontColor=#831843;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="16" y="252" width="168" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="exports_api" value="Export · Backup&#xa;Preferences&#xa;Account purge&#xa;Recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#60A5FA;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="200" y="252" width="164" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp_http" value="Remote MCP&#xa;/mcp + OAuth discovery&#xa;(MCP_ENABLED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontColor=#312E81;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="16" y="348" width="168" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="health" value="/api/health&#xa;OpenAPI docs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9FAFB;strokeColor=#9CA3AF;fontSize=11;" vertex="1" parent="httpapi">
+          <mxGeometry x="200" y="348" width="164" height="56" as="geometry" />
+        </mxCell>
+
+        <!-- Domain / app services -->
+        <mxCell id="appsvc" value="Application services (in-process)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;fontStyle=1;fontSize=13;startSize=30;rounded=1;" vertex="1" parent="process">
+          <mxGeometry x="424" y="52" width="372" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="orch" value="assistantapp.Orchestrator&#xa;provider loop · limits · stop&#xa;prompt assembly · staged tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontColor=#831843;fontSize=11;fontStyle=1;" vertex="1" parent="appsvc">
+          <mxGeometry x="16" y="48" width="168" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="providers" value="ProviderRegistry&#xa;system + user LLM&#xa;encrypted credentials" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#A78BFA;fontSize=11;" vertex="1" parent="appsvc">
+          <mxGeometry x="200" y="48" width="156" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="project_backend" value="ProjectBackend&#xa;documents · memory&#xa;dictionary · change sets&#xa;via store + objectstore" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#A78BFA;fontSize=11;" vertex="1" parent="appsvc">
+          <mxGeometry x="16" y="144" width="168" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="local_mcp" value="projectmcp.Server&#xa;in-process MCP tools&#xa;begin/finish turn&#xa;review · apply · undo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=11;fontStyle=1;" vertex="1" parent="appsvc">
+          <mxGeometry x="200" y="144" width="156" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="policy" value="assistant policy A0–A4&#xa;scope · ownership · mutation gate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#A78BFA;fontSize=11;" vertex="1" parent="appsvc">
+          <mxGeometry x="16" y="240" width="340" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- Adapters inside process -->
+        <mxCell id="adapters" value="Capability adapters" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;fontStyle=1;fontSize=13;startSize=28;rounded=1;" vertex="1" parent="process">
+          <mxGeometry x="424" y="372" width="372" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="live_stt" value="stt.LiveTranscriber&#xa;Deepgram Nova-3&#xa;(native stream)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#EA580C;fontSize=11;" vertex="1" parent="adapters">
+          <mxGeometry x="16" y="44" width="110" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="final_stt" value="stt.FinalTranscriber&#xa;OpenRouter / fake&#xa;/ disabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#EA580C;fontSize=11;" vertex="1" parent="adapters">
+          <mxGeometry x="140" y="44" width="110" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="llm_adapter" value="llm client&#xa;Chat Completions&#xa;or Responses" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#EA580C;fontSize=11;" vertex="1" parent="adapters">
+          <mxGeometry x="264" y="44" width="92" height="84" as="geometry" />
+        </mxCell>
+
+        <!-- Worker -->
+        <mxCell id="worker" value="internal/worker (same process, goroutine)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FEF2F2;strokeColor=#DC2626;fontStyle=1;fontSize=13;startSize=30;rounded=1;" vertex="1" parent="process">
+          <mxGeometry x="24" y="500" width="772" height="236" as="geometry" />
+        </mxCell>
+        <mxCell id="jobq" value="PostgreSQL job queue&#xa;(poll / claim)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;fontStyle=1;" vertex="1" parent="worker">
+          <mxGeometry x="16" y="52" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="audio_asm" value="Audio Assembler&#xa;sequence · checksum&#xa;complete asset" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;" vertex="1" parent="worker">
+          <mxGeometry x="176" y="48" width="130" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="final_tx" value="Final Transcriber&#xa;batch STT job&#xa;retranscribe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;" vertex="1" parent="worker">
+          <mxGeometry x="326" y="48" width="120" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="export_job" value="Export Renderer&#xa;DOCX · MD · TXT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;" vertex="1" parent="worker">
+          <mxGeometry x="466" y="48" width="120" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="purge_job" value="Purge / cleanup&#xa;expired audio&#xa;abandoned runs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;" vertex="1" parent="worker">
+          <mxGeometry x="606" y="48" width="140" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="worker_note" value="Live Deepgram finalization does not auto-spend OpenRouter. Batch finalizer / «Повторить расшифровку» — отдельный job path.&#xa;Artifacts: live_final ≠ draft ≠ manuscript revision — batch never overwrites author edits." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#FECACA;fontColor=#7F1D1D;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="worker">
+          <mxGeometry x="16" y="136" width="730" height="72" as="geometry" />
+        </mxCell>
+
+        <!-- Persistence -->
+        <mxCell id="persist" value="Persistence" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#16A34A;fontStyle=1;fontSize=13;startSize=28;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="120" width="220" height="360" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" value="PostgreSQL&#xa;projects · revisions&#xa;dictation · jobs&#xa;assistant runs&#xa;change sets · MCP grants&#xa;encrypted LLM secrets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#16A34A;fontColor=#14532D;fontSize=11;fontStyle=1;" vertex="1" parent="persist">
+          <mxGeometry x="48" y="36" width="152" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="S3 / MinIO&#xa;audio chunks&#xa;assembled audio&#xa;project images&#xa;export artifacts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#16A34A;fontColor=#14532D;fontSize=11;fontStyle=1;" vertex="1" parent="persist">
+          <mxGeometry x="48" y="200" width="152" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- External -->
+        <mxCell id="external" value="External providers (server-side keys only)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#CA8A04;fontStyle=1;fontSize=13;startSize=30;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="510" width="420" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="deepgram" value="Deepgram&#xa;Nova-3 live STT&#xa;WebSocket stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=11;" vertex="1" parent="external">
+          <mxGeometry x="20" y="52" width="120" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="openrouter" value="OpenRouter&#xa;file STT / fallback&#xa;retranscribe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=11;" vertex="1" parent="external">
+          <mxGeometry x="156" y="52" width="120" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="llm_ext" value="OpenAI-compatible LLM&#xa;system or user&#xa;Responses / Chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontColor=#831843;fontSize=11;" vertex="1" parent="external">
+          <mxGeometry x="292" y="52" width="108" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_note" value="Keys never reach the browser.&#xa;MCP tools are NOT published to the LLM provider — Orchestrator runs them locally and returns normalized results.&#xa;Optional self-hosted STT would implement the same Live/Final contracts outside this process." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#FCD34D;fontColor=#78350F;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="external">
+          <mxGeometry x="20" y="152" width="380" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend" value="Legend" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9CA3AF;fontStyle=1;fontSize=12;startSize=26;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="680" width="200" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="HTTPS JSON API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="14" y="40" width="170" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="WebSocket realtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="14" y="76" width="170" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="Assistant / LLM path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="14" y="112" width="170" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="Background jobs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#DC2626;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="14" y="148" width="170" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- Edges: clients to api -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="browser" target="projects_api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1l" value="HTTPS /api/*" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#1D4ED8;fontStyle=1;" vertex="1" connectable="0" parent="e1">
+          <mxGeometry x="-0.1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;endArrow=classic;startArrow=classic;dashed=1;" edge="1" parent="1" source="browser" target="rtg">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="300" />
+              <mxPoint x="220" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2l" value="WS PCM + events" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#B45309;fontStyle=1;" vertex="1" connectable="0" parent="e2">
+          <mxGeometry x="-0.2" relative="1" as="geometry">
+            <mxPoint y="10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6366F1;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="mcp_client" target="mcp_http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3l" value="/mcp" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#4338CA;fontStyle=1;" vertex="1" connectable="0" parent="e3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Internal wiring -->
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DB2777;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="assistant_http" target="orch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="orch" target="local_mcp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5l" value="local MCP" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#6D28D9;fontStyle=1;" vertex="1" connectable="0" parent="e5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=1;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="local_mcp" target="project_backend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DB2777;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="orch" target="providers">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#EA580C;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="rtg" target="live_stt">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="340" />
+              <mxPoint x="380" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DC2626;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="dictation_api" target="jobq">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="250" />
+              <mxPoint x="560" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#EA580C;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="final_tx" target="final_stt">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="700" />
+              <mxPoint x="700" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6366F1;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="mcp_http" target="local_mcp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="520" />
+              <mxPoint x="760" y="520" />
+              <mxPoint x="760" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- To persistence -->
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="project_backend" target="pg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="httpapi" target="pg">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="280" />
+              <mxPoint x="1080" y="220" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="httpapi" target="s3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="360" />
+              <mxPoint x="1080" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="worker" target="pg">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="760" />
+              <mxPoint x="1080" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="worker" target="s3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1100" y="780" />
+              <mxPoint x="1100" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- To external -->
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="live_stt" target="deepgram">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="500" />
+              <mxPoint x="1180" y="500" />
+              <mxPoint x="1180" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="final_stt" target="openrouter">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="840" y="520" />
+              <mxPoint x="1320" y="520" />
+              <mxPoint x="1320" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DB2777;strokeWidth=2;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="llm_adapter" target="llm_ext">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="500" />
+              <mxPoint x="1460" y="500" />
+              <mxPoint x="1460" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DB2777;strokeWidth=1;endArrow=classic;" edge="1" parent="1" source="providers" target="llm_adapter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="backend-packages" name="Go Packages">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="t2" value="Backend package map (internal/*)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="480" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="entry" value="cmd/server&#xa;wire config · store · objectstore · STT · worker · httpapi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#FFFFFF;strokeColor=#047857;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="360" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_http" value="httpapi&#xa;REST + WS handlers&#xa;auth middleware&#xa;OpenAPI · static SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#2563EB;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="170" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_worker" value="worker&#xa;job poller&#xa;assemble · STT&#xa;export · purge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#DC2626;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="210" y="170" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_config" value="config&#xa;env resolve&#xa;adapter selection&#xa;prod safety gates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="170" width="140" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_store" value="store&#xa;PostgreSQL access&#xa;migrations · queries&#xa;jobs · recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#16A34A;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_obj" value="objectstore&#xa;MinIO/S3 client&#xa;chunks · media&#xa;exports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#16A34A;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="300" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_domain" value="domain&#xa;shared types&#xa;IDs · statuses&#xa;errors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="300" width="140" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_stt" value="stt&#xa;LiveTranscriber&#xa;FinalTranscriber&#xa;deepgram · openrouter&#xa;fake · unavailable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#EA580C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="170" width="150" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p_llm" value="llm&#xa;HTTP client&#xa;credentials encrypt&#xa;chat / responses&#xa;endpoint policy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#EA580C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="730" y="170" width="150" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p_asst" value="assistantapp&#xa;Orchestrator&#xa;ProviderRegistry&#xa;ProjectBackend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="300" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_policy" value="assistant&#xa;policy · resolver&#xa;selection model&#xa;events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#DB2777;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="730" y="300" width="150" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_pmcp" value="projectmcp&#xa;tool catalog&#xa;in-process server&#xa;staged mutations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#7C3AED;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="420" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p_rmcp" value="remotemcp&#xa;Streamable HTTP&#xa;OAuth/bearer grants&#xa;project allowlist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="730" y="420" width="150" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_feat" value="Feature modules used by handlers / backend" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#94A3B8;fontStyle=1;fontSize=12;startSize=28;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="480" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" value="dictation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="16" y="48" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" value="editor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="132" y="48" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" value="canvas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="248" y="48" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f4" value="export" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="364" y="48" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f5" value="documentannotation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="16" y="104" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f6" value="projectmedia" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="172" y="104" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f7" value="markdowntree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="p_feat">
+          <mxGeometry x="308" y="104" width="156" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="f8" value="+ transfer / dictionary / preferences live mostly in httpapi + store" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;fontColor=#64748B;" vertex="1" parent="p_feat">
+          <mxGeometry x="16" y="156" width="440" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow" value="Typical call paths" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#64748B;fontStyle=1;fontSize=12;startSize=28;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="70" width="420" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="flow1" value="1. Dictation live&#xa;Browser WS → httpapi RTG → stt.Deepgram → events back&#xa;chunks → objectstore; session state → store" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;fillColor=#FEF3C7;strokeColor=#D97706;fontSize=11;" vertex="1" parent="flow">
+          <mxGeometry x="16" y="44" width="388" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="flow2" value="2. Stop / retranscribe&#xa;httpapi → enqueue job → worker → FinalTranscriber&#xa;→ transcript artifact (immutable) + draft revision" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;fillColor=#FEE2E2;strokeColor=#DC2626;fontSize=11;" vertex="1" parent="flow">
+          <mxGeometry x="16" y="138" width="388" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="flow3" value="3. Assistant turn&#xa;httpapi → Orchestrator → LLM adapter&#xa;→ projectmcp tools → ProjectBackend → store&#xa;mutations staged until change_set.apply" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;fillColor=#FCE7F3;strokeColor=#DB2777;fontSize=11;" vertex="1" parent="flow">
+          <mxGeometry x="16" y="232" width="388" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="flow4" value="4. Remote MCP&#xa;Client → /mcp (remotemcp) → same tool surface&#xa;grant-scoped projects; no direct canonical write" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;fillColor=#E0E7FF;strokeColor=#6366F1;fontSize=11;" vertex="1" parent="flow">
+          <mxGeometry x="16" y="338" width="388" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- package edges -->
+        <mxCell id="pe1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#059669;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="entry" target="p_http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#059669;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="entry" target="p_worker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;endArrow=classic;" edge="1" parent="1" source="p_http" target="p_store">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;endArrow=classic;" edge="1" parent="1" source="p_http" target="p_obj">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#DC2626;endArrow=classic;" edge="1" parent="1" source="p_worker" target="p_store">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#DC2626;endArrow=classic;" edge="1" parent="1" source="p_worker" target="p_stt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#DB2777;endArrow=classic;" edge="1" parent="1" source="p_http" target="p_asst">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="115" y="280" />
+              <mxPoint x="635" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;endArrow=classic;startArrow=classic;" edge="1" parent="1" source="p_asst" target="p_pmcp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6366F1;endArrow=classic;" edge="1" parent="1" source="p_http" target="p_rmcp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="250" />
+              <mxPoint x="900" y="250" />
+              <mxPoint x="900" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;endArrow=classic;" edge="1" parent="1" source="p_rmcp" target="p_pmcp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#DB2777;endArrow=classic;" edge="1" parent="1" source="p_asst" target="p_llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EA580C;endArrow=classic;" edge="1" parent="1" source="p_http" target="p_stt">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="230" />
+              <mxPoint x="560" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

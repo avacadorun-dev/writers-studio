@@ -29,7 +29,7 @@ func TestValidateRejectsUnknownNodesAndUnsafeLinks(t *testing.T) {
 		},
 		{
 			name:    "unknown schema version",
-			content: `{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"paragraph"}]}`,
+			content: `{"type":"doc","attrs":{"schemaVersion":5},"content":[{"type":"paragraph"}]}`,
 		},
 		{
 			name:    "unsafe image",
@@ -401,8 +401,47 @@ func TestNormalizeSchemaVersionUpgradesOnlyRichDocuments(t *testing.T) {
 		t.Fatal(err)
 	}
 	version, err = SchemaVersion(normalized)
-	if err != nil || version != CurrentSchemaVersion {
+	if err != nil || version != deepHeadingSchemaVersion {
 		t.Fatalf("deep heading schema version = %d, %v", version, err)
+	}
+
+	formula := json.RawMessage(
+		`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"inlineMath","attrs":{"latex":"E=mc^2","description":"Энергия"}}]},{"type":"mathBlock","attrs":{"latex":"x^2+y^2","description":""}}]}`,
+	)
+	normalized, err = NormalizeSchemaVersion(formula)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version, err = SchemaVersion(normalized)
+	if err != nil || version != mathSchemaVersion {
+		t.Fatalf("formula schema version = %d, %v", version, err)
+	}
+}
+
+func TestFormulaValidationAndPortableRendering(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"paragraph","attrs":{"blockId":"intro"},"content":[{"type":"text","text":"Энергия "},{"type":"inlineMath","attrs":{"latex":"E = mc^2","description":"Энергия равна массе на квадрат скорости света"}}]},{"type":"mathBlock","attrs":{"blockId":"equation","latex":"\\frac{-b \\pm \\sqrt{D}}{2a}","description":"Корни квадратного уравнения"}}]}`)
+	if err := Validate(raw); err != nil {
+		t.Fatalf("formula document rejected: %v", err)
+	}
+	plain, err := PlainText(raw)
+	if err != nil || !strings.Contains(plain, "[Формула: E = mc^2]") || !strings.Contains(plain, "Формула: \\frac") {
+		t.Fatalf("formula plain text = %q, %v", plain, err)
+	}
+	markdown, err := Markdown(raw)
+	if err != nil || !strings.Contains(markdown, "$E = mc^2$") || !strings.Contains(markdown, "$$\n\\frac") {
+		t.Fatalf("formula Markdown = %q, %v", markdown, err)
+	}
+
+	invalid := []json.RawMessage{
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":3},"content":[{"type":"mathBlock","attrs":{"latex":"x"}}]}`),
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"mathBlock","attrs":{"latex":7}}]}`),
+		json.RawMessage(`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"inlineMath","attrs":{"latex":"x"},"content":[{"type":"text","text":"bad"}]}]}`),
+	}
+	for _, document := range invalid {
+		if !errors.Is(Validate(document), ErrInvalidDocument) {
+			t.Fatalf("invalid formula accepted: %s", document)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
+  Check,
   CircleAlert,
   Code2,
   Columns3,
@@ -19,18 +20,30 @@ import {
   Redo2,
   Rows3,
   Search,
+  Sigma,
   Strikethrough,
   Table2,
+  TextCursorInput,
   Trash2,
   TriangleAlert,
   Underline as UnderlineIcon,
   Undo2,
   Workflow,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { uploadProjectImage } from "~entities/project";
-import { cn } from "~shared/lib";
+import {
+  cn,
+  type EditorLineHeight,
+  type EditorListItemSpacing,
+  type EditorParagraphSpacing,
+  type EditorToolbarMode,
+  loadWriterPreferences,
+  saveWriterPreferences,
+  type WriterPreferences,
+  writerPreferencesChangedEvent,
+} from "~shared/lib";
 import {
   Button,
   DropdownMenu,
@@ -42,6 +55,7 @@ import {
   useToast,
 } from "~shared/ui";
 import { codeLanguageOptions } from "../model/code-languages";
+import { validateEditorImageFile } from "../model/image-drop";
 
 interface FormattingToolbarProps {
   editor: Editor | null;
@@ -49,6 +63,18 @@ interface FormattingToolbarProps {
   onFind: () => void;
   projectId: string;
   integratedWorkspace?: boolean;
+}
+
+export type ToolbarPresentation = "expanded" | "compact";
+
+export function resolveToolbarPresentation(
+  mode: EditorToolbarMode,
+  availableWidth: number,
+  viewportWidth = availableWidth,
+): ToolbarPresentation {
+  if (mode === "expanded") return "expanded";
+  if (mode === "compact") return "compact";
+  return viewportWidth >= 1280 && availableWidth >= 790 ? "expanded" : "compact";
 }
 
 export function FormattingToolbar({
@@ -61,10 +87,54 @@ export function FormattingToolbar({
   const { requestInput, requestSelect } = useActionDialog();
   const { showToast } = useToast();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [preferences, setPreferences] = useState<WriterPreferences>(loadWriterPreferences);
+  const presentation = resolveToolbarPresentation(
+    preferences.toolbarMode,
+    availableWidth,
+    viewportWidth,
+  );
+
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const measure = () => {
+      setAvailableWidth(toolbar.getBoundingClientRect().width);
+      setViewportWidth(window.innerWidth);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    if (typeof ResizeObserver === "undefined") {
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(toolbar);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setPreferences(loadWriterPreferences());
+    window.addEventListener(writerPreferencesChangedEvent, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(writerPreferencesChangedEvent, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const updatePreferences = (next: Partial<WriterPreferences>) => {
+    setPreferences(saveWriterPreferences({ ...preferences, ...next }));
+  };
   if (!editor) {
     return (
       <div
+        ref={toolbarRef}
         className={cn(
           "shrink-0 border-b border-[var(--border-subtle)]",
           integratedWorkspace ? "h-14 bg-[var(--surface-panel)]" : "h-11 bg-[var(--surface-paper)]",
@@ -105,6 +175,24 @@ export function FormattingToolbar({
       action: () => editor.chain().focus().toggleCode().run(),
     },
     {
+      label: "Строчная формула",
+      icon: Sigma,
+      active: editor.isActive("inlineMath"),
+      action: () => {
+        void requestInput({
+          title: "Вставить строчную формулу",
+          description: "Введите исходник LaTeX без символов $. HTML и сетевые команды отключены.",
+          label: "Исходник LaTeX",
+          defaultValue: "x^2 + y^2",
+          icon: Sigma,
+          confirmLabel: "Вставить",
+        }).then((latex) => {
+          if (!latex?.trim()) return;
+          editor.commands.insertInlineMath({ latex: latex.trim() });
+        });
+      },
+    },
+    {
       label: "Цитата",
       icon: Quote,
       active: editor.isActive("blockquote"),
@@ -126,18 +214,23 @@ export function FormattingToolbar({
 
   return (
     <div
+      ref={toolbarRef}
+      data-toolbar-mode={preferences.toolbarMode}
+      data-toolbar-presentation={presentation}
       className={cn(
-        "flex shrink-0 items-center gap-0.5 border-b border-[var(--border-subtle)] px-2",
-        integratedWorkspace
-          ? "h-14 bg-[var(--surface-panel)]"
-          : "min-h-11 bg-[var(--surface-paper)]",
+        "flex shrink-0 items-center gap-0.5 overflow-hidden border-b border-[var(--border-subtle)] px-2",
+        preferences.toolbarMode === "expanded" ? "min-h-14 flex-wrap py-1" : "min-h-14 flex-nowrap",
+        integratedWorkspace ? "bg-[var(--surface-panel)]" : "min-h-11 bg-[var(--surface-paper)]",
       )}
       role="toolbar"
       aria-label="Форматирование текста"
     >
       <Select
         aria-label="Стиль абзаца"
-        className="mr-1 h-9 w-36 shrink-0 border-0 bg-transparent text-[13px]"
+        className={cn(
+          "mr-1 h-9 shrink-0 border-0 bg-transparent text-[13px]",
+          presentation === "compact" ? "w-28" : "w-36",
+        )}
         value={
           editor.isActive("heading", { level: 1 })
             ? "h1"
@@ -166,33 +259,108 @@ export function FormattingToolbar({
         <option value="h3">Заголовок 3</option>
       </Select>
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />
-      {formatButtons.slice(0, 2).map(({ label, icon: Icon, active, action }) => (
+      {formatButtons
+        .filter(({ label }) => presentation !== "expanded" || label !== "Строчная формула")
+        .slice(0, presentation === "expanded" ? formatButtons.length : 2)
+        .map(({ label, icon: Icon, active, action }) => (
+          <Button
+            key={label}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "size-9 min-h-9 shrink-0",
+              active && "bg-[var(--accent-soft)] text-[var(--accent-ink)]",
+            )}
+            aria-label={label}
+            title={label}
+            aria-pressed={active}
+            onClick={action}
+          >
+            <Icon className="size-4" aria-hidden="true" />
+          </Button>
+        ))}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 min-h-9 shrink-0"
+            aria-label="Типографика"
+            title="Типографика"
+          >
+            <TextCursorInput className="size-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" aria-label="Типографика" className="w-64 p-3">
+          <label htmlFor="editor-toolbar-line-height" className="grid gap-1.5 text-xs font-medium">
+            Межстрочный интервал
+            <Select
+              id="editor-toolbar-line-height"
+              value={preferences.lineHeight}
+              onChange={(event) =>
+                updatePreferences({ lineHeight: Number(event.target.value) as EditorLineHeight })
+              }
+            >
+              <option value={1.5}>1,5 — плотный</option>
+              <option value={1.75}>1,75 — обычный</option>
+              <option value={2}>2 — свободный</option>
+            </Select>
+          </label>
+          <label
+            htmlFor="editor-toolbar-paragraph-spacing"
+            className="mt-3 grid gap-1.5 text-xs font-medium"
+          >
+            Между абзацами
+            <Select
+              id="editor-toolbar-paragraph-spacing"
+              value={preferences.paragraphSpacing}
+              onChange={(event) =>
+                updatePreferences({
+                  paragraphSpacing: Number(event.target.value) as EditorParagraphSpacing,
+                })
+              }
+            >
+              <option value={0.65}>0,65 em</option>
+              <option value={0.9}>0,9 em</option>
+              <option value={1.1}>1,1 em</option>
+            </Select>
+          </label>
+          <label
+            htmlFor="editor-toolbar-list-spacing"
+            className="mt-3 grid gap-1.5 text-xs font-medium"
+          >
+            Между пунктами списка
+            <Select
+              id="editor-toolbar-list-spacing"
+              value={preferences.listItemSpacing}
+              onChange={(event) =>
+                updatePreferences({
+                  listItemSpacing: Number(event.target.value) as EditorListItemSpacing,
+                })
+              }
+            >
+              <option value={0}>Без интервала</option>
+              <option value={0.25}>0,25 em</option>
+              <option value={0.5}>0,5 em</option>
+            </Select>
+          </label>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {presentation === "expanded" ? (
         <Button
-          key={label}
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(
-            "size-9 min-h-9 shrink-0",
-            active && "bg-[var(--accent-soft)] text-[var(--accent-ink)]",
-          )}
-          aria-label={label}
-          aria-pressed={active}
-          onClick={action}
+          className="size-9 min-h-9 shrink-0"
+          aria-label="Вставить разделитель сцены"
+          title="Вставить разделитель сцены"
+          onClick={() => editor.chain().focus().insertContent({ type: "sceneBreak" }).run()}
         >
-          <Icon className="size-4" aria-hidden="true" />
+          <Minus className="size-4" aria-hidden="true" />
         </Button>
-      ))}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-9 min-h-9 shrink-0"
-        aria-label="Вставить разделитель сцены"
-        onClick={() => editor.chain().focus().insertContent({ type: "sceneBreak" }).run()}
-      >
-        <Minus className="size-4" aria-hidden="true" />
-      </Button>
+      ) : null}
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -202,6 +370,7 @@ export function FormattingToolbar({
             size="icon"
             className="size-9 min-h-9 shrink-0"
             aria-label="Вставить блок"
+            title="Вставить блок"
           >
             <Plus className="size-4" aria-hidden="true" />
           </Button>
@@ -214,6 +383,26 @@ export function FormattingToolbar({
           >
             <Table2 className="size-4" aria-hidden="true" />
             Таблица 3 × 3
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              void requestInput({
+                title: "Вставить формулу",
+                description: "Формула займёт отдельный блок. HTML и сетевые команды отключены.",
+                label: "Исходник LaTeX",
+                defaultValue: "\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+                icon: Sigma,
+                confirmLabel: "Вставить",
+                multiline: true,
+                rows: 4,
+              }).then((latex) => {
+                if (!latex?.trim()) return;
+                editor.commands.insertMathBlock({ latex: latex.trim() });
+              });
+            }}
+          >
+            <Sigma className="size-4" aria-hidden="true" />
+            Формула
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
@@ -362,41 +551,49 @@ export function FormattingToolbar({
         className="size-9 min-h-9 shrink-0"
         disabled={!editor.can().undo()}
         aria-label="Отменить"
+        title="Отменить"
         onClick={() => editor.chain().focus().undo().run()}
       >
         <Undo2 className="size-4" aria-hidden="true" />
       </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-9 min-h-9 shrink-0"
-        disabled={!editor.can().redo()}
-        aria-label="Повторить"
-        onClick={() => editor.chain().focus().redo().run()}
-      >
-        <Redo2 className="size-4" aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-9 min-h-9 shrink-0"
-        aria-label="Найти в документе"
-        onClick={onFind}
-      >
-        <Search className="size-4" aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-9 min-h-9 shrink-0"
-        aria-label="Режим фокуса"
-        onClick={onFocusMode}
-      >
-        <Focus className="size-4" aria-hidden="true" />
-      </Button>
+      {presentation === "expanded" ? (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 min-h-9 shrink-0"
+            disabled={!editor.can().redo()}
+            aria-label="Повторить"
+            title="Повторить"
+            onClick={() => editor.chain().focus().redo().run()}
+          >
+            <Redo2 className="size-4" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 min-h-9 shrink-0"
+            aria-label="Найти в документе"
+            title="Найти в документе"
+            onClick={onFind}
+          >
+            <Search className="size-4" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 min-h-9 shrink-0"
+            aria-label="Режим фокуса"
+            title="Режим фокуса"
+            onClick={onFocusMode}
+          >
+            <Focus className="size-4" aria-hidden="true" />
+          </Button>
+        </>
+      ) : null}
       <div className="flex-1" />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -406,17 +603,48 @@ export function FormattingToolbar({
             size="icon"
             className="size-9 min-h-9 shrink-0"
             aria-label="Дополнительное форматирование"
+            title="Дополнительное форматирование"
           >
             <MoreHorizontal className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" aria-label="Дополнительное форматирование">
-          {formatButtons.slice(2).map(({ label, icon: Icon, action }) => (
-            <DropdownMenuItem key={label} onSelect={action}>
-              <Icon className="size-4" aria-hidden="true" />
-              {label}
-            </DropdownMenuItem>
-          ))}
+          {formatButtons
+            .filter(({ label }, index) =>
+              presentation === "expanded" ? label === "Строчная формула" : index >= 2,
+            )
+            .map(({ label, icon: Icon, active, action }) => (
+              <DropdownMenuItem key={label} onSelect={action}>
+                <Icon className="size-4" aria-hidden="true" />
+                <span className="flex-1">{label}</span>
+                {active ? <Check className="size-3.5" aria-label="Активно" /> : null}
+              </DropdownMenuItem>
+            ))}
+          {presentation === "compact" ? (
+            <>
+              <DropdownMenuItem
+                onSelect={() => editor.chain().focus().insertContent({ type: "sceneBreak" }).run()}
+              >
+                <Minus className="size-4" aria-hidden="true" />
+                Вставить разделитель сцены
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!editor.can().redo()}
+                onSelect={() => editor.chain().focus().redo().run()}
+              >
+                <Redo2 className="size-4" aria-hidden="true" />
+                Повторить
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onFind}>
+                <Search className="size-4" aria-hidden="true" />
+                Найти в документе
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onFocusMode}>
+                <Focus className="size-4" aria-hidden="true" />
+                Режим фокуса
+              </DropdownMenuItem>
+            </>
+          ) : null}
           <DropdownMenuItem
             onSelect={() => {
               const previous = editor.getAttributes("link").href as string | undefined;
@@ -479,6 +707,12 @@ export function FormattingToolbar({
           const input = event.currentTarget;
           const file = input.files?.[0];
           if (!file) return;
+          const validation = validateEditorImageFile(file);
+          if (!validation.valid) {
+            showToast({ title: "Изображение не добавлено", description: validation.message });
+            input.value = "";
+            return;
+          }
           setImageUploading(true);
           void uploadProjectImage(projectId, file)
             .then(({ media }) => {

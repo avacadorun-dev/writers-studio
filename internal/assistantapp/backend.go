@@ -3432,6 +3432,10 @@ func inlineNodeText(nodes []editor.Node) string {
 	var appendNodes func([]editor.Node)
 	appendNodes = func(current []editor.Node) {
 		for _, node := range current {
+			if node.Type == "inlineMath" {
+				builder.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
+				continue
+			}
 			builder.WriteString(node.Text)
 			appendNodes(node.Content)
 		}
@@ -3653,16 +3657,18 @@ type assistantContentEnvelope struct {
 }
 
 type assistantContentBlock struct {
-	Type     string              `json:"type"`
-	Language *string             `json:"language,omitempty"`
-	Text     string              `json:"text,omitempty"`
-	Kind     string              `json:"kind,omitempty"`
-	Code     string              `json:"code,omitempty"`
-	Caption  string              `json:"caption,omitempty"`
-	AssetID  string              `json:"assetId,omitempty"`
-	Alt      string              `json:"alt,omitempty"`
-	Rows     []assistantTableRow `json:"rows,omitempty"`
-	Items    []string            `json:"items,omitempty"`
+	Type        string              `json:"type"`
+	Language    *string             `json:"language,omitempty"`
+	Text        string              `json:"text,omitempty"`
+	Kind        string              `json:"kind,omitempty"`
+	Code        string              `json:"code,omitempty"`
+	Caption     string              `json:"caption,omitempty"`
+	AssetID     string              `json:"assetId,omitempty"`
+	Alt         string              `json:"alt,omitempty"`
+	Latex       string              `json:"latex,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Rows        []assistantTableRow `json:"rows,omitempty"`
+	Items       []string            `json:"items,omitempty"`
 }
 
 type assistantTableRow struct {
@@ -3737,6 +3743,10 @@ func normalizeAssistantContent(value any) (json.RawMessage, error) {
 				attrs["code"] = block.Code
 				attrs["caption"] = block.Caption
 				node = editor.Node{Type: "mermaidBlock", Attrs: attrs}
+			case "math":
+				attrs["latex"] = block.Latex
+				attrs["description"] = block.Description
+				node = editor.Node{Type: "mathBlock", Attrs: attrs}
 			case "image":
 				attrs["assetId"] = block.AssetID
 				attrs["src"] = "/api/media/" + block.AssetID + "/content"
@@ -3819,7 +3829,46 @@ func assistantTextParagraph(text string) editor.Node {
 
 func assistantInlineNodes(text string) []editor.Node {
 	nodes, _ := editor.ParseInlineCodeNodes(text, nil)
-	return nodes
+	result := make([]editor.Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Type != "text" || assistantNodeHasMark(node, "code") {
+			result = append(result, node)
+			continue
+		}
+		result = append(result, assistantInlineMathNodes(node.Text, node.Marks)...)
+	}
+	return result
+}
+
+func assistantInlineMathNodes(text string, marks []editor.Mark) []editor.Node {
+	result := make([]editor.Node, 0, 3)
+	for len(text) > 0 {
+		start := strings.IndexByte(text, '$')
+		if start < 0 || (start > 0 && text[start-1] == '\\') {
+			result = append(result, editor.Node{Type: "text", Text: text, Marks: marks})
+			break
+		}
+		endOffset := strings.IndexByte(text[start+1:], '$')
+		if endOffset < 1 {
+			result = append(result, editor.Node{Type: "text", Text: text, Marks: marks})
+			break
+		}
+		end := start + 1 + endOffset
+		latex := text[start+1 : end]
+		if strings.ContainsAny(latex, "\r\n") {
+			result = append(result, editor.Node{Type: "text", Text: text[:end+1], Marks: marks})
+			text = text[end+1:]
+			continue
+		}
+		if start > 0 {
+			result = append(result, editor.Node{Type: "text", Text: text[:start], Marks: marks})
+		}
+		result = append(result, editor.Node{
+			Type: "inlineMath", Attrs: map[string]any{"latex": latex, "description": ""},
+		})
+		text = text[end+1:]
+	}
+	return result
 }
 
 func assistantTableNode(attrs map[string]any, rows []assistantTableRow) editor.Node {
@@ -3880,6 +3929,13 @@ func assistantBlocksFromDocument(raw json.RawMessage) ([]assistantContentBlock, 
 			blocks = append(blocks, assistantContentBlock{
 				Type: "mermaid", Code: stringAttr(node.Attrs, "code"),
 				Caption: stringAttr(node.Attrs, "caption"),
+			})
+			continue
+		}
+		if blockType == "mathBlock" {
+			blocks = append(blocks, assistantContentBlock{
+				Type: "math", Latex: stringAttr(node.Attrs, "latex"),
+				Description: stringAttr(node.Attrs, "description"),
 			})
 			continue
 		}
@@ -3984,6 +4040,9 @@ func assistantBlockText(nodes []editor.Node) string {
 			case "hardBreak":
 				flushCode()
 				output.WriteByte('\n')
+			case "inlineMath":
+				flushCode()
+				output.WriteString("$" + stringAttr(node.Attrs, "latex") + "$")
 			default:
 				appendNodes(node.Content)
 			}
@@ -4067,7 +4126,7 @@ func ensureAssistantBlockMetadata(node *editor.Node) {
 func isAssistantIdentifiedBlock(nodeType string) bool {
 	switch nodeType {
 	case "paragraph", "heading", "blockquote", "codeBlock", "callout", "table",
-		"imageBlock", "mermaidBlock":
+		"imageBlock", "mermaidBlock", "mathBlock":
 		return true
 	default:
 		return false

@@ -27,7 +27,10 @@ describe("writer preferences", () => {
         fontFamily: "comic",
         fontSize: 200,
         lineHeight: 2,
+        paragraphSpacing: 0.65,
+        listItemSpacing: 0,
         manuscriptWidth: 80,
+        toolbarMode: "expanded",
         theme: "dark",
         style: "dried-rose-and-wine",
         spellcheck: false,
@@ -38,7 +41,10 @@ describe("writer preferences", () => {
       commandPrefix: "Мастерская",
       commandsEnabled: false,
       lineHeight: 2,
+      paragraphSpacing: 0.65,
+      listItemSpacing: 0,
       manuscriptWidth: 80,
+      toolbarMode: "expanded",
       theme: "dark",
       style: "dried-rose-and-wine",
       spellcheck: false,
@@ -108,7 +114,10 @@ describe("writer preferences", () => {
       ...defaultWriterPreferences,
       fontSize: 21,
       lineHeight: 2,
+      paragraphSpacing: 1.1,
+      listItemSpacing: 0.5,
       manuscriptWidth: 60,
+      toolbarMode: "compact",
       theme: "dark",
       style: "dried-rose-and-wine",
     });
@@ -118,6 +127,12 @@ describe("writer preferences", () => {
     expect(document.documentElement.dataset.style).toBe("dried-rose-and-wine");
     expect(document.documentElement.style.getPropertyValue("--editor-font-size")).toBe("21px");
     expect(document.documentElement.style.getPropertyValue("--editor-line-height")).toBe("2");
+    expect(document.documentElement.style.getPropertyValue("--editor-paragraph-spacing")).toBe(
+      "1.1em",
+    );
+    expect(document.documentElement.style.getPropertyValue("--editor-list-item-spacing")).toBe(
+      "0.5em",
+    );
     expect(document.documentElement.style.getPropertyValue("--editor-max-width")).toBe("60ch");
     expect(document.documentElement.style.getPropertyValue("--editor-font-family")).toBe(
       "var(--font-manuscript-sofia)",

@@ -1,15 +1,17 @@
 # Traceability: workflow → acceptance criterion → implementation → verification
 
-Дата контрольного прохода: 2026-08-04. Источник требований:
-[`WORKFLOWS.md`](../specification/WORKFLOWS.md).
+Дата контрольного прохода: 2026-08-28. Источники требований:
+[`WORKFLOWS.md`](../specification/WORKFLOWS.md) и
+[`RELEASE_0.7.0.md`](./RELEASE_0.7.0.md).
 
 Этот отчёт фиксирует dictation MVP AC-01…AC-55 и локально проверенный Assistant
 Alpha AC-56…AC-176. `PASS` означает наличие кода и автоматического доказательства;
 ручная продуктовая приёмка и серверная выкладка учитываются отдельно и не меняют
 статус реализованных invariants. LAN production deployment на
-`https://studio.example.test` обновлён 2026-08-04 с двумя проверенными комплектами
-PostgreSQL/MinIO backup, миграцией 017, побайтовой сверкой project data/object
-storage и внешним HTTPS healthcheck.
+`https://studio.example.test` обновлён до release 0.7.0 на 2026-08-28:
+PostgreSQL/MinIO backup проверен, migrations `27/27`, row counts всех
+46 application tables и SHA-256 565 MinIO файлов совпали до/после,
+а внешний HTTPS и production Browser smoke прошли.
 
 WF-33 / AC-132…AC-142 реализуют docked Assistant рядом с mounted manuscript
 editor, selection attachment, inline non-canonical live preview и persistent
@@ -48,12 +50,17 @@ S-38/S-39/S-40/S-41 и Mobile P-11 реализованы в Studio без remou
 | `E-A-SCOPE` | `tests/e2e/assistant-live-flow.spec.ts`: глобальный run показывает schema-derived root label, возвращается в проект и сохраняется как `targetKind=project`, `targetNodeId=null`; 1 сценарий × 4 viewport |
 | `E-A-CHANGE` | `tests/e2e/assistant-change-flow.spec.ts`: `turn → exact modal diff → Apply → grouped Undo`, затем второй turn → direct Apply из panel → toast Undo; форма уточнения показывает Send без Apply; canonical text неизменен до каждого Apply и полностью восстановлен после Undo; 1 сценарий × 4 viewport |
 | `E-A-WORKSPACE` | `tests/e2e/assistant-change-flow.spec.ts`: floating manuscript до запуска, docked layout при открытой панели, единая desktop header line, responsive close/reopen без потери selection, inline preview и bounded modal review без URL transition; 1 сценарий × 4 viewport |
+| `E-070` | `tests/e2e/release-070.spec.ts`: editor/toolbar/rename/backtick/math/DnD/autosave/status bar и общий Studio/Canvas Assistant dock; 2 сценария × 4 viewport |
+| `E-070-REG` | `assistant-change-flow.spec.ts`, `critical-path.spec.ts:163`, `critical-path.spec.ts:342`, `recovery-and-safety.spec.ts:68`: Apply/Undo, versions, compare/restore, export/import и recovery; 16 tests на четырёх viewport |
 | `E-A-THREADS` | `tests/e2e/assistant-multi-session.spec.ts`: два независимых чата, atomic first turn, project list/title, per-run draft и mode restoration, URL selection, mounted editor и desktop/tablet/mobile geometry; отдельный параллельный proposal conflict проверяет successful Apply первого change set, серверный `409 stale_change_set` второго, `r2 → r3`, refresh и независимость остальных чатов; 2 сценария × 4 viewport |
 | `E-ANNOTATIONS` | `tests/e2e/annotations.spec.ts`: контекстное меню выделения, создание ссылки/заметки, общий список проекта, exact deep link, inline decorations и Axe; 1 сценарий × 4 viewport |
 | `E-STT` | `tests/real-stt/deepgram-live.spec.ts`: настоящий WAV → Deepgram continuous live → один prose-run/draft paragraph + timestamps; без автоматического batch artifact |
-| `F-UNIT` | 107 Bun unit tests: Assistant live preview/review/activity/Markdown, thread grouping/status/title/count и annotation-fix presentation, guide-draft recovery, Project Memory filtering/payload allowlist, project outline, autosave, editor schema/undo/provenance, annotation anchors, context-menu placement, paste sanitization, preferences, IndexedDB и controls |
+| `F-UNIT` | 234 Bun unit/component tests: Assistant live preview/review/activity/Markdown, thread grouping/status/title/count, editor schema/undo/provenance, autosave, recovery, project outline, paste sanitization, preferences, Canvas и shared controls |
+| `F-070` | Bun tests `formatting-toolbar`, `image-drop`, `math`, `code-block`/`extensions`, `node-title`, `assistant-message`, `assistant-transcript-scroll`, `assistant-review-presentation`, `assistant-dock-state`/`assistant-dock-shell` и project API rename/upload contracts |
 | `F-ANNOTATIONS` | `annotations.test.ts`, `selection-context-menu.test.ts`, `use-editor-autosave.test.tsx`, `project-api-annotations.test.ts`: transient decorations, Unicode anchors, mapping/detach, viewport-safe menu и атомарный save contract |
 | `G-UNIT` | Go unit tests: editor, commands, export, STT, object storage, transitions |
+| `G-070` | `internal/editor/document_test.go`, `internal/export/formula_test.go`, `native_rich_blocks_roundtrip_test.go`, `project_transfer_test.go`: schema v4, safe formula export, Assistant round-trip и `.wstudio` compatibility |
+| `M-070-PROD` | LAN deployment 2026-08-28: verified PostgreSQL/MinIO backup, `27/27` migrations, 46/46 stable table counts, 565 byte-stable MinIO files, healthy Compose/HTTPS, new PWA asset and Studio toolbar Browser smoke |
 | `G-INT` | `internal/store/store_integration_test.go` с PostgreSQL |
 | `G-TRANSFER` | `project_transfer_test.go`, `project_transfer_integration_test.go` и HTTP archive tests: version/reference/tree/checksum validation, SQL round-trip и ID remap |
 | `G-ANNOTATIONS` | `internal/documentannotation`, `internal/editor/document_test.go`, `internal/store/annotations_integration_test.go`, `assistant_annotations_integration_test.go`: deterministic anchor mapping, ownership, lifecycle/anchor separation, Assistant Apply/Undo/history, deleted-term snapshot и revision safety |
@@ -236,11 +243,31 @@ acceptance scenarios нормативного baseline. Package-wide
 line coverage не используется как замена scenario coverage: она отдельно
 публикуется в verification report.
 
+## Release 0.7.0: WS-0701–WS-0713
+
+| Задача | Реализация | Доказательство | Статус |
+|---|---|---|---|
+| WS-0701 | Auto/expanded/compact toolbar, direct marks/lists, overflow, keyboard names/state | `F-070`, `E-070` | PASS |
+| WS-0702 | External image DnD, MIME/size validation, position indicator, upload-before-insert | `F-070`, `E-070` | PASS |
+| WS-0703 | Independent line/paragraph/list spacing preferences and CSS variables | `F-070`, `E-070` | PASS |
+| WS-0704 | `inlineMath`/`mathBlock`, safe KaTeX, schema v4, paste/export/import/Assistant round-trip | `F-070`, `G-070`, `E-070`, `E-070-REG` | PASS |
+| WS-0705 | Order-independent inline backtick pairing with escaped/mismatched/code-block guards | `F-070`, `E-070` | PASS |
+| WS-0706 | Calm visible manuscript gutter/bounds on desktop, removed on mobile | `E-070` | PASS |
+| WS-0707 | Shared title/content/action grid and in-flow empty state | `E-070` | PASS |
+| WS-0708 | Separate fixed-height 40 px editor footer with word/source state | `E-070` | PASS |
+| WS-0709 | Double-click/F2 inline rename, validation, optimistic cache/rollback without editor remount | `F-070`, `E-070` | PASS |
+| WS-0710 | One 380 px responsive `AssistantDockShell` for Studio/Canvas and persistent project run/view | `F-070`, `E-070` | PASS |
+| WS-0711 | Per-run scroll restoration, near-end auto-follow, isolated wheel/touch and review columns | `F-070`, `E-070` | PASS |
+| WS-0712 | Inert plain/HTML text, exact JSON copy/collapse and keyboard-scrollable code surfaces | `F-070`, `E-070` | PASS |
+| WS-0713 | Status/group/diff hierarchy, excluded/dependency cues, collapsed trace and one primary CTA | `F-070`, `E-A-CHANGE`, `E-070-REG` | PASS |
+
+Production artifact и smoke всего release подтверждаются `M-070-PROD`.
+
 ## Граница ручной проверки
 
 Ручными оставлены только свойства, для которых browser automation не является полной
 заменой: субъективная композиция и читаемость длинной live-сессии, реальное удобство
 голосового потока, OS/browser permission presentation и авторская оценка diff.
-Серверная выкладка выполняется только после этой локальной приёмки. Все state
+Серверная выкладка 0.7.0 выполнена после этой локальной приёмки. Все state
 transitions, persistence invariants, destructive confirmations и критические recovery
 ветки имеют автоматизированное доказательство.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 
 import type { CanvasDocument } from "~entities/canvas";
 import { getCanvasSnapshot } from "~shared/lib";
@@ -170,12 +170,13 @@ describe("canvas autosave", () => {
     act(() => queue?.(content));
     await act(async () => flush?.());
     expect(screen.getByText(/pending|local/)).toBeTruthy();
-    await act(async () => {
+    act(() => {
       window.dispatchEvent(new Event("online"));
-      await new Promise((resolve) => window.setTimeout(resolve, 30));
     });
-    expect(calls).toBe(2);
-    expect(screen.getByText("saved")).toBeTruthy();
+    await waitFor(() => {
+      expect(calls).toBe(2);
+      expect(screen.getByText("saved")).toBeTruthy();
+    });
   });
 
   test("serializes rapid flushes and advances baseRevision before saving the latest snapshot", async () => {

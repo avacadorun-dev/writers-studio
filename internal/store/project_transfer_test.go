@@ -20,6 +20,18 @@ func TestValidateProjectTransferAcceptsPortableProject(t *testing.T) {
 	}
 }
 
+func TestValidateProjectTransferAcceptsFormulaDocuments(t *testing.T) {
+	transfer := validProjectTransferFixture()
+	transfer.DocumentRevisions[0].SchemaVersion = 4
+	transfer.DocumentRevisions[0].Content = json.RawMessage(
+		`{"type":"doc","attrs":{"schemaVersion":4},"content":[{"type":"paragraph","content":[{"type":"text","text":"Закон: "},{"type":"inlineMath","attrs":{"latex":"F=ma","description":"Второй закон Ньютона"}}]},{"type":"mathBlock","attrs":{"blockId":"formula","latex":"E=mc^2","description":""}}]}`,
+	)
+	transfer.DocumentRevisions[0].PlainText = "Закон: [Формула: F=ma]\n\nФормула: E=mc^2"
+	if err := ValidateProjectTransfer(transfer); err != nil {
+		t.Fatalf("formula transfer rejected: %v", err)
+	}
+}
+
 func TestValidateProjectTransferRejectsInvalidAssistantStepLimit(t *testing.T) {
 	transfer := validProjectTransferFixture()
 	invalidLimit := 0

@@ -127,6 +127,18 @@ interface JSONDocumentMark {
   attrs?: Record<string, unknown>;
 }
 
+export interface InlineCodePair {
+  openingStart: number;
+  openingEnd: number;
+  closingStart: number;
+  closingEnd: number;
+}
+
+interface BacktickRun {
+  start: number;
+  end: number;
+}
+
 export function parseFencedCode(value: string): ParsedFencedCode | null {
   const firstLineEnd = value.indexOf("\n");
   if (firstLineEnd < 0) return null;
@@ -282,6 +294,67 @@ function matchingBacktickRun(value: string, start: number, expectedLength: numbe
   return -1;
 }
 
+export function findInlineCodePairs(value: string): InlineCodePair[] {
+  const pairs: InlineCodePair[] = [];
+  let search = 0;
+  while (search < value.length) {
+    const opening = nextUnescapedBacktickRun(value, search);
+    if (!opening) break;
+    if (opening.end >= value.length || /\s/u.test(value[opening.end])) {
+      search = opening.end;
+      continue;
+    }
+    let closingSearch = opening.end;
+    let closing: BacktickRun | null = null;
+    while (closingSearch < value.length) {
+      const candidate = nextUnescapedBacktickRun(value, closingSearch);
+      if (!candidate) break;
+      if (candidate.start > 0 && !/\s/u.test(value[candidate.start - 1])) {
+        closing = candidate;
+        break;
+      }
+      closingSearch = candidate.end;
+    }
+    if (!closing) break;
+    if (closing.end - closing.start !== opening.end - opening.start) {
+      search = closing.end;
+      continue;
+    }
+    if (closing.start > opening.end) {
+      pairs.push({
+        openingStart: opening.start,
+        openingEnd: opening.end,
+        closingStart: closing.start,
+        closingEnd: closing.end,
+      });
+    }
+    search = closing.end;
+  }
+  return pairs;
+}
+
+function nextUnescapedBacktickRun(value: string, start: number): BacktickRun | null {
+  let cursor = start;
+  while (cursor < value.length) {
+    const candidate = value.indexOf("`", cursor);
+    if (candidate < 0) return null;
+    const length = backtickRunLength(value, candidate);
+    if (!isEscapedDelimiter(value, candidate)) {
+      return { start: candidate, end: candidate + length };
+    }
+    cursor = candidate + length;
+  }
+  return null;
+}
+
+function isEscapedDelimiter(value: string, position: number): boolean {
+  let backslashes = 0;
+  for (let cursor = position - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
+    backslashes += 1;
+  }
+  return backslashes % 2 === 1;
+}
+
 function jsonNodeText(node: JSONDocumentNode): string {
   if (node.type === "text") return node.text ?? "";
   if (node.type === "hardBreak") return "\n";
@@ -368,6 +441,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 }
 
 const syntaxHighlightPluginKey = new PluginKey<DecorationSet>("writers-studio-code-highlight");
+const inlineCodePluginKey = new PluginKey("writers-studio-inline-code-normalizer");
 
 function syntaxDecorations(document: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
@@ -437,6 +511,58 @@ const CodeBlockEnhancements = Extension.create({
             view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
             return true;
           },
+        },
+      }),
+      new Plugin({
+        key: inlineCodePluginKey,
+        appendTransaction: (transactions, _oldState, newState) => {
+          if (
+            !transactions.some((transaction) => transaction.docChanged) ||
+            transactions.some((transaction) => transaction.getMeta(inlineCodePluginKey))
+          ) {
+            return null;
+          }
+          const codeMark = newState.schema.marks.code;
+          if (!codeMark) return null;
+          const matches: Array<InlineCodePair & { contentStart: number }> = [];
+          newState.doc.descendants((node, position) => {
+            if (!node.isTextblock || node.type.name === "codeBlock") return;
+            const children = node.content.content;
+            if (children.some((child) => !child.isText)) return;
+            const text = children.map((child) => child.text ?? "").join("");
+            if (!text.includes("`")) return;
+            const codeRanges: Array<{ from: number; to: number }> = [];
+            let offset = 0;
+            for (const child of children) {
+              const end = offset + child.nodeSize;
+              if (child.marks.some((mark) => mark.type === codeMark)) {
+                codeRanges.push({ from: offset, to: end });
+              }
+              offset = end;
+            }
+            for (const pair of findInlineCodePairs(text)) {
+              if (
+                codeRanges.some(
+                  (range) => range.from < pair.closingEnd && range.to > pair.openingStart,
+                )
+              ) {
+                continue;
+              }
+              matches.push({ ...pair, contentStart: position + 1 });
+            }
+          });
+          if (matches.length === 0) return null;
+          const transaction = newState.tr.setMeta(inlineCodePluginKey, true);
+          for (const match of matches.reverse()) {
+            const openingStart = match.contentStart + match.openingStart;
+            const openingEnd = match.contentStart + match.openingEnd;
+            const closingStart = match.contentStart + match.closingStart;
+            const closingEnd = match.contentStart + match.closingEnd;
+            transaction.addMark(openingEnd, closingStart, codeMark.create());
+            transaction.delete(closingStart, closingEnd);
+            transaction.delete(openingStart, openingEnd);
+          }
+          return transaction;
         },
       }),
     ];

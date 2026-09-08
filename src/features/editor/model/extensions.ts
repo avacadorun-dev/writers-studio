@@ -11,10 +11,11 @@ import StarterKit from "@tiptap/starter-kit";
 import { createClientId } from "~shared/lib";
 import { DocumentAnnotationsExtension } from "./annotations";
 import { codeBlockExtensions } from "./code-block";
+import { InlineMath, MathBlock, MathCommands, MathPaste } from "./math";
 import { Callout, ImageBlock, MermaidBlock } from "./rich-blocks";
 import { sanitizePastedHTML } from "./sanitize-pasted-html";
 
-export const editorDocumentSchemaVersion = 3;
+export const editorDocumentSchemaVersion = 4;
 
 const identifiedBlockTypes = [
   "paragraph",
@@ -25,6 +26,7 @@ const identifiedBlockTypes = [
   "table",
   "imageBlock",
   "mermaidBlock",
+  "mathBlock",
 ];
 
 const richBlockTypes = new Set([
@@ -192,9 +194,12 @@ const BlockIdentity = Extension.create({
 function documentRequiredSchemaVersion(document: ProseMirrorNode): number {
   let required = 1;
   document.descendants((node) => {
-    if (node.type.name === "heading" && Number(node.attrs.level) >= 4) {
+    if (node.type.name === "inlineMath" || node.type.name === "mathBlock") {
       required = editorDocumentSchemaVersion;
       return false;
+    }
+    if (node.type.name === "heading" && Number(node.attrs.level) >= 4) {
+      required = Math.max(required, 3);
     }
     if (
       required < 2 &&
@@ -323,4 +328,8 @@ export const editorExtensions = [
   Callout,
   ImageBlock,
   MermaidBlock,
+  InlineMath,
+  MathBlock,
+  MathCommands,
+  MathPaste,
 ];

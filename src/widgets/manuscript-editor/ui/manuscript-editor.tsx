@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -21,28 +22,33 @@ import {
 } from "react";
 import type { AssistantLivePreview, AssistantSelectionAttachment } from "~entities/assistant";
 import { getSegmentAudioSource } from "~entities/dictation";
-import type {
-  AnnotationAnchor,
-  DocumentAnnotation,
-  DocumentNode,
-  TiptapNode,
+import {
+  type AnnotationAnchor,
+  type DocumentAnnotation,
+  type DocumentNode,
+  type TiptapNode,
+  uploadProjectImage,
 } from "~entities/project";
 import { useEditorAutosave } from "~features/autosave";
 import {
   annotationAnchorFromSelection,
   editorExtensions,
   FormattingToolbar,
+  isExternalFileDrag,
   mappedAnnotationAnchors,
   migrateFencedCodeBlocks,
   migrateInlineCodeMarks,
   revealDocumentAnnotation,
   setDocumentAnnotations,
+  validateEditorImageFile,
 } from "~features/editor";
 import {
   cn,
   createClientId,
   getEditorSnapshot,
   loadWriterPreferences,
+  maximumNodeTitleLength,
+  normalizeNodeTitle,
   type WriterPreferences,
   writerPreferencesChangedEvent,
 } from "~shared/lib";
@@ -58,6 +64,7 @@ interface ManuscriptEditorProps {
   highlight?: string;
   onSaveState: (state: SaveState) => void;
   onDictate: () => void;
+  onRenameNode?: (title: string) => void;
   assistantSelection?: AssistantSelectionAttachment;
   assistantPreview?: AssistantLivePreview;
   onAssistantSelectionChange?: (selection?: AssistantSelectionAttachment) => void;
@@ -88,6 +95,7 @@ export function ManuscriptEditor({
   highlight,
   onSaveState,
   onDictate,
+  onRenameNode,
   assistantSelection,
   assistantPreview,
   onAssistantSelectionChange,
@@ -107,7 +115,13 @@ export function ManuscriptEditor({
   const [recovered, setRecovered] = useState(false);
   const [contextPanel, setContextPanel] = useState<"overview" | "stats" | null>(null);
   const [selectionMenu, setSelectionMenu] = useState<SelectionContextMenuPosition | null>(null);
+  const [imageDrop, setImageDrop] = useState<{ position: number; top: number } | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [editingNodeTitle, setEditingNodeTitle] = useState(false);
+  const [nodeTitleDraft, setNodeTitleDraft] = useState(node.title);
   const selectionMenuRef = useRef<HTMLDivElement | null>(null);
+  const nodeTitleInputRef = useRef<HTMLInputElement | null>(null);
+  const editorScrollRef = useRef<HTMLDivElement | null>(null);
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
   const loadedDocument = useRef<{ nodeId: string; revision: number } | null>(null);
   const currentRevisionRef = useRef(node.currentRevision);
@@ -116,6 +130,19 @@ export function ManuscriptEditor({
   const annotationSelectRef = useRef(onAnnotationSelect);
   const { showToast } = useToast();
   const { requestInput } = useActionDialog();
+  useEffect(() => {
+    if (!editingNodeTitle) setNodeTitleDraft(node.title);
+  }, [editingNodeTitle, node.title]);
+  useEffect(() => {
+    if (!editingNodeTitle) return;
+    nodeTitleInputRef.current?.focus();
+    nodeTitleInputRef.current?.select();
+  }, [editingNodeTitle]);
+  const commitNodeTitle = () => {
+    const title = normalizeNodeTitle(nodeTitleDraft, node.title);
+    setEditingNodeTitle(false);
+    if (title) onRenameNode?.(title);
+  };
   const updateTextStats = useCallback((text: string) => {
     const words = text.trim() ? text.trim().split(/\s+/u).length : 0;
     setTextStats({ words, characters: Array.from(text).length });
@@ -387,6 +414,82 @@ export function ManuscriptEditor({
     editor.commands.focus();
   }, [editor]);
 
+  const imageDropPosition = useCallback(
+    (event: ReactDragEvent<HTMLElement>) => {
+      if (!editor || !editorScrollRef.current) return null;
+      const result = editor.view.posAtCoords({ left: event.clientX, top: event.clientY });
+      if (!result) return null;
+      try {
+        const caret = editor.view.coordsAtPos(result.pos);
+        const viewport = editorScrollRef.current;
+        const viewportBounds = viewport.getBoundingClientRect();
+        return {
+          position: result.pos,
+          top: caret.top - viewportBounds.top + viewport.scrollTop,
+        };
+      } catch {
+        return null;
+      }
+    },
+    [editor],
+  );
+
+  const handleImageDragOver = useCallback(
+    (event: ReactDragEvent<HTMLElement>) => {
+      if (!isExternalFileDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      const position = imageDropPosition(event);
+      if (position) setImageDrop(position);
+    },
+    [imageDropPosition],
+  );
+
+  const handleImageDrop = useCallback(
+    (event: ReactDragEvent<HTMLElement>) => {
+      if (!editor || !isExternalFileDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      const position = imageDropPosition(event)?.position ?? imageDrop?.position;
+      setImageDrop(null);
+      const file = event.dataTransfer.files[0];
+      if (!file || position === undefined) return;
+      const validation = validateEditorImageFile(file);
+      if (!validation.valid) {
+        showToast({ title: "Изображение не добавлено", description: validation.message });
+        return;
+      }
+      setImageUploading(true);
+      void uploadProjectImage(node.projectId, file)
+        .then(({ media }) => {
+          if (editor.isDestroyed) return;
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(position, {
+              type: "imageBlock",
+              attrs: {
+                src: media.contentUrl,
+                assetId: media.id,
+                alt: media.originalName.replace(/\.[^.]+$/u, ""),
+                caption: "",
+                width: media.width ?? 1,
+                height: media.height ?? 1,
+              },
+            })
+            .run();
+          showToast({ title: "Изображение добавлено" });
+        })
+        .catch((error: unknown) => {
+          showToast({
+            title: "Не удалось загрузить изображение",
+            description: error instanceof Error ? error.message : "Повторите попытку",
+          });
+        })
+        .finally(() => setImageUploading(false));
+    },
+    [editor, imageDrop?.position, imageDropPosition, node.projectId, showToast],
+  );
+
   useEffect(() => {
     const refreshPreferences = () => setPreferences(loadWriterPreferences());
     window.addEventListener(writerPreferencesChangedEvent, refreshPreferences);
@@ -574,7 +677,7 @@ export function ManuscriptEditor({
             body="Они сохранятся на сервере после восстановления соединения."
           />
         ) : null}
-        <div className="relative min-h-0 flex-1 overflow-y-auto">
+        <div ref={editorScrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
           <div
             className={cn(
               "px-5 pt-8 sm:pt-10",
@@ -584,7 +687,37 @@ export function ManuscriptEditor({
             <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
               {nodeTypeLabel}
             </p>
-            <h1 className="font-display mt-2 text-[34px] leading-[1.25]">{node.title}</h1>
+            {editingNodeTitle ? (
+              <input
+                ref={nodeTitleInputRef}
+                value={nodeTitleDraft}
+                maxLength={maximumNodeTitleLength}
+                aria-label={`Новое название для «${node.title}»`}
+                className="font-display mt-2 w-full rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-2 text-[34px] leading-[1.25] outline-none"
+                onFocus={(event) => event.currentTarget.select()}
+                onChange={(event) => setNodeTitleDraft(event.target.value)}
+                onBlur={commitNodeTitle}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitNodeTitle();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    setNodeTitleDraft(node.title);
+                    setEditingNodeTitle(false);
+                  }
+                }}
+              />
+            ) : (
+              <p
+                className="font-display mt-2 w-fit max-w-full cursor-text rounded px-1 text-[34px] leading-[1.25] hover:bg-[var(--surface-subtle)]"
+                title="Дважды нажмите, чтобы переименовать"
+                onDoubleClick={() => onRenameNode && setEditingNodeTitle(true)}
+              >
+                <span className="sr-only">Название материала: </span>
+                {node.title}
+              </p>
+            )}
             <div className="mt-6 h-0.5 w-11 bg-[var(--accent)]" aria-hidden="true" />
             {assistantSelection ? (
               <div className="mt-5 flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-3 py-2 text-xs">
@@ -616,35 +749,68 @@ export function ManuscriptEditor({
                 </Button>
               </div>
             ) : null}
+            <div className="mt-5 flex min-h-10 items-center" aria-live="polite">
+              {editor?.isEmpty ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => editor.chain().focus("start").run()}
+                  >
+                    Начать писать
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={onDictate}>
+                    <Mic className="size-4" aria-hidden="true" />
+                    Диктовать
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
-          {assistantPreview ? <AssistantProposalPreview preview={assistantPreview} /> : null}
+          {assistantPreview ? (
+            <AssistantProposalPreview
+              preview={assistantPreview}
+              integratedWorkspace={integratedWorkspace}
+            />
+          ) : null}
+          {imageDrop ? (
+            <div
+              data-testid="editor-image-drop-indicator"
+              className="pointer-events-none absolute inset-x-5 z-20 mx-auto max-w-[var(--editor-max-width)]"
+              style={{ top: imageDrop.top }}
+              aria-hidden="true"
+            >
+              <div className="h-0.5 bg-[var(--accent)] shadow-[0_0_0_3px_var(--accent-soft)]" />
+              <span className="mt-1 inline-flex rounded-full bg-[var(--accent-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--ink-on-inverse)]">
+                {imageUploading ? "Загружаем изображение…" : "Вставить изображение здесь"}
+              </span>
+            </div>
+          ) : null}
           <EditorContent
             editor={editor}
             className="editor-content"
             onMouseDown={preserveSelectionOnRightClick}
             onContextMenu={handleSelectionContextMenu}
             onKeyDown={handleSelectionMenuKey}
+            onDragOver={handleImageDragOver}
+            onDragLeave={(event) => {
+              const related = event.relatedTarget;
+              if (related instanceof Node && event.currentTarget.contains(related)) return;
+              setImageDrop(null);
+            }}
+            onDrop={handleImageDrop}
           />
-          {editor?.isEmpty ? (
-            <div className="pointer-events-none absolute inset-x-0 top-56 flex justify-center">
-              <div className="pointer-events-auto flex gap-2">
-                <Button type="button" variant="secondary" onClick={() => editor.commands.focus()}>
-                  Начать писать
-                </Button>
-                <Button type="button" variant="secondary" onClick={onDictate}>
-                  <Mic className="size-4" aria-hidden="true" />
-                  Диктовать
-                </Button>
-              </div>
-            </div>
-          ) : null}
+        </div>
+        <footer className="flex h-10 shrink-0 items-center border-t border-[var(--border-subtle)] bg-[var(--surface-panel)] text-[11px] text-[var(--ink-tertiary)]">
           <div
             className={cn(
-              "flex items-center gap-3 px-5 pb-10 text-[11px] text-[var(--ink-tertiary)]",
-              integratedWorkspace ? "editor-shell-width mx-auto sm:px-14" : "w-full sm:px-[72px]",
+              "flex w-full items-center gap-3 px-5",
+              integratedWorkspace ? "editor-shell-width mx-auto sm:px-14" : "sm:px-[72px]",
             )}
           >
-            <span>{new Intl.NumberFormat("ru").format(textStats.words)} слов</span>
+            <span aria-live="polite">
+              {new Intl.NumberFormat("ru").format(textStats.words)} слов
+            </span>
             {sourceRefs.length > 0 ? (
               <Button
                 type="button"
@@ -652,13 +818,14 @@ export function ManuscriptEditor({
                 size="icon"
                 className="size-8 min-h-8"
                 aria-label="Прослушать источник этого абзаца"
+                title="Прослушать источник"
                 onClick={() => void playSource()}
               >
                 <Headphones className="size-4" aria-hidden="true" />
               </Button>
             ) : null}
           </div>
-        </div>
+        </footer>
       </div>
       {selectionMenu ? (
         <div
@@ -795,7 +962,13 @@ function stableSelectionRanges(editor: Editor, from: number, to: number) {
   return ranges;
 }
 
-function AssistantProposalPreview({ preview }: { preview: AssistantLivePreview }) {
+function AssistantProposalPreview({
+  preview,
+  integratedWorkspace,
+}: {
+  preview: AssistantLivePreview;
+  integratedWorkspace: boolean;
+}) {
   const edits = Array.isArray(preview.arguments.edits)
     ? preview.arguments.edits.filter(isPreviewEdit)
     : [];
@@ -804,11 +977,13 @@ function AssistantProposalPreview({ preview }: { preview: AssistantLivePreview }
     <aside
       data-testid="assistant-live-preview"
       aria-label="Неприменённое предложение ассистента"
-      className={`mx-5 mt-6 rounded-[var(--radius-md)] border px-4 py-4 sm:mx-[72px] ${
+      className={cn(
+        "mt-6 rounded-[var(--radius-md)] border px-4 py-4",
+        integratedWorkspace ? "editor-shell-width mx-auto" : "mx-5 sm:mx-[72px]",
         preview.stale
           ? "border-[var(--danger)]/35 bg-[var(--danger-soft)]"
-          : "border-[var(--success)]/35 bg-[var(--diff-insert)]"
-      }`}
+          : "border-[var(--success)]/35 bg-[var(--diff-insert)]",
+      )}
     >
       <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] uppercase">
         <Sparkles className="size-3.5" aria-hidden="true" />

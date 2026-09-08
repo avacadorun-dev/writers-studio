@@ -14,6 +14,9 @@ export type EditorStyle = (typeof editorStyleOptions)[number]["id"];
 export type EditorFontSize = 17 | 19 | 21;
 export type EditorLineHeight = 1.5 | 1.75 | 2;
 export type EditorManuscriptWidth = 60 | 70 | 80;
+export type EditorParagraphSpacing = 0.65 | 0.9 | 1.1;
+export type EditorListItemSpacing = 0 | 0.25 | 0.5;
+export type EditorToolbarMode = "auto" | "expanded" | "compact";
 export type AssistantSilenceCheckpointMs = 0 | 3000 | 5000 | 8000;
 
 export interface WriterPreferences {
@@ -27,7 +30,10 @@ export interface WriterPreferences {
   fontFamily: EditorFontFamily;
   fontSize: EditorFontSize;
   lineHeight: EditorLineHeight;
+  paragraphSpacing: EditorParagraphSpacing;
+  listItemSpacing: EditorListItemSpacing;
   manuscriptWidth: EditorManuscriptWidth;
+  toolbarMode: EditorToolbarMode;
   theme: EditorTheme;
   style: EditorStyle;
   spellcheck: boolean;
@@ -54,7 +60,10 @@ export const defaultWriterPreferences: WriterPreferences = {
   fontFamily: "sofia",
   fontSize: 19,
   lineHeight: 1.75,
+  paragraphSpacing: 0.9,
+  listItemSpacing: 0.25,
   manuscriptWidth: 70,
+  toolbarMode: "auto",
   theme: "system",
   style: "quiet",
   spellcheck: true,
@@ -95,6 +104,8 @@ export function applyWriterPreferences(preferences = loadWriterPreferences()): v
   );
   root.style.setProperty("--editor-font-size", `${preferences.fontSize}px`);
   root.style.setProperty("--editor-line-height", String(preferences.lineHeight));
+  root.style.setProperty("--editor-paragraph-spacing", `${preferences.paragraphSpacing}em`);
+  root.style.setProperty("--editor-list-item-spacing", `${preferences.listItemSpacing}em`);
   root.style.setProperty("--editor-max-width", `${preferences.manuscriptWidth}ch`);
   syncBrowserThemeColor();
 }
@@ -134,7 +145,14 @@ export function normalizeWriterPreferences(value: unknown): WriterPreferences {
     fontFamily: normalizeEditorFontFamily(value.fontFamily),
     fontSize: isChoice(value.fontSize, [17, 19, 21]) ? value.fontSize : 19,
     lineHeight: isChoice(value.lineHeight, [1.5, 1.75, 2]) ? value.lineHeight : 1.75,
+    paragraphSpacing: isChoice(value.paragraphSpacing, [0.65, 0.9, 1.1])
+      ? value.paragraphSpacing
+      : 0.9,
+    listItemSpacing: isChoice(value.listItemSpacing, [0, 0.25, 0.5]) ? value.listItemSpacing : 0.25,
     manuscriptWidth: isChoice(value.manuscriptWidth, [60, 70, 80]) ? value.manuscriptWidth : 70,
+    toolbarMode: isChoice(value.toolbarMode, ["auto", "expanded", "compact"])
+      ? value.toolbarMode
+      : "auto",
     theme: isChoice(value.theme, ["light", "dark", "system"]) ? value.theme : "system",
     style: normalizeEditorStyle(value.style),
     spellcheck: readBoolean(value.spellcheck, true),

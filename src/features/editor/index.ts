@@ -19,5 +19,11 @@ export {
   editorExtensions,
   highlightSourceNode,
 } from "./model/extensions";
+export {
+  isExternalFileDrag,
+  maximumEditorImageBytes,
+  supportedEditorImageTypes,
+  validateEditorImageFile,
+} from "./model/image-drop";
 export { sanitizePastedHTML } from "./model/sanitize-pasted-html";
 export { FormattingToolbar } from "./ui/formatting-toolbar";

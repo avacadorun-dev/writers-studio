@@ -17,6 +17,8 @@ func TestCanonicalRichBlocksRoundTripWithoutParagraphFlattening(t *testing.T) {
 		map[string]any{"type": "callout", "kind": "warning", "text": "Осторожно"},
 		map[string]any{"type": "callout", "kind": "todo", "text": "Проверить факты"},
 		map[string]any{"type": "mermaid", "code": "flowchart LR\n  A --> B", "caption": "Поток"},
+		map[string]any{"type": "paragraph", "text": "Энергия $E=mc^2$ сохраняется"},
+		map[string]any{"type": "math", "latex": `\\frac{a}{b}`, "description": "Дробь"},
 		map[string]any{"type": "image", "assetId": assetID, "alt": "Карта", "caption": "Схема мира"},
 		map[string]any{"type": "table", "rows": []any{
 			map[string]any{"cells": []any{
@@ -41,7 +43,7 @@ func TestCanonicalRichBlocksRoundTripWithoutParagraphFlattening(t *testing.T) {
 	if err := editor.Validate(content); err != nil {
 		t.Fatal(err)
 	}
-	if version, err := editor.SchemaVersion(content); err != nil || version != 2 {
+	if version, err := editor.SchemaVersion(content); err != nil || version != 4 {
 		t.Fatalf("rich schema version = %d, %v", version, err)
 	}
 	var document editor.Node
@@ -52,14 +54,18 @@ func TestCanonicalRichBlocksRoundTripWithoutParagraphFlattening(t *testing.T) {
 		document.Content[0].Type, document.Content[4].Type,
 		document.Content[5].Type, document.Content[6].Type, document.Content[7].Type,
 		document.Content[8].Type, document.Content[9].Type, document.Content[10].Type,
+		document.Content[11].Type, document.Content[12].Type,
 	}; !reflect.DeepEqual(got, []string{
-		"callout", "mermaidBlock", "imageBlock", "table", "bulletList",
+		"callout", "mermaidBlock", "paragraph", "mathBlock", "imageBlock", "table", "bulletList",
 		"orderedList", "sceneBreak", "horizontalRule",
 	}) {
 		t.Fatalf("canonical rich nodes were flattened: %v", got)
 	}
-	if document.Content[5].Attrs["src"] != "/api/media/"+assetID+"/content" {
-		t.Fatalf("image source is not canonical: %#v", document.Content[5].Attrs)
+	if document.Content[7].Attrs["src"] != "/api/media/"+assetID+"/content" {
+		t.Fatalf("image source is not canonical: %#v", document.Content[7].Attrs)
+	}
+	if document.Content[5].Content[1].Type != "inlineMath" || document.Content[5].Content[1].Attrs["latex"] != "E=mc^2" {
+		t.Fatalf("inline formula was flattened: %#v", document.Content[5].Content)
 	}
 
 	blocks, err := assistantBlocksFromDocument(content)
@@ -73,6 +79,8 @@ func TestCanonicalRichBlocksRoundTripWithoutParagraphFlattening(t *testing.T) {
 	for _, expected := range []string{
 		`"type":"callout","text":"Справка\nбез потерь","kind":"info"`,
 		`"type":"mermaid","code":"flowchart LR\n  A --\u003e B","caption":"Поток"`,
+		`"type":"paragraph","text":"Энергия $E=mc^2$ сохраняется"`,
+		`"type":"math","latex":"\\\\frac{a}{b}","description":"Дробь"`,
 		`"type":"image","caption":"Схема мира","assetId":"` + assetID + `","alt":"Карта"`,
 		`"type":"table","rows":[{"cells":[{"text":"Параметр","header":true,"colspan":1,"rowspan":1}`,
 		`{"text":"HP","header":false,"colspan":1,"rowspan":1}`,

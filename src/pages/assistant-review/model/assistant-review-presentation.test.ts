@@ -9,6 +9,8 @@ import {
   exactTextEdits,
   operationLabel,
   resolvedTarget,
+  reviewPrimaryAction,
+  reviewStatusLabel,
   selectedChangeGroupDependents,
   snapshotText,
   withRequiredChangeGroups,
@@ -34,6 +36,21 @@ function operation(overrides: Partial<AssistantChangeOperation> = {}): Assistant
 }
 
 describe("assistant review presentation", () => {
+  test("derives one primary action and an author-facing status", () => {
+    expect(reviewStatusLabel("staged")).toBe("Не применено");
+    expect(reviewStatusLabel("applied")).toBe("Применено");
+    expect(reviewStatusLabel("undone")).toBe("Отменено");
+    expect(reviewPrimaryAction("staged", false)).toEqual({
+      action: "apply",
+      label: "Применить изменения",
+    });
+    expect(reviewPrimaryAction("staged", true).action).toBe("send-feedback");
+    expect(reviewPrimaryAction("applied", false)).toEqual({
+      action: "undo",
+      label: "Отменить набор",
+    });
+    expect(reviewPrimaryAction("rejected", false).action).toBe("return");
+  });
   test("uses author-facing operation and group labels", () => {
     expect(operationLabel("document.replace_range")).toBe("Точная правка текста");
     expect(operationLabel("document.append_chunk")).toBe("Большой фрагмент документа");

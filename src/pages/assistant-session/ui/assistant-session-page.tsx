@@ -28,6 +28,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -54,7 +55,7 @@ import { getProject } from "~entities/project";
 import { LivePCMStream } from "~features/dictation";
 import { APIError } from "~shared/api";
 import { cn } from "~shared/lib";
-import { AssistantMarkdown, Banner, Button, Spinner, useToast } from "~shared/ui";
+import { AssistantMessage, Banner, Button, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 import { assistantLivePreview } from "../model/assistant-live-preview";
 import {
@@ -63,7 +64,13 @@ import {
   buildAssistantActivity,
   buildAssistantNativeActions,
 } from "../model/assistant-presentation";
-import { isAssistantTranscriptNearEnd } from "../model/assistant-transcript-scroll";
+import {
+  assistantTranscriptScrollStorageKey,
+  captureAssistantTranscriptScroll,
+  isAssistantTranscriptNearEnd,
+  normalizeAssistantTranscriptScrollSnapshot,
+  restoredAssistantTranscriptScrollTop,
+} from "../model/assistant-transcript-scroll";
 
 interface AssistantSessionPageProps {
   projectId: string;
@@ -106,6 +113,7 @@ export function AssistantSessionPage({
       : "voice",
   );
   const chatDraftKey = `writers-studio-assistant-chat-draft:${runId}`;
+  const transcriptScrollKey = assistantTranscriptScrollStorageKey(runId);
   const [message, setMessage] = useState(() => localStorage.getItem(chatDraftKey) ?? "");
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
@@ -123,6 +131,7 @@ export function AssistantSessionPage({
   const voiceAttemptRef = useRef(0);
   const transcriptViewportRef = useRef<HTMLDivElement | null>(null);
   const transcriptFollowsActivityRef = useRef(true);
+  const restoredTranscriptRunRef = useRef<string | undefined>(undefined);
   const [showLatestActivity, setShowLatestActivity] = useState(false);
   const voiceClientAvailable =
     window.isSecureContext && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -186,7 +195,29 @@ export function AssistantSessionPage({
     const followsActivity = isAssistantTranscriptNearEnd(viewport);
     transcriptFollowsActivityRef.current = followsActivity;
     setShowLatestActivity(!followsActivity);
-  }, []);
+    localStorage.setItem(
+      transcriptScrollKey,
+      JSON.stringify(captureAssistantTranscriptScroll(viewport)),
+    );
+  }, [transcriptScrollKey]);
+
+  useLayoutEffect(() => {
+    if (!turns.isSuccess || restoredTranscriptRunRef.current === runId) return;
+    const viewport = transcriptViewportRef.current;
+    if (!viewport) return;
+    let snapshot = null;
+    try {
+      snapshot = normalizeAssistantTranscriptScrollSnapshot(
+        JSON.parse(localStorage.getItem(transcriptScrollKey) ?? "null"),
+      );
+    } catch {
+      snapshot = null;
+    }
+    restoredTranscriptRunRef.current = runId;
+    transcriptFollowsActivityRef.current = snapshot?.followsActivity ?? true;
+    viewport.scrollTop = restoredAssistantTranscriptScrollTop(viewport, snapshot);
+    setShowLatestActivity(!(snapshot?.followsActivity ?? true));
+  }, [runId, transcriptScrollKey, turns.isSuccess]);
 
   useEffect(() => {
     // The revision deliberately re-runs this effect as transcript content grows.
@@ -1559,9 +1590,9 @@ function Conversation({
                         ? "через MCP"
                         : "в чате"}
                   </p>
-                  <p
+                  <AssistantMessage
+                    compact={compact}
                     className={cn(
-                      "whitespace-pre-wrap",
                       focusedVoiceTurn &&
                         cn(
                           "font-ui",
@@ -1572,14 +1603,15 @@ function Conversation({
                     )}
                   >
                     {turn.instruction}
-                  </p>
+                  </AssistantMessage>
                 </article>
                 {turn.assistantText ? (
                   <article className="mt-3 max-w-[92%] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-5 py-4 text-[14px]">
                     <p className="mb-2 text-[9px] font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
                       Ассистент
                     </p>
-                    <AssistantMarkdown
+                    <AssistantMessage
+                      compact={compact}
                       className={
                         compact
                           ? "[&_h1]:text-[15px] [&_h2]:text-[14px] [&_h3]:text-[14px] [&_h1]:my-2 [&_h2]:my-2 [&_h3]:my-2"
@@ -1587,7 +1619,7 @@ function Conversation({
                       }
                     >
                       {turn.assistantText}
-                    </AssistantMarkdown>
+                    </AssistantMessage>
                   </article>
                 ) : null}
                 {turn.state === "failed" ? (

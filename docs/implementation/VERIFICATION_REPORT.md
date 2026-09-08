@@ -1,7 +1,58 @@
 # Verification report
 
-Дата: 2026-08-04  
+Дата: 2026-08-28
+
 Runtime: Docker Desktop, PostgreSQL 17, MinIO, Go 1.26, Bun 1.3.14, Chromium/Playwright.
+
+## Delta 0.7.0 — 2026-08-28
+
+WS-0701–WS-0713 реализованы, локально проверены и развёрнуты в production.
+Editor delta включает
+адаптивный toolbar, раздельные типографические интервалы, image DnD,
+schema v4 с `inlineMath`/`mathBlock`, обратный backtick, видимые границы рукописи,
+выровненный empty state, стабильный 40 px footer и inline rename. Assistant delta
+объединяет Studio/Canvas в одном responsive dock, изолирует прокрутку, безопасно
+показывает JSON/длинные messages и даёт review один явный primary action.
+
+Документы v1–v3 продолжают валидироваться; v4 требуется только при наличии
+формулы. KaTeX запущен с `trust: false`; HTML, URL/resource и user-defined commands
+отклоняются. Markdown сохраняет LaTeX delimiters, TXT/DOCX используют исходник,
+а `.wstudio` import проверяет v4 documents до commit.
+
+| Проверка | Результат 0.7.0 |
+|---|---|
+| `bun run check` | PASS: docs contract + Biome |
+| `bun run type-check` | PASS |
+| `bun run test` | PASS: 234/234 unit/component tests |
+| `bun run build` | PASS: production Vite/PWA build + TypeScript |
+| `go test ./...` | PASS: all Go packages |
+| Release E2E | PASS: 8/8, `release-070.spec.ts`, 2 scenarios × 4 viewport |
+| Assistant change-set E2E | PASS: 4/4, exact staged diff → Apply → grouped Undo |
+| Versions/export/import/recovery E2E | PASS: 12/12, selected existing scenarios × 4 viewport |
+| Browser matrix | PASS: 1440×1024, 1024×768, 834×1194, 390×844; no document-level overflow |
+| Data safety | PASS: autosave/reload, editor undo/redo, versions compare/restore, TXT/Markdown/DOCX, `.wstudio`, recovery and Assistant change sets |
+| LAN production deployment | PASS: 2026-08-28, `127.0.0.1` / `https://studio.example.test` |
+
+Production deployment выполнен с предварительным backup
+`postgres-20260828T080931Z.sql.gz` и `object-data-20260828T080931Z.tar.gz`;
+оба архива проверены через `gzip -t` / `tar -tzf`. Образ собран из
+того же pinned `Dockerfile` под `linux/amd64`, загружен на сервер и
+переключён через production Compose. Image ID:
+`sha256:5628ce82f85bf389983f1824a12e520717f80b8ed2c7d274cb07c7be4f195f33`;
+SHA-256 Go binary:
+`b4439c6cc51222fa76a7de98926518266931078e072d0bcd8179c66dd0f7fcd9`.
+
+После switch миграции остались `27/27`, все 46 application tables
+сохранили точные row counts. В MinIO совпали количество `565`
+файлов и aggregate SHA-256
+`0d9cbf7e166347977a78d0bf175a192568b922084fa54c0238225174b236086e`.
+`app`, `db` и `storage` healthy, proxy работает, recent app logs без
+`panic`/`fatal`/`error`. Внешние HTTPS `/`, `/projects` и `/api/health`
+прошли; in-app Browser после автообновления PWA cache загрузил
+`index-B05Pzt2n.js`, Studio editor, toolbar и `Типографика` без console
+errors и horizontal overflow. Rollback сохранён как
+`writers-studio-app:rollback-pre-0.7.0-20260828T080826Z` и
+`/path/to/apps/writers-studio.rollback-pre-0.7.0-20260828T080826Z`.
 
 ## Delta 0.2.0 — 2026-08-05
 

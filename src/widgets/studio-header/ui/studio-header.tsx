@@ -14,11 +14,12 @@ import {
   Server,
   Settings,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Project } from "~entities/project";
 import { useSession } from "~entities/session";
 import { EditProjectDialog } from "~features/edit-project";
+import { maximumNodeTitleLength, normalizeNodeTitle } from "~shared/lib";
 import { BrandMark, Button, type SaveState, SaveStatus } from "~shared/ui";
 
 interface StudioHeaderProps {
@@ -28,6 +29,7 @@ interface StudioHeaderProps {
   saveState: SaveState;
   onDictate?: () => void;
   onAssistant?: () => void;
+  onRenameNode?: (title: string) => void;
 }
 
 export function StudioHeader({
@@ -37,9 +39,26 @@ export function StudioHeader({
   saveState,
   onDictate,
   onAssistant,
+  onRenameNode,
 }: StudioHeaderProps) {
   const session = useSession();
   const [editingProject, setEditingProject] = useState(false);
+  const [editingNodeTitle, setEditingNodeTitle] = useState(false);
+  const [nodeTitleDraft, setNodeTitleDraft] = useState(nodeTitle);
+  const nodeTitleInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!editingNodeTitle) setNodeTitleDraft(nodeTitle);
+  }, [editingNodeTitle, nodeTitle]);
+  useEffect(() => {
+    if (!editingNodeTitle) return;
+    nodeTitleInputRef.current?.focus();
+    nodeTitleInputRef.current?.select();
+  }, [editingNodeTitle]);
+  const commitNodeTitle = () => {
+    const title = normalizeNodeTitle(nodeTitleDraft, nodeTitle);
+    setEditingNodeTitle(false);
+    if (title) onRenameNode?.(title);
+  };
   const initials = (session.data?.user.displayName || "Автор")
     .split(/\s+/)
     .map((part) => part[0])
@@ -61,9 +80,38 @@ export function StudioHeader({
           className="hidden size-3.5 shrink-0 text-[var(--ink-tertiary)] sm:block"
           aria-hidden="true"
         />
-        <p className="hidden truncate text-[13px] text-[var(--ink-secondary)] sm:block">
-          {nodeTitle}
-        </p>
+        {editingNodeTitle ? (
+          <input
+            ref={nodeTitleInputRef}
+            value={nodeTitleDraft}
+            maxLength={maximumNodeTitleLength}
+            aria-label={`Новое название для «${nodeTitle}»`}
+            className="hidden h-8 min-w-24 max-w-60 rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-2 text-[13px] outline-none sm:block"
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => setNodeTitleDraft(event.target.value)}
+            onBlur={commitNodeTitle}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitNodeTitle();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setNodeTitleDraft(nodeTitle);
+                setEditingNodeTitle(false);
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="hidden min-w-0 truncate rounded px-1 text-[13px] text-[var(--ink-secondary)] hover:bg-[var(--surface-subtle)] focus-visible:outline-2 sm:block"
+            aria-label={`Материал «${nodeTitle}». Дважды нажмите, чтобы переименовать`}
+            title="Дважды нажмите, чтобы переименовать"
+            onDoubleClick={() => onRenameNode && setEditingNodeTitle(true)}
+          >
+            {nodeTitle}
+          </button>
+        )}
       </div>
       <div className="hidden md:block">
         <SaveStatus state={saveState} />

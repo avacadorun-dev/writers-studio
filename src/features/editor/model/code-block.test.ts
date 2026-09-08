@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { migrateFencedCodeBlocks, migrateInlineCodeMarks, parseFencedCode } from "./code-block";
+import {
+  findInlineCodePairs,
+  migrateFencedCodeBlocks,
+  migrateInlineCodeMarks,
+  parseFencedCode,
+} from "./code-block";
 import {
   codeHighlightLanguage,
   codeLanguageOptions,
@@ -140,6 +145,16 @@ describe("native code blocks", () => {
       content: [{ type: "paragraph", content: [{ type: "text", text: "before `missing" }] }],
     };
     expect(migrateInlineCodeMarks(plain)).toBe(plain);
+  });
+
+  test("finds complete matching inline delimiters and rejects escaped or mismatched runs", () => {
+    expect(findInlineCodePairs("до `code` после ``raw``")).toEqual([
+      { openingStart: 3, openingEnd: 4, closingStart: 8, closingEnd: 9 },
+      { openingStart: 16, openingEnd: 18, closingStart: 21, closingEnd: 23 },
+    ]);
+    expect(findInlineCodePairs("\\`escaped`")).toEqual([]);
+    expect(findInlineCodePairs("``mismatch`")).toEqual([]);
+    expect(findInlineCodePairs("`unclosed")).toEqual([]);
   });
 
   test("offers a broad language registry including Go without rewriting fence aliases", () => {

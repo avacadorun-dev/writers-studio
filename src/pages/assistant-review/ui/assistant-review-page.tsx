@@ -25,7 +25,7 @@ import {
   undoAssistantChangeSet,
 } from "~entities/assistant";
 import { getProject } from "~entities/project";
-import { Banner, Button, Checkbox, Spinner, useToast } from "~shared/ui";
+import { AssistantMessage, Banner, Button, Checkbox, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 
 import {
@@ -35,6 +35,8 @@ import {
   exactTextEdits,
   operationLabel,
   resolvedTarget,
+  reviewPrimaryAction,
+  reviewStatusLabel,
   selectedChangeGroupDependents,
   snapshotText,
   withRequiredChangeGroups,
@@ -96,6 +98,9 @@ export function AssistantReviewPage({
   const [requestingChanges, setRequestingChanges] = useState(false);
   const [changeRequest, setChangeRequest] = useState("");
   const changeRequestRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (groups.length > 0 && selectedGroups.size === 0) {
       setSelectedGroups(new Set(groups));
@@ -116,11 +121,36 @@ export function AssistantReviewPage({
   }, [requestingChanges]);
   useEffect(() => {
     if (!embedded) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose?.();
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const maintainDialogFocus = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const controls = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null);
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", maintainDialogFocus);
+    return () => {
+      window.removeEventListener("keydown", maintainDialogFocus);
+      window.requestAnimationFrame(() => returnFocusRef.current?.focus());
+    };
   }, [embedded, onClose]);
   const apply = useMutation({
     mutationFn: () => {
@@ -214,6 +244,7 @@ export function AssistantReviewPage({
   const value = changeSet.data.changeSet;
   const staged = value.state === "staged";
   const applied = value.state === "applied";
+  const primaryAction = reviewPrimaryAction(value.state, requestingChanges);
 
   if (embedded) {
     return (
@@ -226,6 +257,7 @@ export function AssistantReviewPage({
             onClick={returnToSession}
           />
           <section
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="assistant-review-title"
@@ -235,16 +267,18 @@ export function AssistantReviewPage({
             <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] px-5 sm:px-6">
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-                  Ассистент · предложение
+                  {reviewStatusLabel(value.state)} · выбрано {selectedGroups.size} из{" "}
+                  {groups.length}
                 </p>
-                <h1 id="assistant-review-title" className="font-display mt-0.5 text-xl">
-                  Проверка изменения
+                <h1 id="assistant-review-title" className="font-display mt-0.5 truncate text-xl">
+                  {value.title}
                 </h1>
               </div>
               <span className="rounded-full bg-[var(--surface-subtle)] px-3 py-1 text-[11px]">
-                {staged ? "Пока ничего не изменено" : applied ? "Применено" : "Отменено"}
+                {reviewStatusLabel(value.state)}
               </span>
               <Button
+                ref={closeButtonRef}
                 type="button"
                 variant="ghost"
                 size="icon"
@@ -264,7 +298,8 @@ export function AssistantReviewPage({
                   />
                   <div>
                     <p className="text-[14px] font-semibold">
-                      {value.operations.length} изменений готово к подтверждению
+                      {selectedGroups.size} из {groups.length} групп · {value.operations.length}{" "}
+                      точных изменений
                     </p>
                     <p className="mt-0.5 text-[11px] text-[var(--ink-secondary)]">
                       Рукопись, autosave и история пока не изменены
@@ -316,7 +351,11 @@ export function AssistantReviewPage({
                         <label
                           key={group}
                           htmlFor={controlId}
-                          className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--surface-paper)] p-2 text-[12px]"
+                          className={`flex items-start gap-2 rounded-[var(--radius-sm)] border p-2 text-[12px] ${
+                            selected
+                              ? "border-transparent bg-[var(--surface-paper)]"
+                              : "border-dashed border-[var(--border-strong)] bg-transparent"
+                          }`}
                         >
                           <Checkbox
                             id={controlId}
@@ -336,7 +375,23 @@ export function AssistantReviewPage({
                               })
                             }
                           />
-                          <span>{changeGroupLabel(value.operations, group)}</span>
+                          <span>
+                            <span className="block">
+                              {changeGroupLabel(value.operations, group)}
+                            </span>
+                            {!selected ? (
+                              <span className="mt-0.5 block text-[10px] text-[var(--ink-tertiary)]">
+                                Исключена из применения
+                              </span>
+                            ) : requiredBy.length > 0 ? (
+                              <span className="mt-0.5 block text-[10px] text-[var(--ink-tertiary)]">
+                                Обязательна для:{" "}
+                                {requiredBy
+                                  .map((item) => changeGroupLabel(value.operations, item))
+                                  .join(", ")}
+                              </span>
+                            ) : null}
+                          </span>
                         </label>
                       );
                     })}
@@ -348,6 +403,38 @@ export function AssistantReviewPage({
                     После применения весь набор останется отменяемым в Studio.
                   </p>
                 </div>
+                <details className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
+                  <summary className="cursor-pointer text-[12px] font-semibold">
+                    Полный контекст сессии
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    {(turns.data?.turns ?? []).map((turn) => (
+                      <div key={turn.id} className="space-y-2">
+                        <AssistantMessage>{turn.instruction}</AssistantMessage>
+                        {turn.assistantText ? (
+                          <AssistantMessage>{turn.assistantText}</AssistantMessage>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+                <details className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
+                  <summary className="cursor-pointer text-[12px] font-semibold">
+                    Трассировка и JSON
+                  </summary>
+                  <div className="mt-3">
+                    <AssistantMessage>
+                      {JSON.stringify(
+                        value.operations.map((operation) => ({
+                          tool: operation.toolName,
+                          arguments: operation.arguments,
+                          trace: operation.trace,
+                          proposedSnapshot: operation.proposedSnapshot,
+                        })),
+                      )}
+                    </AssistantMessage>
+                  </div>
+                </details>
               </aside>
             </main>
 
@@ -386,7 +473,7 @@ export function AssistantReviewPage({
                       type="submit"
                       disabled={!changeRequest.trim() || requestChanges.isPending}
                     >
-                      {requestChanges.isPending ? "Отправляем…" : "Отправить"}
+                      {requestChanges.isPending ? "Отправляем…" : primaryAction.label}
                     </Button>
                   </div>
                 </form>
@@ -415,20 +502,16 @@ export function AssistantReviewPage({
                         disabled={selectedGroups.size === 0 || apply.isPending}
                       >
                         <Check className="size-4" aria-hidden="true" />
-                        {apply.isPending ? "Применяем…" : "Применить изменения"}
+                        {apply.isPending ? "Применяем…" : primaryAction.label}
                       </Button>
                     </>
                   ) : applied ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => undo.mutate()}
-                      disabled={undo.isPending}
-                    >
+                    <Button onClick={() => undo.mutate()} disabled={undo.isPending}>
                       <RotateCcw className="size-4" aria-hidden="true" />
-                      Мгновенно отменить весь набор
+                      {primaryAction.label}
                     </Button>
                   ) : (
-                    <Button onClick={returnToSession}>Вернуться в Studio</Button>
+                    <Button onClick={returnToSession}>{primaryAction.label}</Button>
                   )}
                 </div>
               )}
@@ -464,15 +547,12 @@ export function AssistantReviewPage({
               </Link>
             </Button>
           )}
-          <p className="ml-2 text-sm font-semibold">Ассистент · Предложение</p>
+          <p className="ml-2 min-w-0 truncate text-sm font-semibold">{value.title}</p>
+          <span className="ml-3 hidden text-[11px] text-[var(--ink-tertiary)] sm:inline">
+            Выбрано {selectedGroups.size} из {groups.length}
+          </span>
           <span className="ml-auto rounded-full bg-[var(--surface-subtle)] px-3 py-1 text-[11px]">
-            {value.state === "staged"
-              ? "Пока ничего не изменено"
-              : value.state === "applied"
-                ? "Применено"
-                : value.state === "undone"
-                  ? "Отменено"
-                  : value.state}
+            {reviewStatusLabel(value.state)}
           </span>
         </header>
         <main className="grid min-h-0 flex-1 overflow-y-auto xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:overflow-hidden">
@@ -520,7 +600,11 @@ export function AssistantReviewPage({
                   <label
                     key={group}
                     htmlFor={controlId}
-                    className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3"
+                    className={`flex cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border p-3 ${
+                      selected
+                        ? "border-[var(--border-subtle)] bg-[var(--surface-paper)]"
+                        : "border-dashed border-[var(--border-strong)] bg-transparent"
+                    }`}
                   >
                     <Checkbox
                       id={controlId}
@@ -539,7 +623,11 @@ export function AssistantReviewPage({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm">{label}</span>
-                      {requiredBy.length > 0 ? (
+                      {!selected ? (
+                        <span className="mt-1 block text-[10px] text-[var(--ink-tertiary)]">
+                          Исключена из применения
+                        </span>
+                      ) : requiredBy.length > 0 ? (
                         <span className="mt-1 block text-[10px] text-[var(--ink-tertiary)]">
                           Требуется для:{" "}
                           {requiredBy
@@ -595,61 +683,49 @@ export function AssistantReviewPage({
           </section>
           <aside className="border-t border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5 pb-28 xl:overflow-y-auto xl:border-t-0 xl:border-l">
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-              Контекст сессии
+              Дополнительные материалы
             </p>
             <h2 className="font-display mt-3 text-2xl">Поручение и ход работы</h2>
-            <ol className="mt-5 space-y-4" aria-label="Стенограмма сессии ассистента">
-              {(turns.data?.turns ?? []).map((turn) => (
-                <li key={turn.id} className="space-y-2">
-                  <article className="rounded-[var(--radius-md)] bg-[var(--accent-soft)] px-3 py-3 text-xs leading-5">
-                    <p className="mb-1 text-[9px] font-semibold tracking-wider text-[var(--accent)] uppercase">
-                      {turn.inputMode === "mcp"
-                        ? "Внешний агент · MCP"
-                        : `Вы · ${turn.inputMode === "voice" ? "голосом" : "в чате"}`}
-                    </p>
-                    <p className="whitespace-pre-wrap">{turn.instruction}</p>
-                    {turn.selectionAttachment ? (
-                      <p className="mt-2 rounded bg-[var(--surface-paper)]/65 px-2 py-1 text-[10px] text-[var(--ink-secondary)]">
-                        Выделение: {turn.selectionAttachment.quote}
-                      </p>
+            <details className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Полный контекст сессии
+              </summary>
+              <ol className="mt-4 space-y-4" aria-label="Стенограмма сессии ассистента">
+                {(turns.data?.turns ?? []).map((turn) => (
+                  <li key={turn.id} className="space-y-2">
+                    <AssistantMessage compact>{turn.instruction}</AssistantMessage>
+                    {turn.assistantText ? (
+                      <AssistantMessage compact>{turn.assistantText}</AssistantMessage>
                     ) : null}
-                  </article>
-                  {turn.assistantText ? (
-                    <article className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] px-3 py-3 text-xs leading-5">
-                      <p className="mb-1 text-[9px] font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
-                        Ассистент
-                      </p>
-                      <p className="whitespace-pre-wrap">{turn.assistantText}</p>
-                    </article>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-            <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
-              <p className="text-[10px] font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
-                Трассировка точных целей
-              </p>
-              <ul className="mt-3 space-y-2 text-[11px] leading-5 text-[var(--ink-secondary)]">
+                  </li>
+                ))}
+              </ol>
+            </details>
+            <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Трассировка и сырые данные
+              </summary>
+              <div className="mt-4 space-y-3">
                 {value.operations.map((operation) => {
                   const target = resolvedTarget(operation);
                   return (
-                    <li
-                      key={operation.id}
-                      className="rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] px-3 py-2"
-                    >
-                      <span className="font-semibold text-[var(--ink-primary)]">
+                    <div key={operation.id} className="text-[11px] text-[var(--ink-secondary)]">
+                      <p className="font-semibold text-[var(--ink-primary)]">
                         {operationLabel(operation.toolName)}
-                      </span>
-                      {target ? (
-                        <span className="mt-1 block">
-                          {target.ranges.length} диапазонов · revision {target.baseRevision}
-                        </span>
-                      ) : null}
-                    </li>
+                        {target ? ` · ${target.ranges.length} диапазонов` : ""}
+                      </p>
+                      <AssistantMessage compact>
+                        {JSON.stringify({
+                          arguments: operation.arguments,
+                          trace: operation.trace,
+                          proposedSnapshot: operation.proposedSnapshot,
+                        })}
+                      </AssistantMessage>
+                    </div>
                   );
                 })}
-              </ul>
-            </div>
+              </div>
+            </details>
           </aside>
         </main>
         <footer className="fixed right-0 bottom-0 left-0 z-[60] border-t border-[var(--border-subtle)] bg-[var(--surface-panel)]/95 px-4 py-3 backdrop-blur xl:right-[360px] xl:left-[280px]">
@@ -689,7 +765,7 @@ export function AssistantReviewPage({
                       type="submit"
                       disabled={!changeRequest.trim() || requestChanges.isPending}
                     >
-                      {requestChanges.isPending ? "Отправляем…" : "Отправить замечания"}
+                      {requestChanges.isPending ? "Отправляем…" : primaryAction.label}
                     </Button>
                   </div>
                 </form>
@@ -717,30 +793,26 @@ export function AssistantReviewPage({
                     disabled={selectedGroups.size === 0 || apply.isPending}
                   >
                     <Check className="size-4" aria-hidden="true" />
-                    {apply.isPending
-                      ? "Применяем…"
-                      : selectedGroups.size === groups.length
-                        ? "Применить изменения"
-                        : `Применить группы · ${selectedGroups.size}`}
+                    {apply.isPending ? "Применяем…" : primaryAction.label}
                   </Button>
                 </div>
               ) : null}
             </div>
           ) : applied ? (
             <div className="flex justify-end">
-              <Button variant="secondary" onClick={() => undo.mutate()} disabled={undo.isPending}>
+              <Button onClick={() => undo.mutate()} disabled={undo.isPending}>
                 <RotateCcw className="size-4" aria-hidden="true" />
-                Мгновенно отменить весь набор
+                {primaryAction.label}
               </Button>
             </div>
           ) : (
             <div className="flex justify-end">
               {embedded ? (
-                <Button onClick={returnToSession}>Вернуться в сессию</Button>
+                <Button onClick={returnToSession}>{primaryAction.label}</Button>
               ) : (
                 <Button asChild>
                   <Link to="/projects/$projectId/assistant/$runId" params={{ projectId, runId }}>
-                    Вернуться в сессию
+                    {primaryAction.label}
                   </Link>
                 </Button>
               )}
@@ -774,8 +846,10 @@ function OperationCard({
   const targetTitle = operation.beforeSnapshot?.title;
   return (
     <article
-      className={`rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5 ${
-        excluded ? "opacity-45" : ""
+      className={`rounded-[var(--radius-lg)] border bg-[var(--surface-paper)] p-5 ${
+        excluded
+          ? "border-dashed border-[var(--border-strong)] opacity-60"
+          : "border-[var(--border-subtle)]"
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">

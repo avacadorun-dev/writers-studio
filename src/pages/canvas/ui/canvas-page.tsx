@@ -23,13 +23,18 @@ import { CanvasSchemaEditor } from "~features/canvas-schema-editor";
 import { AssistantSessionPage } from "~pages/assistant-session";
 import { getCanvasSnapshot } from "~shared/lib";
 import { Banner, Button, Spinner, useActionDialog, useToast } from "~shared/ui";
-import { AssistantNewChatPanel, AssistantThreadSwitcher } from "~widgets/assistant-threads";
+import {
+  AssistantDockShell,
+  type AssistantDockView,
+  AssistantNewChatPanel,
+  AssistantThreadSwitcher,
+  loadAssistantDockState,
+  saveAssistantDockState,
+} from "~widgets/assistant-threads";
 import { CanvasBoard } from "~widgets/canvas-board";
 import { ProjectTree } from "~widgets/project-tree";
 import { RequireSession } from "~widgets/require-session";
 import { StudioHeader } from "~widgets/studio-header";
-
-type AssistantPanelView = "session" | "threads" | "new";
 
 export function CanvasPage({
   projectId,
@@ -129,8 +134,13 @@ function LoadedCanvasPage({
   const restoredSnapshotKey = useRef<string | undefined>(undefined);
   const [schemaEditorOpen, setSchemaEditorOpen] = useState(false);
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
-  const [assistantPanelView, setAssistantPanelView] = useState<AssistantPanelView>("new");
-  const [activeAssistantRunId, setActiveAssistantRunId] = useState<string>();
+  const [assistantPanelView, setAssistantPanelView] = useState<AssistantDockView>(
+    () => loadAssistantDockState(projectId).view,
+  );
+  const [activeAssistantRunId, setActiveAssistantRunId] = useState<string | undefined>(
+    () => loadAssistantDockState(projectId).runId,
+  );
+  const assistantReturnFocusRef = useRef<HTMLElement | null>(null);
   const [assistantContext, setAssistantContext] = useState({
     selectionIds: [] as string[],
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -152,6 +162,7 @@ function LoadedCanvasPage({
   });
 
   const openAssistantPanel = () => {
+    assistantReturnFocusRef.current = document.activeElement as HTMLElement | null;
     setAssistantPanelOpen(true);
     setAssistantPanelView(
       activeAssistantRunId
@@ -161,6 +172,13 @@ function LoadedCanvasPage({
           : "new",
     );
   };
+
+  useEffect(() => {
+    saveAssistantDockState(projectId, {
+      runId: activeAssistantRunId,
+      view: assistantPanelView,
+    });
+  }, [activeAssistantRunId, assistantPanelView, projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,124 +414,126 @@ function LoadedCanvasPage({
               });
             }}
           />
-          <main className="relative min-h-0 min-w-0 flex-1">
-            <fieldset className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg lg:top-3">
-              <legend className="sr-only">Действия с доской</legend>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Открыть Ассистента для этой доски"
-                title="Ассистент Canvas"
-                onClick={openAssistantPanel}
-              >
-                <Bot className="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Настроить типы карточек и связей"
-                title="Каталог Canvas"
-                onClick={() => setSchemaEditorOpen(true)}
-              >
-                <Tags className="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Переименовать доску"
-                title="Переименовать"
-                onClick={() =>
-                  void requestInput({
-                    title: "Переименовать доску",
-                    label: "Название",
-                    defaultValue: title,
-                    icon: Pencil,
-                    confirmLabel: "Сохранить",
-                  }).then((value) => {
-                    if (value?.trim() && value.trim() !== title) rename.mutate(value.trim());
-                  })
-                }
-              >
-                <Pencil className="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Создать копию доски"
-                title="Создать копию"
-                onClick={() => duplicate.mutate()}
-              >
-                <Copy className="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-[var(--danger)]"
-                aria-label="Переместить доску в корзину"
-                title="В корзину"
-                onClick={() =>
-                  void requestConfirmation({
-                    title: `Удалить «${title}»?`,
-                    description: "Доску можно будет восстановить из корзины проекта.",
-                    icon: Trash2,
-                    tone: "danger",
-                    confirmLabel: "В корзину",
-                  }).then((confirmed) => confirmed && trash.mutate())
-                }
-              >
-                <Trash2 className="size-3.5" aria-hidden="true" />
-              </Button>
-            </fieldset>
-            {recoveryReady ? (
-              <CanvasBoard
-                projectId={projectId}
-                title={title}
-                content={initialContent}
-                documents={previews}
-                media={workspace.media}
-                projectDocuments={projectDocuments}
-                typeSchema={typeSchema}
-                promotionEnabled={autosave.saveState === "saved"}
-                onPromoteNode={promoteNode}
-                initialFocusNodeId={focusNodeId}
-                onChange={(content) => autosave.queue(content)}
-                onAssistantContextChange={setAssistantContext}
-                onOpenDocument={(nodeId) => {
-                  void navigate({
-                    to: "/projects/$projectId/studio/$nodeId",
-                    params: { projectId, nodeId },
-                  });
-                }}
-                onOpenCanvas={(nextCanvasId) => {
-                  void navigate({
-                    to: "/projects/$projectId/canvases/$canvasId",
-                    params: { projectId, canvasId: nextCanvasId },
-                  });
-                }}
+          <main className="relative flex min-h-0 min-w-0 flex-1">
+            <div className="relative min-h-0 min-w-0 flex-1">
+              <fieldset className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg lg:top-3">
+                <legend className="sr-only">Действия с доской</legend>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Открыть Ассистента для этой доски"
+                  title="Ассистент Canvas"
+                  onClick={openAssistantPanel}
+                >
+                  <Bot className="size-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Настроить типы карточек и связей"
+                  title="Каталог Canvas"
+                  onClick={() => setSchemaEditorOpen(true)}
+                >
+                  <Tags className="size-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Переименовать доску"
+                  title="Переименовать"
+                  onClick={() =>
+                    void requestInput({
+                      title: "Переименовать доску",
+                      label: "Название",
+                      defaultValue: title,
+                      icon: Pencil,
+                      confirmLabel: "Сохранить",
+                    }).then((value) => {
+                      if (value?.trim() && value.trim() !== title) rename.mutate(value.trim());
+                    })
+                  }
+                >
+                  <Pencil className="size-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Создать копию доски"
+                  title="Создать копию"
+                  onClick={() => duplicate.mutate()}
+                >
+                  <Copy className="size-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-[var(--danger)]"
+                  aria-label="Переместить доску в корзину"
+                  title="В корзину"
+                  onClick={() =>
+                    void requestConfirmation({
+                      title: `Удалить «${title}»?`,
+                      description: "Доску можно будет восстановить из корзины проекта.",
+                      icon: Trash2,
+                      tone: "danger",
+                      confirmLabel: "В корзину",
+                    }).then((confirmed) => confirmed && trash.mutate())
+                  }
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </Button>
+              </fieldset>
+              {recoveryReady ? (
+                <CanvasBoard
+                  projectId={projectId}
+                  title={title}
+                  content={initialContent}
+                  documents={previews}
+                  media={workspace.media}
+                  projectDocuments={projectDocuments}
+                  typeSchema={typeSchema}
+                  promotionEnabled={autosave.saveState === "saved"}
+                  onPromoteNode={promoteNode}
+                  initialFocusNodeId={focusNodeId}
+                  onChange={(content) => autosave.queue(content)}
+                  onAssistantContextChange={setAssistantContext}
+                  onOpenDocument={(nodeId) => {
+                    void navigate({
+                      to: "/projects/$projectId/studio/$nodeId",
+                      params: { projectId, nodeId },
+                    });
+                  }}
+                  onOpenCanvas={(nextCanvasId) => {
+                    void navigate({
+                      to: "/projects/$projectId/canvases/$canvasId",
+                      params: { projectId, canvasId: nextCanvasId },
+                    });
+                  }}
+                />
+              ) : (
+                <Spinner label="Проверяем локальные изменения…" />
+              )}
+              <CanvasSchemaEditor
+                open={schemaEditorOpen}
+                schema={typeSchema}
+                pending={saveTypeSchema.isPending}
+                onOpenChange={setSchemaEditorOpen}
+                onSave={(schema) => saveTypeSchema.mutate(schema)}
               />
-            ) : (
-              <Spinner label="Проверяем локальные изменения…" />
-            )}
-            <CanvasSchemaEditor
-              open={schemaEditorOpen}
-              schema={typeSchema}
-              pending={saveTypeSchema.isPending}
-              onOpenChange={setSchemaEditorOpen}
-              onSave={(schema) => saveTypeSchema.mutate(schema)}
-            />
+            </div>
             {assistantPanelOpen ? (
-              <div
-                data-testid="canvas-assistant-panel"
-                className="absolute bottom-3 right-3 top-[4.5rem] z-30 w-[min(380px,calc(100%-24px))] overflow-hidden rounded-[16px] border border-[var(--border-subtle)] bg-[var(--surface-panel)] shadow-[-12px_14px_42px_var(--shadow-color)]"
+              <AssistantDockShell
+                testId="canvas-assistant-panel"
+                returnFocusRef={assistantReturnFocusRef}
               >
                 {assistantPanelView === "session" && activeAssistantRunId ? (
                   <AssistantSessionPage
@@ -556,7 +576,7 @@ function LoadedCanvasPage({
                     onClose={() => setAssistantPanelOpen(false)}
                   />
                 )}
-              </div>
+              </AssistantDockShell>
             ) : null}
           </main>
         </div>

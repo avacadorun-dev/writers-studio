@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import {
   assistantTranscriptDistanceFromEnd,
+  assistantTranscriptScrollStorageKey,
+  captureAssistantTranscriptScroll,
   isAssistantTranscriptNearEnd,
+  normalizeAssistantTranscriptScrollSnapshot,
+  restoredAssistantTranscriptScrollTop,
 } from "./assistant-transcript-scroll";
 
 describe("assistant transcript scroll", () => {
@@ -22,5 +26,34 @@ describe("assistant transcript scroll", () => {
     expect(
       isAssistantTranscriptNearEnd({ scrollHeight: 1_000, scrollTop: 350, clientHeight: 600 }, 40),
     ).toBe(false);
+  });
+
+  test("stores independent run positions and restores a bounded scroll offset", () => {
+    expect(assistantTranscriptScrollStorageKey("run-a")).not.toBe(
+      assistantTranscriptScrollStorageKey("run-b"),
+    );
+    const snapshot = captureAssistantTranscriptScroll({
+      scrollHeight: 2_000,
+      scrollTop: 320,
+      clientHeight: 600,
+    });
+    expect(snapshot).toEqual({ scrollTop: 320, followsActivity: false });
+    expect(
+      restoredAssistantTranscriptScrollTop({ scrollHeight: 900, clientHeight: 600 }, snapshot),
+    ).toBe(300);
+    expect(
+      restoredAssistantTranscriptScrollTop(
+        { scrollHeight: 900, clientHeight: 600 },
+        { scrollTop: 0, followsActivity: true },
+      ),
+    ).toBe(300);
+  });
+
+  test("rejects malformed stored positions", () => {
+    expect(normalizeAssistantTranscriptScrollSnapshot(null)).toBeNull();
+    expect(normalizeAssistantTranscriptScrollSnapshot({ scrollTop: "4" })).toBeNull();
+    expect(
+      normalizeAssistantTranscriptScrollSnapshot({ scrollTop: -20, followsActivity: false }),
+    ).toEqual({ scrollTop: 0, followsActivity: false });
   });
 });

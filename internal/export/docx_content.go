@@ -146,6 +146,15 @@ func (renderer wordNodeRenderer) renderBlocks(output *strings.Builder, nodes []e
 			if caption != "" {
 				renderer.renderParagraph(output, []editor.Node{{Type: "text", Text: caption}}, "Caption", 0, 0)
 			}
+		case "mathBlock":
+			latex, _ := node.Attrs["latex"].(string)
+			renderer.renderParagraph(
+				output,
+				[]editor.Node{{Type: "text", Text: "Формула: " + latex}},
+				"Quote",
+				0,
+				0,
+			)
 		case "text", "hardBreak":
 			renderer.renderParagraph(output, []editor.Node{node}, "", listNumberID, listLevel)
 		default:
@@ -315,6 +324,13 @@ func (renderer wordNodeRenderer) renderInline(output *strings.Builder, node edit
 		}
 	case "hardBreak":
 		output.WriteString("<w:r><w:br/></w:r>")
+	case "inlineMath":
+		latex, _ := node.Attrs["latex"].(string)
+		writeWordTextRun(
+			output,
+			"[Формула: "+latex+"]",
+			`<w:rFonts w:ascii="IBM Plex Mono" w:hAnsi="IBM Plex Mono"/>`,
+		)
 	default:
 		for _, child := range node.Content {
 			renderer.renderInline(output, child)
