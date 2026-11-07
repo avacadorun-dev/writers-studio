@@ -1,70 +1,54 @@
-# Архитектура и FSD
+# Frontend architecture and Feature-Sliced Design
 
-## Слои
+## Layers and dependency direction
 
-Проект использует Feature-Sliced Design. Размещай код по смыслу, а не по техническому типу:
+Use Feature-Sliced Design. Place code by responsibility:
 
-- `app` - инициализация приложения, провайдеры, глобальные конфиги, TanStack Router route files.
-- `pages` - страницы маршрутов, сборка виджетов и фичей в экран.
-- `widgets` - крупные самостоятельные блоки страницы.
-- `features` - пользовательские сценарии и действия.
-- `entities` - доменные сущности, типы, запросы, модель и entity-specific UI.
-- `shared` - инфраструктура без бизнес-смысла: API client, config, lib, hooks, styles, UI primitives, utils.
+- `app`: application initialization, providers, global configuration and TanStack Router routes.
+- `pages`: complete route screens assembled from widgets and features.
+- `widgets`: substantial, self-contained screen sections.
+- `features`: user actions and workflows.
+- `entities`: domain types, models, requests and entity-specific UI.
+- `shared`: infrastructure without domain knowledge: API client, configuration, libraries, hooks, styles and primitives.
 
-Зависимости направлены только сверху вниз: `app -> pages -> widgets -> features -> entities -> shared`.
-Нижний слой не импортирует верхний. Соседние slices не импортируют внутренности друг друга.
+Dependencies point downwards: `app -> pages -> widgets -> features -> entities -> shared`.
+Lower layers must not import higher ones. Sibling slices must not reach into each other's internals.
 
-## Public API
+## Public APIs and file layout
 
-Каждый slice должен иметь публичный API через `index.ts`.
-Внешний импорт должен идти из публичного API slice или слоя:
+Expose each slice through `index.ts`. External imports use its public API:
 
 ```ts
-import { ModelForm } from '~entities/models';
+import { ModelForm } from "~entities/models";
 ```
 
-Не используй deep imports во внутренние `model`, `api`, `ui`, `hooks`, если это не код того же slice.
-Внутри одного slice или entity предпочитай относительные импорты между его сегментами. Это снижает риск циклических зависимостей и не превращает внутренние связи slice в внешние импорты через `~entities/*` или `~features/*`.
+Do not deep-import another slice's `model`, `api`, `ui` or hooks. Within a slice,
+prefer relative imports instead of importing its own public API, which can create cycles.
 
-## Структура slice
+Use `api` for requests and transport adapters; `model` for state and business rules;
+`lib` or `utils` for pure helpers; `hooks` when separate hooks are useful; `ui` for
+components; and `assets` for slice-specific resources. Keep simple slices flat.
+Use kebab-case for new files and directories. Components may use PascalCase.
+Do not rename existing files as an unrelated cleanup.
 
-Рекомендуемые сегменты:
+## Components and state
 
-- `api` - запросы, DTO, адаптеры внешнего API.
-- `model` - состояние, бизнес-правила, типы состояния, store/query hooks.
-- `lib` или `utils` - чистые функции slice.
-- `hooks` - React hooks slice, если они не являются частью `model`.
-- `ui` - компоненты slice.
-- `assets` - локальные изображения и svg slice.
+Keep components focused. Move business rules and complicated transformations into
+models, helpers or hooks. Do not perform HTTP requests directly in JSX components.
+Represent loading, success, error and empty states explicitly. Compute derived data
+instead of duplicating it in state. Query caches own server state.
 
-Не создавай сегмент без необходимости. Если slice остается маленьким, держи структуру плоской.
+## Routing
 
-## Имена файлов
+Route files live in `src/app/routes`; the generated tree is
+`src/app/routeTree.gen.ts`. Never edit the generated tree manually. Route modules
+import screen components from the `pages` layer.
 
-Новые файлы и папки называй в `kebab-case`: `model-form.tsx`, `use-create-model.ts`, `format-relative-time.ts`.
-Компонент внутри файла может оставаться `PascalCase`.
+## Refactoring and commits
 
-Существующие файлы с другим стилем не переименовывай попутно. Переименование делай только отдельным рефакторингом с проверкой импортов и роутинга.
-
-## Рефакторинг и коммиты
-
-- Рефакторинг оформляй отдельным коммитом от функционального изменения, если пользователь попросил сделать коммиты или дал агенту право их создавать.
-- Не смешивай переименование, перенос файлов, миграцию стилей и изменение поведения в одном коммите без явной причины.
-- Коммит должен быть атомарным: одна законченная причина изменения, проверяемый diff и понятное сообщение.
-- Перед коммитом проверь `git diff`, чтобы не добавить чужие изменения пользователя, generated файлы без необходимости или локальные артефакты.
-- Сообщение коммита пиши в повелительном наклонении и с областью изменения, например `refactor(models): split model form sections` или `test(auth): cover token refresh fallback`.
-- Если рефакторинг нужен как подготовка к фиче, сначала сделай коммит рефакторинга, затем коммит поведения.
-
-## Компоненты и логика
-
-- Компоненты должны быть небольшими и сфокусированными.
-- Бизнес-логику и сложные преобразования выноси в `model`, `lib`, `utils` или hooks.
-- Не делай HTTP-запросы напрямую из JSX-компонента.
-- Состояния async операций описывай явно: loading, success, error, empty.
-- Не храни производные данные в state, если их можно вычислить из props/cache/store.
-
-## Роутинг
-
-TanStack Router route files находятся в `src/app/routes`, generated tree - `src/app/routeTree.gen.ts`.
-Не редактируй generated file вручную.
-Страницы маршрутов должны импортировать screen-level компоненты из `pages`.
+When commits are authorized, keep preparatory refactors separate from behavior
+changes. Each commit has one reviewable purpose; inspect its diff to avoid adding
+unrelated user changes or generated artifacts. Use imperative scoped messages such
+as `refactor(models): split model form sections`. Include relevant tests with the
+behavior they verify. Do not mix unrelated renames, moves, style migrations and
+functional changes.

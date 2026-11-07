@@ -1,8 +1,8 @@
 name: writers-studio
 
 # Standalone installation for Docker Desktop on Windows.
-# This file intentionally has no `build:` section: it pulls the private image
-# specified in .env from Docker Hub.
+# This file intentionally has no `build:` section: it pulls the release image
+# specified in .env from your configured registry.
 services:
   db:
     image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
@@ -37,8 +37,7 @@ services:
   app:
     image: ${WRITERS_STUDIO_IMAGE:?set WRITERS_STUDIO_IMAGE in .env}
     # Updates are deliberate: run `docker compose pull` before `up -d`.
-    # This lets an already-installed app start even after a temporary pull token
-    # has been revoked.
+    # An already-installed app can start without contacting the registry.
     pull_policy: missing
     restart: unless-stopped
     environment:

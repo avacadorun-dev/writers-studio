@@ -1,69 +1,47 @@
-# Расширенный редактор документов
+# Rich document editor
 
-Статус: реализовано; обновлено в release 0.7.0. Текущая схема
-rich-документа — v4.
+Status: implemented through the frozen 0.7.0 edition. Current document schema: v4.
 
-## Область действия
+The same Tiptap/ProseMirror editor serves every content-bearing node, including
+novels, screenplays, notes, free structures and game-design projects.
 
-Один и тот же Tiptap/ProseMirror-редактор используется во всех content-bearing
-узлах. Поэтому новые блоки доступны в романах, сценариях, свободных проектах,
-заметках и проектах `game_design`; отдельного несовместимого «редактора для
-гейм-дизайна» нет.
+## Supported content and presentation
 
-Поддерживаются:
+- Tables with headers and row/column insertion/deletion.
+- Inline code and fenced blocks with a language identifier.
+- PNG/JPEG/GIF images up to 12 MiB, with alt text and captions.
+- Image drop at the manuscript position after durable project-media upload.
+- Mermaid diagrams, callouts (`info`, `idea`, `warning`, `todo`), inline/block LaTeX.
+- Existing headings, lists, quotes, links, scene breaks and text marks.
 
-- таблицы с заголовком, добавлением и удалением строк/столбцов;
-- строчный код и fenced code block с языком;
-- изображения PNG, JPEG и GIF до 12 MiB с alt-текстом и подписью;
-- drag-and-drop изображений в точную позицию рукописи после durable upload;
-- Mermaid-схемы, включая flowchart, sequence, state и class diagrams;
-- callout-блоки `info`, `idea`, `warning` и `todo`;
-- строчные и блочные LaTeX-формулы с редактируемым исходником;
-- существующие заголовки, списки, цитаты, ссылки, scene breaks и текстовые marks.
+Mermaid uses strict security mode; KaTeX uses `trust: false` without HTML, external
+URLs or user-defined commands. Invalid formulas show a safe source fallback.
+Paste removes scripts, iframes, SVG, forms and event handlers and validates URLs.
+Toolbar modes are automatic, expanded and compact. Overflow avoids horizontal
+scrolling; typography settings separately control line, paragraph and list spacing.
 
-Mermaid выполняется клиентом с `securityLevel: strict`. Формулы рендерятся
-KaTeX с `trust: false`, без HTML, внешних URL и пользовательских команд. Ошибка
-LaTeX показывает безопасный fallback с исходником и не ломает документ.
-Вставляемый HTML проходит
-allowlist-санацию: script/iframe/SVG/form и обработчики событий удаляются, ссылки
-и источники изображений проверяются.
+## Compatibility
 
-Тулбар имеет режимы `Авто`, `Расширенный` и `Компактный`. В широком
-workspace базовые marks и списки видны сразу; на узком экране они переходят в
-единое overflow-меню без горизонтальной прокрутки. В меню `Типографика` независимо
-настраиваются межстрочный, межабзацный и межсписочный интервалы.
+Migration 019 adds project media without rewriting document history. Missing
+schema version means v1. Plain editing does not eagerly upgrade it: rich blocks
+and inline code require v2, heading levels 4–6 require v3, mathematics requires v4.
+The backend validates v1–v4 and derives revision schema from the JSON itself.
 
-## Совместимость существующих проектов
+Search, replacement, duplication, transfer, named versions and Undo preserve schema
+and context. Copied rich blocks receive independent block IDs. Formula-bearing
+revisions need 0.7.0 or newer; old revisions remain intact.
 
-- Миграция `019_project_media.sql` только создаёт новую таблицу и индексы. Она не
-  обновляет и не удаляет проекты, узлы или document revisions.
-- Документ без `schemaVersion` считается v1. Открытие и обычная текстовая правка
-  не повышают версию. Rich-блоки и mark `code` требуют v2, заголовки 4–6 уровня —
-  v3, а `inlineMath`/`mathBlock` — v4.
-- Backend читает и валидирует schema v1–v4. Номер schema, сохранённый у revision,
-  выводится из самого JSON, поэтому история старого сетевого проекта остаётся
-  согласованной.
-- Поиск, замена, дублирование, перенос ассистентом, версии и Undo сохраняют
-  текстовый контекст и версию документа. Rich-блоки получают независимые
-  `blockId` при копировании.
-- Текущий `.wstudio` format v8 переносит project media, revisions, versions,
-  Assistant guide/memory и Canvas schema; importer сохраняет обратную совместимость
-  с ранними format versions и отклоняет future version до частичного импорта.
+Native `.wstudio` archive v8 carries project media, document/history, guidance,
+memory and Canvas schemas while accepting supported older versions. Future
+formats fail before partial import. Archive and document schema versions differ.
 
-После использования формулы конкретная revision становится v4 и требует
-приложение 0.7.0 или новее. Это не затрагивает старые revisions. Перед
-сетевым обновлением штатный `deploy/update-server.sh` сохраняет PostgreSQL и
-MinIO, что даёт точку восстановления для всего проекта и media.
+## Media and export
 
-## Хранение и переносимость
+Upload images to private project storage before writing `assetId`, authorized
+same-origin `src`, dimensions, alt text and caption into the document. Reads check
+ownership and integrity; account/project purge includes media. Full backups include
+metadata and objects.
 
-Изображение сначала загружается в приватное project media storage, затем в JSON
-попадают только `assetId`, same-origin `src`, размеры, alt-текст и подпись. GET
-проверяет владельца, размер и SHA-256 и отдаёт immutable private response.
-Project/account purge включает media objects в план удаления.
-Account backup включает metadata project media и файлы в каталоге `media/`.
-
-Markdown сохраняет GFM-таблицы, code fences, Mermaid fences, callout, ссылки на
-изображения и LaTeX как `$...$`/`$$...$$`. TXT и DOCX используют безопасное текстовое
-представление с подписями/alt-текстом, исходником Mermaid и LaTeX. Полностью
-переносимая копия с бинарными изображениями — файл `.wstudio` текущего формата v8.
+Markdown preserves GFM tables, fences, Mermaid, callouts, images and `$...$` /
+`$$...$$` math. Reader formats use safe textual fallbacks where required. Native
+archives are the complete portable copy, including binary resources.

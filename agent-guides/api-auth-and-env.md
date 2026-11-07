@@ -1,51 +1,38 @@
-# API, auth и env
+# API, authentication and environment configuration
 
-## API слой
+## API boundaries
 
-Общая API-инфраструктура находится в `src/shared/api`.
-Доменные запросы размещай внутри slice:
+Shared HTTP infrastructure lives in `src/shared/api`. Put entity requests in
+`entities/<entity>/api`, workflow-specific requests in `features/<feature>/api`,
+and temporary widget integration in `widgets/<widget>/api` only when necessary.
+Components consume hooks and models rather than calling `fetch` directly.
 
-- `entities/<entity>/api` для entity-level операций.
-- `features/<feature>/api` только если запрос принадлежит конкретному пользовательскому сценарию.
-- `widgets/<widget>/api` допустимо для временной интеграции виджета, но доменную логику лучше переносить ниже.
+Keep transport DTOs beside their requests and domain/UI types in `model`. Introduce
+pure adapters when transport data differs from the client contract: normalize nulls,
+defaults, dates, enums, names, nested structures and discriminated responses explicitly.
+Do not conceal optional transport fields inside supposedly complete UI state.
 
-Не выполняй `fetch` или `axios` напрямую в JSX-компонентах. Компоненты должны использовать hooks/model слой.
+## Server state
 
-## DTO и типы
+Use TanStack Query with stable keys. Mutations invalidate or update related queries.
+Do not duplicate query-owned data in local state. Pages, widgets and features render
+loading, error and empty states; API helpers return data or typed errors.
 
-- Типы внешнего API держи рядом с запросами в `api/types.ts`.
-- Внутренние UI/model типы держи в `model/types.ts`.
-- Добавляй adapter/mapper на границе API, когда DTO отличается от модели клиента по контракту, а не только по имени поля.
-- Переводи DTO через adapter, если backend возвращает nullable/optional поля, которые в UI должны стать обязательными после default values; даты, enum/status или числовые значения требуют нормализации; вложенная структура API должна стать плоской моделью; backend отдает `snake_case`, технические поля или transport-specific формат; API объединяет несколько вариантов ответа, которые в UI должны стать discriminated union.
-- Adapter должен быть чистой функцией без React, TanStack Query и UI side effects. Он принимает DTO, возвращает model type и явно задает default/fallback значения.
-- Не смешивай optional поля API с обязательным UI state без нормализации.
+## Authentication and secrets
 
-## TanStack Query
+The application uses its own server sessions; inspect `internal/httpapi/auth.go`,
+`internal/store/auth.go`, `src/entities/session` and `src/features/auth` for the
+current contract. Do not assume unrelated identity-provider documentation exists.
+Never put server secrets in frontend code. `VITE_*` values and `window.__ENV__`
+are public to the browser.
 
-Используй TanStack Query для server state:
+## Runtime configuration
 
-- Query keys должны быть стабильными и предсказуемыми.
-- Mutations должны явно инвалидировать или обновлять связанные queries.
-- Не копируй server state в Zustand или local state без необходимости.
+Browser runtime configuration is read by `src/shared/config/env.ts`, from
+`window.__ENV__` with an `import.meta.env` fallback. The served runtime file is
+`public/env-config.js`; server environment examples live in `.env.example`.
 
-Loading/error/empty состояния обрабатывай в слое, который использует API hooks: `features`, `widgets` или `pages`. API слой должен отдавать данные, ошибки и статус так, чтобы UI мог явно собрать эти состояния.
-
-## Auth
-
-Auth helpers находятся в `src/shared/lib/auth.ts`, session model - в `src/entities/session`.
-Для auth flows и Keycloak сначала смотри `docs/auth/`.
-
-Не храни новые секреты в frontend коде. Любые `VITE_*` переменные публичны для клиента.
-
-## Runtime env
-
-Runtime env читается через `window.__ENV__` с fallback на `import.meta.env` в `src/shared/config/env.ts`.
-Docker runtime template находится в `docker/env-config.template.js`.
-
-При добавлении env:
-
-- Не редактируй `.env` без явного запроса пользователя. Если нужна новая локальная переменная, сначала попроси пользователя добавить ее или разрешить изменение `.env`.
-- Добавь тип в `Window.__ENV__`.
-- Добавь экспорт в `shared/config/env.ts`.
-- Обнови docker template, если значение нужно в контейнере.
-- Укажи безопасный default только если он корректен для локальной разработки.
+When adding a variable, update its boundary type, shared configuration export,
+relevant container configuration and the sanitized example. Use a safe default only
+when appropriate for development. Do not modify a local `.env` without authorization;
+never print its contents or include it in commits, images or release snapshots.

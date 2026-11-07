@@ -19,6 +19,9 @@ if [[ -z "${DEEPGRAM_API_KEY:-}" ]]; then
   exit 1
 fi
 
+: "${PUBLIC_HOST:?Set PUBLIC_HOST to your deployment hostname}"
+: "${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL to your HTTPS origin}"
+
 postgres_password="$(openssl rand -hex 24)"
 storage_secret="$(openssl rand -hex 24)"
 mcp_oauth_secret="$(openssl rand -hex 32)"
@@ -43,8 +46,8 @@ umask 077
   printf 'OPENROUTER_STT_MODEL=%s\n' "${OPENROUTER_STT_MODEL:-openai/whisper-large-v3}"
   printf 'DEEPGRAM_API_KEY=%s\n' "$DEEPGRAM_API_KEY"
   printf 'DEEPGRAM_STT_MODEL=%s\n' "${DEEPGRAM_STT_MODEL:-nova-3}"
-  printf 'PUBLIC_BASE_URL=https://studio.example.test\n'
-  printf 'PUBLIC_HOST=studio.example.test\n'
+  printf 'PUBLIC_BASE_URL=%s\n' "$PUBLIC_BASE_URL"
+  printf 'PUBLIC_HOST=%s\n' "$PUBLIC_HOST"
   printf 'MCP_ENABLED=false\n'
   printf 'MCP_OAUTH_SECRET=%s\n' "$mcp_oauth_secret"
 } >"$temporary_file"

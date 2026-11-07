@@ -32,6 +32,7 @@ export function ProjectUtilityShell({
   const navigate = useNavigate();
   const firstNode = nodes.find((node) => !node.trashedAt);
   const activeNode = nodes.find((node) => node.id === activeNodeId && !node.trashedAt) ?? firstNode;
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [treeCollapsed, setTreeCollapsed] = useState(!expandedTree);
 
   if (!activeNode) {
@@ -48,6 +49,8 @@ export function ProjectUtilityShell({
     <RequireSession>
       <div className="flex h-full min-h-0 flex-col bg-[var(--surface-app)]">
         <StudioHeader
+          documentsOpen={mobileTreeOpen}
+          onOpenDocuments={() => setMobileTreeOpen(true)}
           project={project}
           nodeId={activeNode.id}
           nodeTitle={activeNode.title}
@@ -74,6 +77,8 @@ export function ProjectUtilityShell({
         ) : null}
         <div className="flex min-h-0 flex-1">
           <ProjectTree
+            mobileOpen={mobileTreeOpen}
+            onMobileOpenChange={setMobileTreeOpen}
             projectId={project.id}
             activeNodeId={activeNode.id}
             nodes={nodes}

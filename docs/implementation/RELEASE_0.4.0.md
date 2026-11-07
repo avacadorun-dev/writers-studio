@@ -1,45 +1,15 @@
-# Release 0.4.0 — Canvas-доски
+# Historical release 0.4.0: Canvas boards
 
-Дата подготовки: 2026-08-05. Статус: implementation candidate, не развёрнут.
+The first card-first Canvas release added independent project boards, Markdown,
+document and image cards, spatial groups, colored connections, pan/zoom,
+multiselect, resizing, copy/paste, Undo/Redo, local recovery and server revisions.
+Mobile supported read-only layout with navigation to linked documents.
 
-## Состав
+Migration 023 adds Canvas tables/indexes without rewriting old document history.
+Native archive v6 added complete board snapshots and resource-ID remapping while
+retaining import of v1–v5. Later releases added drawing and expanded media/types.
 
-- несколько Canvas-досок на проект на базе `@xyflow/react`;
-- Markdown-, document- и image-карточки, spatial-группы, цвета и связи;
-- pan/zoom, fit, lasso/multiselect, move/resize, grid, z-order и reconnect;
-- copy/cut/paste, duplicate, undo/redo и безопасный Markdown preview;
-- локальный recovery через 300 мс и server autosave 1,5 с / максимум 15 с;
-- конфликтующая копия при stale `baseRevision`;
-- mobile read-only layout с pan/zoom и переходом в Studio;
-- `.wstudio` v6 со всеми canvas revisions и remap document/media resources;
-- OpenAPI Canvas API и migration 023.
-
-Свободное рисование намеренно отложено. Будущий SVG/custom-node layer использует
-тот же viewport; миграция существующих досок не требуется.
-
-## Обновление и откат
-
-Migration 023 только добавляет `canvases`, `canvas_revisions` и индексы. Она не
-переписывает проекты, документы, media или старые revisions и может остаться в БД
-при откате binary. Старый binary проигнорирует новые таблицы, но не сможет открыть
-или экспортировать доски. Архив `.wstudio` v6 требует версии 0.4.0+; importer 0.4.0
-продолжает принимать v1–v5.
-
-Перед production switch использовать `./deploy/update-server.sh`; удалять volumes
-или выполнять `docker compose down -v` нельзя.
-
-## Проверка перед выпуском
-
-```bash
-bun run check
-bun run type-check
-bun run test
-bun run test:canvas:coverage
-bun run build
-go test ./...
-```
-
-PostgreSQL integration отдельно проверяет экспорт/import v6 с новым canvas ID и
-переназначенной document reference. Browser E2E должен пройти создание карточек,
-resize/connect/group/color, reload, offline recovery, переход в Studio и mobile
-read-only viewport.
+Update through the backup-first deployment script. An older binary may ignore
+new tables but cannot open/export the new board features. Preserve a consistent
+database/object-storage recovery point before rollback. Historical coverage and
+deployment notes are not evidence for the current publication candidate.

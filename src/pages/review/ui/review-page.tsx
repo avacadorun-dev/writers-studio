@@ -211,8 +211,11 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
         }),
       };
     },
-    onSuccess: ({ previousContent, response, target }) => {
-      void queryClient.invalidateQueries({ queryKey: ["project", project.data?.project.id] });
+    onSuccess: async ({ previousContent, response, target }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["node", target.id], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ["project", target.projectId] }),
+      ]);
       showToast({
         title: "Черновик вставлен в рукопись",
         description: "Вставка сохранена одной редакцией.",
@@ -225,9 +228,10 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                 source: "transcript_transfer_undo",
                 operationId: response.operationId,
               }).then(async () => {
-                await queryClient.invalidateQueries({
-                  queryKey: ["project", target.projectId],
-                });
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["node", target.id], exact: true }),
+                  queryClient.invalidateQueries({ queryKey: ["project", target.projectId] }),
+                ]);
                 showToast({ title: "Вставка отменена" });
               });
             }

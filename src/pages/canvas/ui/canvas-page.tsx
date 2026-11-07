@@ -122,6 +122,7 @@ function LoadedCanvasPage({
   const queryClient = useQueryClient();
   const { requestConfirmation, requestInput, requestSelect } = useActionDialog();
   const { showToast } = useToast();
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     const saved = localStorage.getItem("writers-studio-tree-collapsed");
     return saved === null ? window.innerWidth < 1280 : saved === "true";
@@ -376,6 +377,8 @@ function LoadedCanvasPage({
     <RequireSession>
       <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--surface-app)]">
         <StudioHeader
+          documentsOpen={mobileTreeOpen}
+          onOpenDocuments={() => setMobileTreeOpen(true)}
           project={project.project}
           nodeTitle={title}
           saveState={autosave.saveState}
@@ -401,6 +404,8 @@ function LoadedCanvasPage({
         ) : null}
         <div className="flex min-h-0 min-w-0 flex-1">
           <ProjectTree
+            mobileOpen={mobileTreeOpen}
+            onMobileOpenChange={setMobileTreeOpen}
             projectId={projectId}
             activeNodeId={firstNode?.id ?? ""}
             activeCanvasId={canvasId}

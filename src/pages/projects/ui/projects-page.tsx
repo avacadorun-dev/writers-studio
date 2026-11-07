@@ -1,6 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileArchive, FileUp, FolderOpen, LifeBuoy, LoaderCircle, Plus } from "lucide-react";
+import {
+  Archive,
+  BookOpen,
+  Clock3,
+  FileArchive,
+  FileUp,
+  FolderOpen,
+  LayoutGrid,
+  LifeBuoy,
+  LoaderCircle,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { useRef, useState } from "react";
 
 import {
@@ -17,15 +31,47 @@ import { RequireSession } from "~widgets/require-session";
 import { WorkspaceHeader } from "~widgets/workspace-header";
 
 import { ProjectCard } from "./project-card";
+import "./projects.css";
 
 type ProjectFilter = "recent" | "active" | "archived" | "trash";
 
-const filters: Array<{ value: ProjectFilter; label: string }> = [
-  { value: "recent", label: "Недавние" },
-  { value: "active", label: "Все" },
-  { value: "archived", label: "Архив" },
-  { value: "trash", label: "Корзина" },
-];
+const filters = [
+  { value: "recent", label: "Недавние", icon: Clock3 },
+  { value: "active", label: "Все", icon: LayoutGrid },
+  { value: "archived", label: "Архив", icon: Archive },
+  { value: "trash", label: "Корзина", icon: Trash2 },
+] satisfies Array<{ value: ProjectFilter; label: string; icon: typeof Clock3 }>;
+
+function ProjectFilters({
+  status,
+  onChange,
+  presentation,
+}: {
+  status: ProjectFilter;
+  onChange: (value: ProjectFilter) => void;
+  presentation: "sidebar" | "tabs";
+}) {
+  return (
+    <fieldset
+      className={`library-filters library-filters-${presentation}`}
+      aria-label="Фильтр проектов"
+    >
+      {filters.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChange(value)}
+          className="library-filter"
+          data-active={status === value}
+          aria-pressed={status === value}
+        >
+          <Icon className="size-[17px]" aria-hidden="true" />
+          {label}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
 
 interface DirectoryManifestEntry {
   id: string;
@@ -123,6 +169,7 @@ export function ProjectsPage() {
   const zipInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<ProjectFilter>("recent");
+  const [searchQuery, setSearchQuery] = useState("");
   const [markdownDialogOpen, setMarkdownDialogOpen] = useState(false);
   const [markdownSource, setMarkdownSource] = useState<"zip" | "directory">("zip");
   const [markdownTitle, setMarkdownTitle] = useState("");
@@ -209,208 +256,253 @@ export function ProjectsPage() {
       directoryInputRef.current?.click();
     }
   };
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase("ru");
+  const matchingProjects = projects.data?.projects.filter(
+    (project) =>
+      !normalizedSearch ||
+      `${project.title} ${project.synopsis ?? ""}`
+        .toLocaleLowerCase("ru")
+        .includes(normalizedSearch),
+  );
   const visibleProjects =
-    status === "recent" ? projects.data?.projects.slice(0, 6) : projects.data?.projects;
+    status === "recent" && !normalizedSearch ? matchingProjects?.slice(0, 6) : matchingProjects;
   const hasRecovery = recovery.data?.some((recording) => recording.status !== "uploaded");
 
   return (
     <RequireSession>
-      <div className="min-h-full bg-[var(--surface-app)]">
+      <div className="projects-workspace library-workspace">
         <WorkspaceHeader />
-        <main className="px-4 py-8 sm:px-8 sm:py-12 xl:px-16">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-                Рабочее пространство
-              </p>
-              <h1 className="font-display mt-2 text-[40px] leading-[1.1]">Ваши проекты</h1>
-              <p className="mt-3 text-sm text-[var(--ink-secondary)]">
-                Продолжите рукопись или сохраните новую идею
-              </p>
+        <div className="library-shell">
+          <aside className="library-sidebar" aria-label="Библиотека проектов">
+            <div className="library-sidebar-title">
+              <BookOpen className="size-4" aria-hidden="true" />
+              Библиотека
             </div>
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".wstudio,application/vnd.writers-studio.project+zip"
-                className="sr-only"
-                aria-label="Выбрать файл проекта Writers Studio"
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  event.currentTarget.value = "";
-                  if (file) importProject.mutate(file);
-                }}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={importProject.isPending}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {importProject.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <FileUp className="size-4" aria-hidden="true" />
-                )}
-                {importProject.isPending ? "Импортируем…" : "Проект Writers Studio"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setMarkdownDialogOpen(true)}>
-                <FolderOpen className="size-4" aria-hidden="true" />
-                Markdown / Obsidian
-              </Button>
-              <Button asChild>
+            <ProjectFilters status={status} onChange={setStatus} presentation="sidebar" />
+            <div className="library-sidebar-divider" />
+            <nav className="library-utilities" aria-label="Инструменты студии">
+              <Link to="/recovery">
+                <LifeBuoy className="size-[17px]" aria-hidden="true" />
+                Восстановление
+              </Link>
+              <Link to="/settings">
+                <Settings className="size-[17px]" aria-hidden="true" />
+                Настройки
+              </Link>
+            </nav>
+            <a href="/docs" className="library-sidebar-help">
+              <BookOpen className="size-4" aria-hidden="true" />
+              Руководство по студии
+            </a>
+          </aside>
+          <section className="library-pane" aria-label="Библиотека">
+            <div className="library-toolbar">
+              <div className="library-heading">
+                <h1>Ваши проекты</h1>
+                <p>
+                  {status === "recent"
+                    ? "Недавно открытые и обновлённые"
+                    : status === "archived"
+                      ? "Завершённые и отложенные"
+                      : status === "trash"
+                        ? "Удалённые проекты"
+                        : "Все тексты в одном месте"}
+                </p>
+              </div>
+              <Button asChild className="library-new-button">
                 <Link to="/projects/new">
-                  <Plus className="size-4" aria-hidden="true" />
+                  <Plus className="size-[18px]" aria-hidden="true" />
                   Новый проект
                 </Link>
               </Button>
             </div>
-          </div>
-
-          {importProject.isError ? (
-            <Banner
-              className="mt-6"
-              variant="danger"
-              title="Проект не импортирован"
-              body={importProject.error.message}
-            />
-          ) : null}
-          {importReport ? (
-            <Banner
-              className="mt-6"
-              variant={importReport.warningsCount > 0 ? "warning" : "success"}
-              title="Markdown-хранилище импортировано"
-              body={`${importReport.documents} документов · ${importReport.directories} папок · ${importReport.images} изображений · ${importReport.resolvedLinks} ссылок. Предупреждений: ${importReport.warningsCount}.`}
-              action={
-                importedMarkdownProject ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                      void navigate({
-                        to: "/projects/$projectId/studio/$nodeId",
-                        params: {
-                          projectId: importedMarkdownProject.projectId,
-                          nodeId: importedMarkdownProject.firstNodeId,
-                        },
-                      })
-                    }
-                  >
-                    Открыть проект
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : null}
-          {importReport?.warnings.length ? (
-            <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4 text-sm">
-              <summary className="cursor-pointer font-medium">
-                Показать предупреждения ({importReport.warningsCount})
-              </summary>
-              <ul className="mt-3 grid gap-2 text-xs text-[var(--ink-secondary)]">
-                {importReport.warnings.map((warning) => (
-                  <li key={`${warning.path}-${warning.code}-${warning.message}`}>
-                    <span className="font-medium text-[var(--ink-primary)]">
-                      {warning.path || "Хранилище"}:
-                    </span>{" "}
-                    {warning.message}
-                  </li>
-                ))}
-              </ul>
-              {importReport.warningsCount > importReport.warnings.length ? (
-                <p className="mt-3 text-xs text-[var(--ink-tertiary)]">
-                  Показаны первые {importReport.warnings.length} записей.
-                </p>
-              ) : null}
-            </details>
-          ) : null}
-
-          <div className="mt-7 flex items-center gap-1">
-            {filters.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => setStatus(filter.value)}
-                className="min-h-9 rounded-[var(--radius-pill)] border border-transparent px-3 text-[13px] text-[var(--ink-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] data-[active=true]:border-[var(--border-subtle)] data-[active=true]:bg-[var(--surface-raised)] data-[active=true]:text-[var(--ink-primary)]"
-                data-active={status === filter.value}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-
-          {(status === "active" || status === "recent") && hasRecovery ? (
-            <Banner
-              className="mt-6"
-              variant="info"
-              title="Незавершённые записи всегда можно восстановить"
-              body="Центр восстановления проверяет локальные аудиофрагменты при каждом запуске."
-              action={
-                <Button asChild variant="ghost" size="compact">
-                  <Link to="/recovery">
-                    <LifeBuoy className="size-4" aria-hidden="true" />
-                    Восстановить
-                  </Link>
+            <div className="library-controls">
+              <label className="library-search">
+                <Search className="size-[17px]" aria-hidden="true" />
+                <input
+                  type="search"
+                  aria-label="Поиск проектов"
+                  placeholder="Найти проект…"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </label>
+              <div className="library-imports">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".wstudio,application/vnd.writers-studio.project+zip"
+                  className="sr-only"
+                  aria-label="Выбрать файл проекта Writers Studio"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (file) importProject.mutate(file);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  aria-label="Проект Writers Studio"
+                  disabled={importProject.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {importProject.isPending ? (
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <FileUp className="size-4" aria-hidden="true" />
+                  )}
+                  <span>{importProject.isPending ? "Импортируем…" : "Проект Writers Studio"}</span>
                 </Button>
-              }
-            />
-          ) : null}
-
-          {projects.isPending ? (
-            <Spinner label="Открываем проекты…" />
-          ) : projects.isError ? (
-            <div className="mt-10 rounded-[var(--radius-lg)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-6">
-              <h2 className="font-medium text-[var(--danger)]">Не удалось загрузить проекты</h2>
-              <Button className="mt-4" variant="secondary" onClick={() => void projects.refetch()}>
-                Повторить
-              </Button>
-            </div>
-          ) : visibleProjects?.length === 0 ? (
-            <section className="mt-10 grid min-h-72 place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-panel)] p-8 text-center">
-              <div>
-                <h2 className="font-display text-3xl">
-                  {status === "active" ? "Создайте первое произведение" : "Здесь пока пусто"}
-                </h2>
-                <p className="mt-3 text-sm text-[var(--ink-secondary)]">
-                  {status === "active"
-                    ? "Начните с названия — первая глава появится автоматически."
-                    : "Проекты появятся здесь после соответствующего действия."}
-                </p>
-                {status === "active" ? (
-                  <Button asChild className="mt-5">
-                    <Link to="/projects/new">Создать проект</Link>
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  aria-label="Markdown / Obsidian"
+                  onClick={() => setMarkdownDialogOpen(true)}
+                >
+                  <FolderOpen className="size-4" aria-hidden="true" />
+                  <span>Markdown / Obsidian</span>
+                </Button>
               </div>
-            </section>
-          ) : (
-            <section
-              className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-              aria-label="Список проектов"
-            >
-              <Link
-                to="/projects/new"
-                className="grid min-h-[220px] place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-panel)] p-5 text-center hover:bg-[var(--surface-subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
-              >
-                <div>
-                  <span className="mx-auto grid size-11 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-                    <Plus className="size-5" aria-hidden="true" />
-                  </span>
-                  <span className="mt-4 block text-sm font-medium">Новый проект</span>
-                  <span className="mt-1 block text-xs text-[var(--ink-tertiary)]">
-                    Начните с названия и первой сцены
-                  </span>
+            </div>
+            <ProjectFilters status={status} onChange={setStatus} presentation="tabs" />
+            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: The scrollable project region must be reachable for keyboard scrolling. */}
+            <main className="library-scroll" aria-label="Проекты" tabIndex={0}>
+              {importProject.isError ? (
+                <Banner
+                  className="mt-6"
+                  variant="danger"
+                  title="Проект не импортирован"
+                  body={importProject.error.message}
+                />
+              ) : null}
+              {importReport ? (
+                <Banner
+                  className="mt-6"
+                  variant={importReport.warningsCount > 0 ? "warning" : "success"}
+                  title="Markdown-хранилище импортировано"
+                  body={`${importReport.documents} документов · ${importReport.directories} папок · ${importReport.images} изображений · ${importReport.resolvedLinks} ссылок. Предупреждений: ${importReport.warningsCount}.`}
+                  action={
+                    importedMarkdownProject ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() =>
+                          void navigate({
+                            to: "/projects/$projectId/studio/$nodeId",
+                            params: {
+                              projectId: importedMarkdownProject.projectId,
+                              nodeId: importedMarkdownProject.firstNodeId,
+                            },
+                          })
+                        }
+                      >
+                        Открыть проект
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : null}
+              {importReport?.warnings.length ? (
+                <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4 text-sm">
+                  <summary className="cursor-pointer font-medium">
+                    Показать предупреждения ({importReport.warningsCount})
+                  </summary>
+                  <ul className="mt-3 grid gap-2 text-xs text-[var(--ink-secondary)]">
+                    {importReport.warnings.map((warning) => (
+                      <li key={`${warning.path}-${warning.code}-${warning.message}`}>
+                        <span className="font-medium text-[var(--ink-primary)]">
+                          {warning.path || "Хранилище"}:
+                        </span>{" "}
+                        {warning.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {importReport.warningsCount > importReport.warnings.length ? (
+                    <p className="mt-3 text-xs text-[var(--ink-tertiary)]">
+                      Показаны первые {importReport.warnings.length} записей.
+                    </p>
+                  ) : null}
+                </details>
+              ) : null}
+
+              {(status === "active" || status === "recent") && hasRecovery ? (
+                <Banner
+                  className="mt-6"
+                  variant="info"
+                  title="Незавершённые записи всегда можно восстановить"
+                  body="Центр восстановления проверяет локальные аудиофрагменты при каждом запуске."
+                  action={
+                    <Button asChild variant="ghost" size="compact">
+                      <Link to="/recovery">
+                        <LifeBuoy className="size-4" aria-hidden="true" />
+                        Восстановить
+                      </Link>
+                    </Button>
+                  }
+                />
+              ) : null}
+
+              {projects.isPending ? (
+                <Spinner label="Открываем проекты…" />
+              ) : projects.isError ? (
+                <div className="mt-10 rounded-[var(--radius-lg)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-6">
+                  <h2 className="font-medium text-[var(--danger)]">Не удалось загрузить проекты</h2>
+                  <Button
+                    className="mt-4"
+                    variant="secondary"
+                    onClick={() => void projects.refetch()}
+                  >
+                    Повторить
+                  </Button>
                 </div>
-              </Link>
-              {visibleProjects?.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </section>
-          )}
-        </main>
+              ) : visibleProjects?.length === 0 &&
+                (normalizedSearch || (status !== "active" && status !== "recent")) ? (
+                <section className="mt-10 grid min-h-72 place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-panel)] p-8 text-center">
+                  <div>
+                    <h2 className="font-display text-3xl">
+                      {normalizedSearch ? "Проекты не найдены" : "Здесь пока пусто"}
+                    </h2>
+                    <p className="mt-3 text-sm text-[var(--ink-secondary)]">
+                      {normalizedSearch
+                        ? "Попробуйте другое название или описание."
+                        : "Проекты появятся здесь после соответствующего действия."}
+                    </p>
+                    {status === "active" ? (
+                      <Button asChild className="mt-5">
+                        <Link to="/projects/new">Создать проект</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                </section>
+              ) : (
+                <section className="library-grid" aria-label="Список проектов">
+                  <Link to="/projects/new" className="project-create-card library-create-card">
+                    <span className="library-create-icon">
+                      <Plus className="size-6" aria-hidden="true" />
+                    </span>
+                    <span className="library-create-title">Новый проект</span>
+                    <span className="library-create-description">
+                      Выберите название и структуру
+                    </span>
+                    <span className="library-create-arrow" aria-hidden="true">
+                      ↗
+                    </span>
+                  </Link>
+                  {visibleProjects?.map((project) => (
+                    <ProjectCard key={project.id} project={project} />
+                  ))}
+                </section>
+              )}
+            </main>
+          </section>
+        </div>
         <input
           ref={zipInputRef}
-          className="sr-only"
+          className="hidden"
+          aria-label="Выбрать ZIP-архив Markdown"
           type="file"
           accept=".zip,application/zip"
           onChange={(event) => {
@@ -422,7 +514,8 @@ export function ProjectsPage() {
         />
         <input
           ref={directoryInputRef}
-          className="sr-only"
+          className="hidden"
+          aria-label="Выбрать папку Markdown"
           type="file"
           multiple
           {...({ webkitdirectory: "" } as Record<string, string>)}

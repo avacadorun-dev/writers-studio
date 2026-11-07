@@ -191,13 +191,9 @@ func (s *Server) handleAssistantVoiceWebSocket(
 		}
 	}
 	var provider stt.LiveSession
-	var providerCancel context.CancelFunc
 	var pending *liveClientMessage
 	fixtureIndex := 0
 	defer func() {
-		if providerCancel != nil {
-			providerCancel()
-		}
 		if provider != nil {
 			provider.Close()
 		}
@@ -252,8 +248,8 @@ func (s *Server) handleAssistantVoiceWebSocket(
 					})
 					return
 				}
-				var providerContext context.Context
-				providerContext, providerCancel = context.WithCancel(request.Context())
+				providerContext, providerCancel := context.WithCancel(request.Context())
+				defer providerCancel()
 				go s.forwardAssistantVoiceEvents(providerContext, state, provider)
 			}
 			sendContext, cancel := context.WithTimeout(request.Context(), 5*time.Second)

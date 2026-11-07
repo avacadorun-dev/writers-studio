@@ -218,6 +218,7 @@ export function StudioPage({
   const { showToast } = useToast();
   const { requestInput } = useActionDialog();
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     const savedState = localStorage.getItem("writers-studio-tree-collapsed");
     return savedState === null ? window.innerWidth < 1280 : savedState === "true";
@@ -554,8 +555,10 @@ export function StudioPage({
 
   return (
     <RequireSession>
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="studio-workspace flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         <StudioHeader
+          documentsOpen={mobileTreeOpen}
+          onOpenDocuments={() => setMobileTreeOpen(true)}
           project={project.data.project}
           nodeId={nodeId}
           nodeTitle={node.title}
@@ -583,6 +586,8 @@ export function StudioPage({
         </div>
         <div className="flex min-h-0 min-w-0 flex-1">
           <ProjectTree
+            mobileOpen={mobileTreeOpen}
+            onMobileOpenChange={setMobileTreeOpen}
             projectId={projectId}
             activeNodeId={nodeId}
             nodes={project.data.nodes}

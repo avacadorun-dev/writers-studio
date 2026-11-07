@@ -69,6 +69,32 @@ test("P-01 creates, dictates, reviews, transfers, and durably saves a manuscript
   }
   await page.evaluate(() => {
     performance.clearMarks("writers-studio-record-click");
+    performance.clearMarks("writers-studio-recording-ready");
+    const observer = new MutationObserver(() => {
+      if (
+        !performance.getEntriesByName("writers-studio-record-click").length ||
+        !window.location.pathname.includes("/dictate/")
+      ) {
+        return;
+      }
+      const pause = Array.from(document.querySelectorAll("button")).find(
+        (button) => button.textContent?.trim() === "Пауза",
+      );
+      if (
+        pause &&
+        pause.getClientRects().length > 0 &&
+        getComputedStyle(pause).visibility !== "hidden"
+      ) {
+        performance.mark("writers-studio-recording-ready");
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "hidden", "style"],
+    });
     const startButton = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "Начать запись",
     );
@@ -85,10 +111,12 @@ test("P-01 creates, dictates, reviews, transfers, and durably saves a manuscript
   await expect(page.getByRole("button", { name: "Пауза" })).toBeVisible();
   const localStartLatencyMs = await page.evaluate(() => {
     const mark = performance.getEntriesByName("writers-studio-record-click").at(-1);
-    if (!mark) {
-      throw new Error("recording start mark is missing");
+    const ready = performance.getEntriesByName("writers-studio-recording-ready").at(-1);
+    if (!mark || !ready) {
+      throw new Error("recording start or ready mark is missing");
     }
-    return performance.now() - mark.startTime;
+    // Both timestamps are captured in the page, excluding Playwright round trips.
+    return ready.startTime - mark.startTime;
   });
   expect(localStartLatencyMs).toBeLessThanOrEqual(300);
   await expect(page.getByText(/Дом стоял у самой воды/)).toBeVisible({ timeout: 20_000 });

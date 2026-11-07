@@ -22,7 +22,7 @@ async function listMdxFiles(directory: string): Promise<string[]> {
 
 function readFrontmatter(source: string, path: string): { data: Frontmatter; body: string } {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!match) throw new Error(`${path}: отсутствует frontmatter`);
+  if (!match) throw new Error(`${path}: missing frontmatter`);
   const values = Object.fromEntries(
     match[1]
       .split(/\r?\n/)
@@ -31,7 +31,7 @@ function readFrontmatter(source: string, path: string): { data: Frontmatter; bod
       .map((item) => [item[1], item[2].trim().replace(/^['"]|['"]$/g, "")]),
   );
   if (!values.title || !values.description) {
-    throw new Error(`${path}: обязательны title и description`);
+    throw new Error(`${path}: title and description are required`);
   }
   return { data: values as Frontmatter, body: source.slice(match[0].length) };
 }
@@ -57,8 +57,8 @@ const indexes = await Promise.all(
     };
   }),
 );
-const api = createSearchAPI("advanced", { indexes, language: "russian" });
+const api = createSearchAPI("advanced", { indexes, language: "english" });
 const response = await api.staticGET();
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, `${await response.text()}\n`);
-console.log(`Индекс документации: ${indexes.length} страниц`);
+console.log(`Documentation index: ${indexes.length} pages`);

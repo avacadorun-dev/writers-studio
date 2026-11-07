@@ -1,32 +1,32 @@
 ---
-title: Если запись прервалась
-description: Где искать локально сохранённые данные и как безопасно повторить обработку аудио.
+title: Interrupted recordings
+description: Find locally saved data and safely retry audio processing.
 ---
 
-Обрыв связи или случайно закрытая вкладка неприятны, но не всегда означают потерю записи. Студия сохраняет промежуточные данные в браузере и показывает найденные материалы в центре восстановления.
+A lost connection or accidentally closed tab does not always mean a lost recording. The Studio saves intermediate data in the browser and shows recovered materials in the recovery center.
 
-## Сначала сохраните спокойствие и вкладку
+## Keep the tab and local data
 
-Если страница ещё открыта, не очищайте данные браузера и не запускайте новую запись поверх старой. Проверьте соединение, подождите несколько секунд и посмотрите, появилось ли сообщение о продолжении отправки.
+If the page is still open, keep browser data intact and avoid starting a new recording over the old one. Check the connection, wait a few seconds, and look for a message that uploading has resumed.
 
-Откройте **«Центр восстановления»** из меню проектов. Найдите сессию по времени, длительности и названию проекта. Прослушайте начало или доступный фрагмент, чтобы не спутать две соседние записи, затем выберите восстановление.
+Open the **Recovery center** from the projects menu. Find the session by its time, duration, and project name. Listen to the beginning or an available passage to distinguish nearby recordings, then choose recovery.
 
 <figure>
-  <img src="/docs/images/recovery.webp" alt="Центр восстановления с отдельными разделами локальных и серверных записей" />
-  <figcaption>Центр показывает записи на этом устройстве отдельно от серверных. Сначала смотрите локальный раздел: после обрыва сети там может находиться единственная полная копия.</figcaption>
+  <img src="/docs/images/recovery.png" alt="Recovery center with separate local and server recording sections" />
+  <figcaption>Recordings on this device are listed separately from server recordings. Check the local section first: it may contain the only complete copy after a connection failure. Screenshots illustrate the Russian interface.</figcaption>
 </figure>
 
-## Что произойдёт
+## What happens next
 
-Сохранённые фрагменты будут повторно собраны и, если требуется, отправлены на распознавание. Получив расшифровку, сравните её со звуком и только после этого переносите текст в рукопись. Повторная расшифровка не должна сама заменять уже отредактированный документ.
+Saved chunks are assembled again and sent for recognition if necessary. Compare the transcript with the audio before transferring text into the manuscript. Re-transcription does not automatically replace an edited document.
 
-Если первая попытка распознавания содержит много ошибок, запустите повторную обработку исходного аудио. Старая расшифровка остаётся ориентиром до тех пор, пока вы сами не выберете новую.
+If the first recognition attempt has many errors, reprocess the source audio. The previous transcript remains a reference until you select the new one.
 
-## Если ничего не найдено
+## If nothing is found
 
-- Проверьте тот же браузер и устройство, на котором велась запись: локальные фрагменты не переносятся между ними автоматически.
-- Не используйте очистку кеша и данных сайта до завершения восстановления.
-- Убедитесь, что вошли в тот же аккаунт и открыли нужный проект.
-- Если звук сохранился отдельным файлом, начните новую расшифровку из него, не удаляя исходник.
+- Use the same browser and device as the recording. Local chunks do not transfer between them automatically.
+- Keep the cache and site data until recovery is complete.
+- Check that you signed into the same account and opened the correct project.
+- If you saved the audio as a separate file, start a new transcription from it and keep the original.
 
-После восстановления откройте документ, убедитесь, что вставленный текст находится на месте, и дождитесь индикатора сохранения. Ненужный восстановленный дубль можно удалить только после такого сравнения.
+After recovery, open the document, check the inserted text, and wait for save confirmation. Remove an unwanted recovered duplicate after making that comparison.

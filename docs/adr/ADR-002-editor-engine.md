@@ -1,253 +1,46 @@
-# ADR-002: Tiptap/ProseMirror как основа редактора рукописи
+# ADR-002: Tiptap/ProseMirror manuscript editor
 
-> Статус: принято  
-> Дата: 29 июля 2026  
-> Владельцы: Product Design + Frontend
+Status: accepted and implemented.
 
-## Контекст
+## Context and decision
 
-«Студия автора» не может завершаться экраном расшифровки или простым `textarea`. После диктовки автор должен полноценно работать с текстом:
+The manuscript needs ordinary writing features, structured content, reliable
+transactions, selection mapping, source references and exact assistant changes.
+Use Tiptap 3 and ProseMirror rather than a textarea, opaque HTML editor or a custom
+editing engine.
 
-- исправлять формулировки и структуру абзацев;
-- использовать типографику художественного текста;
-- выполнять поиск и замену;
-- безопасно отменять действия;
-- сохранять версии;
-- переносить фрагменты между сценами;
-- возвращаться от текста к исходному аудио;
-- работать с большими главами без деградации интерфейса.
+Canonical content is validated Tiptap JSON, not arbitrary HTML. Each content-bearing
+project node has its own document revisions. Stable block IDs support provenance,
+annotations and exact operations. Plain text and Markdown are derived views.
 
-Редактор должен быть open source, встраиваться в React и позволять контролировать документную модель. HTML не должен быть единственным источником истины.
+## Schema and compatibility
 
-## Рассмотренные варианты
+Schema v1 covers paragraphs, headings, lists, quotations, scene breaks and ordinary
+marks. v2 adds rich blocks and inline code; v3 adds heading levels 4–6; v4 adds
+inline/block mathematics. Missing `schemaVersion` means v1. Opening or editing plain
+text does not eagerly upgrade old documents. The server validates supported
+versions and derives revision schema from content.
 
-| Вариант | Сильные стороны | Ограничения для продукта |
-|---|---|---|
-| Tiptap 3 / ProseMirror | React bindings, headless UI, schema, transactions, extensions, MIT core | Некоторые готовые advanced-функции Tiptap платные |
-| Чистый ProseMirror | Максимальный контроль, зрелая транзакционная модель | Больше собственной инфраструктуры и UI-кода |
-| Lexical | MIT, React, производительность и доступность | Больше продуктовых возможностей придётся собирать самостоятельно; меньше прямой пользы от ProseMirror-экосистемы |
-| `contenteditable` / `textarea` | Быстрый прототип | Нет надёжной схемы, сложных трансформаций, provenance и масштабируемого форматирования |
+Paste uses an allowlist. Rich images are uploaded durably before insertion;
+canonical references use project media IDs and authorized same-origin URLs.
+Mermaid runs in strict mode and KaTeX uses `trust: false`.
 
-## Решение
+## Persistence and integration
 
-Использовать **Tiptap 3 на базе ProseMirror**.
+Autosave appends revisions without resetting mounted editor content, selection,
+scroll or undo history on acknowledgement. Local snapshots provide emergency
+recovery; base revision conflicts preserve alternate work. Named versions remain
+separate from autosave history. Restore appends a revision.
 
-Причины:
+Transcript transfer is one explicit editor operation at a selected destination,
+with provenance and Undo. Late transcription cannot apply a hidden transaction.
+Assistant previews and annotation decorations are transient until an authorized
+canonical mutation. Project annotations are not embedded in document JSON.
 
-- open-source core распространяется под MIT;
-- официальные React bindings;
-- ProseMirror хранит документ как проверяемое дерево по заданной schema;
-- изменения проходят через transactions, что подходит для autosave, undo/redo, provenance и безопасной вставки расшифровки;
-- headless-подход позволяет дизайнеру создать спокойный писательский интерфейс без визуальной привязки к редактору;
-- расширения позволяют добавить `scene_break`, source references и собственные команды.
+## Consequences and verification
 
-Платные Tiptap Comments, Version History, AI и Cloud не являются частью решения. История версий реализуется доменным backend-сервисом, чтобы данные не зависели от коммерческого расширения редактора.
-
-## Канонический формат
-
-Источник истины — versioned ProseMirror/Tiptap JSON:
-
-```json
-{
-  "type": "doc",
-  "attrs": { "schemaVersion": 1 },
-  "content": [
-    {
-      "type": "paragraph",
-      "attrs": {
-        "blockId": "blk_01J...",
-        "sourceRefs": ["trseg_01J..."]
-      },
-      "content": [
-        {
-          "type": "text",
-          "text": "Она остановилась у двери."
-        }
-      ]
-    }
-  ]
-}
-```
-
-HTML, Markdown, DOCX и PDF — производные форматы импорта/экспорта. Сервер валидирует входящий JSON по известной версии schema. Миграции schema являются явными и тестируемыми.
-
-## Schema MVP
-
-### Nodes
-
-- `doc`;
-- `paragraph` со стабильным `blockId`;
-- `heading` уровней 1–3;
-- `blockquote`;
-- `bulletList`, `orderedList`, `listItem`;
-- `hardBreak`;
-- `horizontalRule`;
-- `sceneBreak` — семантический разделитель сцены;
-- `text`.
-
-### Marks
-
-- `italic`;
-- `bold`;
-- `underline`;
-- `strike`;
-- `link`;
-- `commentAnchor` зарезервирован, но не включён в MVP.
-
-Для художественного текста основные действия — абзац, курсив, полужирный, тире/кавычки и разделитель сцены. Панель не должна визуально подталкивать автора к избыточному форматированию.
-
-### Расширение schema v2
-
-Release 0.2.0 добавляет `codeBlock`, `table`/`tableRow`/`tableHeader`/`tableCell`,
-`imageBlock`, `mermaidBlock`, `callout` и mark `code`. Schema v1 остаётся
-поддерживаемой и не конвертируется при чтении: документ получает v2 только после
-фактического использования нового блока. Подробный контракт и media lifecycle —
-в [RICH_DOCUMENT_EDITOR.md](../specification/RICH_DOCUMENT_EDITOR.md).
-
-## Гранулярность документов
-
-Одна editor instance открывает один content-bearing node: сцену, главу без сцен, черновик или заметку. Вся книга не монтируется как единый `contenteditable`.
-
-Рукопись собирается из упорядоченного дерева документов. Это:
-
-- удерживает производительность на длинных проектах;
-- ограничивает размер конфликтов и autosave;
-- упрощает версии и восстановление;
-- соответствует навигации «часть → глава → сцена».
-
-## Autosave и версии
-
-Редактор ведёт два уровня сохранения:
-
-1. **Локальный recovery journal** — batches транзакций или snapshots в IndexedDB.
-2. **Серверная revision** — сохранение после короткого idle и периодически во время непрерывной работы.
-
-Целевые правила:
-
-- локальный recovery не позднее 1 секунды после изменения;
-- серверное сохранение после 1,5 секунды бездействия;
-- принудительное серверное сохранение не реже 15 секунд при непрерывном вводе;
-- навигация не блокируется, если локальная копия сохранена;
-- именованная версия создаёт immutable snapshot текущей revision;
-- Undo/Redo текущей сессии не заменяет историю версий.
-
-При конфликте двух вкладок сервер не применяет last-write-wins. Пользователю создаётся «Конфликтующая копия», обе версии сохраняются.
-
-## Интеграция диктовки с редактором
-
-### Вставка
-
-- Live partial не попадает в editor document.
-- Finalized live-сегменты отображаются в transcript draft.
-- Команда «Перенести в рукопись» создаёт одну транзакцию Tiptap.
-- Каждый вставленный абзац получает новый `blockId` и `sourceRefs`.
-- Вставка является одним undoable действием.
-
-### Поздняя финализация
-
-Если quality-pass STT завершился после того, как пользователь открыл редактирование:
-
-- текущий документ не изменяется;
-- пользователь видит «Доступна более точная расшифровка»;
-- сравнение выполняется в отдельном review-режиме;
-- принять можно весь фрагмент или выбранные изменения;
-- каждое принятие — отдельная транзакция с понятным Undo.
-
-### Связь с аудио
-
-MVP гарантирует paragraph-level provenance:
-
-- `sourceRefs` ведут к transcript segments;
-- сегменты содержат `audioAssetId`, `startMs` и `endMs`;
-- кнопка «Прослушать источник» запускает ближайший диапазон аудио;
-- после разделения абзаца оба новых блока наследуют source refs;
-- после объединения refs объединяются и дедуплицируются;
-- напечатанный вручную блок может не иметь source refs.
-
-Word-level подсветка является progressive enhancement и включается, если финальный STT возвращает надёжные word timestamps.
-
-## Требования к редактору MVP
-
-### Редактирование
-
-- ввод, выделение, copy/paste;
-- undo/redo;
-- разбиение и объединение абзацев;
-- заголовки и базовые marks;
-- разделитель сцены;
-- drag-and-drop текста без потери;
-- очистка опасного и неподдерживаемого форматирования при вставке;
-- сохранение обычных кавычек/тире без неожиданных замен.
-
-### Навигация
-
-- outline текущего проекта;
-- переход между сценами без потери selection/save;
-- поиск по текущему документу;
-- поиск по проекту;
-- replace в текущем документе;
-- replace-all по проекту только с preview.
-
-### Писательский режим
-
-- ширина строки 60–80 символов;
-- настраиваемые гарнитура, кегль, межстрочный интервал и тема;
-- focus mode;
-- word/character count;
-- цель по словам;
-- spellcheck браузера с возможностью отключения;
-- все основные действия с клавиатуры.
-
-### Доступность
-
-- WCAG 2.2 AA для окружающего UI;
-- видимый focus;
-- toolbar доступен с клавиатуры;
-- форматирование объявляется screen reader;
-- источники аудио доступны без hover;
-- partial/final отличаются не только цветом.
-
-## Производительность
-
-- тестовый документ: не менее 50 000 слов в одном editor node;
-- обычный сценарий: одна сцена или глава до 15 000 слов;
-- не ререндерить всё React-дерево на каждую транзакцию;
-- тяжёлые показатели и поиск выполнять с debounce или в worker;
-- проектный поиск выполняется сервером/индексом, а не монтированием всех редакторов;
-- сборка целой рукописи для экспорта выполняется вне интерактивного editor view.
-
-## Последствия
-
-### Положительные
-
-- продукт получает настоящий редактор, а не временный слой после STT;
-- дизайн полностью контролируется командой;
-- JSON schema и transactions подходят для версий и аудио-provenance;
-- MVP не зависит от платного Tiptap Cloud.
-
-### Отрицательные
-
-- toolbar, comments UI и writer-specific nodes нужно проектировать и реализовывать;
-- schema migrations становятся нашей ответственностью;
-- импорт DOCX потребует отдельного конвертера и проверки потерь;
-- Tiptap/ProseMirror требуют аккуратной интеграции с React state.
-
-## Проверки до production
-
-- [ ] Прототип 50 000 слов остаётся отзывчивым на целевых устройствах.
-- [ ] Autosave не перемещает selection и не создаёт визуальных скачков.
-- [ ] Paste из Word и Google Docs проходит через sanitizer.
-- [ ] Русские кавычки, длинные тире и неразрывные пробелы переживают save/load/export.
-- [ ] Source refs корректно переживают split/join/cut/paste/undo.
-- [ ] Batch-обновление никогда не перезаписывает ручную правку.
-- [ ] Recovery после аварийного закрытия восстанавливает последнюю локальную версию.
-- [ ] Экспорт/импорт покрыт round-trip fixtures.
-
-## Источники
-
-- [Tiptap: Overview](https://tiptap.dev/docs/editor/getting-started/overview)
-- [Tiptap: React integration](https://tiptap.dev/docs/editor/getting-started/install/react)
-- [Tiptap: MIT license](https://github.com/ueberdosis/tiptap/blob/main/LICENSE.md)
-- [ProseMirror Guide](https://prosemirror.net/docs/guide/)
-- [Lexical](https://lexical.dev/)
-- [Lexical: MIT license](https://github.com/facebook/lexical/blob/main/LICENSE)
+The engine provides schema-aware transactions and mapping at the cost of explicit
+extension design and validation. Test rich content round-trips, paste sanitization,
+exact Unicode ranges, block-ID remapping, selection preservation, source playback,
+conflict recovery and export fallbacks. See
+[rich-document specification](../specification/RICH_DOCUMENT_EDITOR.md).

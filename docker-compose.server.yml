@@ -82,7 +82,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     environment:
-      PUBLIC_HOST: ${PUBLIC_HOST:-studio.example.test}
+      PUBLIC_HOST: ${PUBLIC_HOST:?PUBLIC_HOST is required}
     depends_on:
       app:
         condition: service_healthy

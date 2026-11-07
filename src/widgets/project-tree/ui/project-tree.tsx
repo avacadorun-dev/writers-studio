@@ -16,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -56,6 +57,7 @@ import {
   Trash2,
   Upload,
   Workflow,
+  X,
 } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -150,6 +152,8 @@ interface ProjectTreeProps {
   onToggle: () => void;
   integratedWorkspace?: boolean;
   activeCanvasId?: string;
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
 }
 
 const iconByName = {
@@ -230,6 +234,64 @@ function DocumentStatusMark({ status }: { status: DocumentNode["status"] }) {
 }
 
 export function ProjectTree({
+  mobileOpen = false,
+  onMobileOpenChange,
+  ...props
+}: ProjectTreeProps) {
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => {
+      if (desktop.matches) onMobileOpenChange?.(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, [mobileOpen, onMobileOpenChange]);
+
+  return (
+    <>
+      {!mobileOpen ? <ProjectTreeContent {...props} /> : null}
+      <DialogPrimitive.Root open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[80] bg-[var(--surface-overlay)] backdrop-blur-sm" />
+          <DialogPrimitive.Content
+            className="project-sidebar fixed inset-y-0 left-0 z-[81] flex w-[min(360px,calc(100vw-28px))] flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] shadow-[var(--shadow-lg)] focus:outline-none"
+            aria-describedby={undefined}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              document.getElementById("project-documents-trigger")?.focus();
+            }}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a[href]")) onMobileOpenChange?.(false);
+            }}
+          >
+            <div className="flex min-h-14 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] px-4">
+              <ListTree className="size-4 text-[var(--accent)]" aria-hidden="true" />
+              <DialogPrimitive.Title className="text-sm font-semibold">
+                Документы проекта
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Close asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto shrink-0"
+                  aria-label="Закрыть список документов"
+                  tooltip={false}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </Button>
+              </DialogPrimitive.Close>
+            </div>
+            <ProjectTreeContent {...props} collapsed={false} mobile />
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    </>
+  );
+}
+
+function ProjectTreeContent({
   projectId,
   activeNodeId,
   nodes,
@@ -238,7 +300,8 @@ export function ProjectTree({
   onToggle,
   integratedWorkspace = false,
   activeCanvasId,
-}: ProjectTreeProps) {
+  mobile = false,
+}: ProjectTreeProps & { mobile?: boolean }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -265,6 +328,7 @@ export function ProjectTree({
   const [renameDraft, setRenameDraft] = useState("");
   const treeViewportRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameFromMenuRef = useRef(false);
   useEffect(() => {
     if (!renamingNodeId) return;
     renameInputRef.current?.focus();
@@ -297,7 +361,7 @@ export function ProjectTree({
     () => flattenVisibleOutline(outline.roots, collapsedNodeIds),
     [collapsedNodeIds, outline],
   );
-  const treeRowHeight = 36;
+  const treeRowHeight = mobile ? 44 : 36;
   const treeViewportHeight = 560;
   const treeVirtualStart = Math.max(0, Math.floor(treeScrollTop / treeRowHeight) - 10);
   const treeVirtualEnd = Math.min(
@@ -315,7 +379,7 @@ export function ProjectTree({
     const top = Math.max(0, index * treeRowHeight - treeViewportHeight / 3);
     treeViewportRef.current.scrollTop = top;
     setTreeScrollTop(top);
-  }, [activeNodeId, visibleOutline]);
+  }, [activeNodeId, visibleOutline, treeRowHeight]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
@@ -784,8 +848,25 @@ export function ProjectTree({
                 <MoreHorizontal className="size-3.5" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={startRename}>
+            <DropdownMenuContent
+              align="end"
+              className={mobile ? "z-[90]" : undefined}
+              onCloseAutoFocus={(event) => {
+                if (!renameFromMenuRef.current) return;
+                renameFromMenuRef.current = false;
+                // Keep the inline input focused: restoring focus to the menu
+                // trigger would blur it and prematurely commit the rename.
+                event.preventDefault();
+                renameInputRef.current?.focus();
+                renameInputRef.current?.select();
+              }}
+            >
+              <DropdownMenuItem
+                onSelect={() => {
+                  renameFromMenuRef.current = true;
+                  startRename();
+                }}
+              >
                 <Pencil className="size-4" aria-hidden="true" />
                 Переименовать
               </DropdownMenuItem>
@@ -801,7 +882,7 @@ export function ProjectTree({
     return (
       <nav
         className={cn(
-          "hidden min-w-0 w-16 shrink-0 flex-col items-center overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex",
+          "project-sidebar hidden min-w-0 w-16 shrink-0 flex-col items-center overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex",
           !integratedWorkspace && "py-1",
         )}
         aria-label="Структура проекта свёрнута"
@@ -853,7 +934,12 @@ export function ProjectTree({
   return (
     <TooltipPrimitive.Provider delayDuration={350} skipDelayDuration={150}>
       <nav
-        className="hidden min-w-0 w-[280px] shrink-0 flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex"
+        className={cn(
+          "project-sidebar min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--surface-panel)]",
+          mobile
+            ? "flex w-full flex-1 [&_a]:min-h-11"
+            : "hidden w-[280px] shrink-0 border-r border-[var(--border-subtle)] lg:flex",
+        )}
         aria-label="Структура проекта"
       >
         <div
@@ -867,9 +953,16 @@ export function ProjectTree({
             Структура
           </span>
           <div className="ml-auto flex">
-            <Button variant="ghost" size="icon" aria-label="Свернуть структуру" onClick={onToggle}>
-              <PanelLeftClose className="size-4" aria-hidden="true" />
-            </Button>
+            {!mobile ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Свернуть структуру"
+                onClick={onToggle}
+              >
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="icon"
@@ -890,7 +983,7 @@ export function ProjectTree({
                 </Button>
               </DropdownMenuTrigger>
               {activeNode ? (
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className={mobile ? "z-[90]" : undefined}>
                   <TreeAction
                     icon={Pencil}
                     label="Переименовать"

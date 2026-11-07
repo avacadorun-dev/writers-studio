@@ -7,7 +7,7 @@ default with `MCP_ENABLED=false`.
 
 ## Context
 
-The built-in Assistant already uses a 69-tool in-process MCP catalog and durable
+The built-in Assistant already uses a in-process MCP tool catalog and durable
 Assistant change sets. A local external agent needs the same project abilities,
 including review, Apply, Reject and Undo, without opening the Writer's Studio UI.
 The external client must never choose an owner or smuggle a different project ID
@@ -16,7 +16,7 @@ through ordinary tool arguments.
 ## Decision
 
 - `/mcp` is a stateful MCP Streamable HTTP endpoint with a 30-minute idle timeout.
-- The remote catalog is a strict superset of the unchanged 69-tool internal catalog.
+- The remote catalog is a strict superset of the internal catalog.
 - OAuth Authorization Code + mandatory S256 PKCE is validated at the protocol
   boundary by ORY Fosite. Protected-resource/authorization-server discovery,
   Client ID Metadata Documents and Dynamic Client Registration are supported;

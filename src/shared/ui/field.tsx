@@ -51,7 +51,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
     <input
       ref={ref}
       className={cn(
-        "h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 text-[15px] text-[var(--ink-primary)] placeholder:text-[var(--ink-tertiary)] focus:border-[var(--focus)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--focus)]",
+        "studio-input h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 text-base text-[var(--ink-primary)] placeholder:text-[var(--ink-tertiary)] focus:border-[var(--focus)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--focus)]",
         className,
       )}
       {...props}

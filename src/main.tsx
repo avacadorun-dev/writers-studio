@@ -2,7 +2,6 @@ import "@fontsource/literata/400.css";
 import "@fontsource/literata/400-italic.css";
 import "@fontsource/literata/500.css";
 import "@fontsource/literata/600.css";
-import "@fontsource/philosopher/700.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";

@@ -3,9 +3,16 @@ import { Link } from "@tanstack/react-router";
 import {
   Archive,
   ArrowRight,
+  BookMarked,
   BookOpen,
+  Clapperboard,
+  Clock3,
+  FileText,
+  Gamepad2,
+  Layers3,
   Mic,
   MoreHorizontal,
+  NotebookPen,
   PencilLine,
   RotateCcw,
   Trash2,
@@ -38,7 +45,18 @@ const kindLabels: Record<Project["kind"], string> = {
   custom: "Своя структура",
 };
 
+const kindIcons = {
+  novel: BookOpen,
+  story: FileText,
+  screenplay: Clapperboard,
+  nonfiction: BookMarked,
+  game_design: Gamepad2,
+  free: NotebookPen,
+  custom: Layers3,
+};
+
 export function ProjectCard({ project }: { project: Project }) {
+  const KindIcon = kindIcons[project.kind];
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { requestInput } = useActionDialog();
@@ -69,94 +87,99 @@ export function ProjectCard({ project }: { project: Project }) {
   });
 
   return (
-    <article className="group relative flex min-h-[220px] flex-col rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5 transition-colors hover:border-[var(--border-strong)]">
-      <div className="flex items-center justify-between">
-        <span className="inline-flex min-h-7 items-center rounded-[var(--radius-pill)] bg-[var(--surface-subtle)] px-2.5 text-[11px] font-semibold tracking-[0.12em] text-[var(--ink-secondary)] uppercase">
-          {kindLabels[project.kind]}
+    <article className="project-card group" data-kind={project.kind}>
+      <div className="project-card-top">
+        <span className="project-card-symbol" aria-hidden="true">
+          <KindIcon className="size-[18px]" />
         </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Действия: ${project.title}`}
-            >
-              <MoreHorizontal className="size-4" aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" aria-label={`Действия с проектом «${project.title}»`}>
-            {project.status !== "trash" ? (
-              <DropdownMenuItem onSelect={() => setEditing(true)}>
-                <PencilLine className="size-4" aria-hidden="true" />
-                Редактировать
-              </DropdownMenuItem>
-            ) : null}
-            {project.status !== "active" ? (
-              <DropdownMenuItem onSelect={() => status.mutate("active")}>
-                <RotateCcw className="size-4" aria-hidden="true" />
-                Восстановить
-              </DropdownMenuItem>
-            ) : null}
-            {project.status === "active" ? (
-              <DropdownMenuItem onSelect={() => status.mutate("archived")}>
-                <Archive className="size-4" aria-hidden="true" />В архив
-              </DropdownMenuItem>
-            ) : null}
-            {project.status !== "trash" ? (
-              <DropdownMenuItem destructive onSelect={() => status.mutate("trash")}>
-                <Trash2 className="size-4" aria-hidden="true" />В корзину
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                destructive
-                onSelect={() => {
-                  void requestInput({
-                    title: "Удалить проект безвозвратно?",
-                    description:
-                      "Будут удалены рукопись, версии и связанные записи. Резервные копии внешних систем могут храниться по их правилам.",
-                    label: "Название проекта",
-                    requiredValue: project.title,
-                    icon: Trash2,
-                    tone: "danger",
-                    confirmLabel: "Удалить безвозвратно",
-                  }).then((confirmation) => {
-                    if (confirmation !== undefined) {
-                      purge.mutate(confirmation);
-                    }
-                  });
-                }}
+        <span className="project-card-kind">{kindLabels[project.kind]}</span>
+        <div className="project-card-menu">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Действия: ${project.title}`}
               >
-                <Trash2 className="size-4" aria-hidden="true" />
-                Удалить навсегда
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" aria-label={`Действия с проектом «${project.title}»`}>
+              {project.status !== "trash" ? (
+                <DropdownMenuItem onSelect={() => setEditing(true)}>
+                  <PencilLine className="size-4" aria-hidden="true" />
+                  Редактировать
+                </DropdownMenuItem>
+              ) : null}
+              {project.status !== "active" ? (
+                <DropdownMenuItem onSelect={() => status.mutate("active")}>
+                  <RotateCcw className="size-4" aria-hidden="true" />
+                  Восстановить
+                </DropdownMenuItem>
+              ) : null}
+              {project.status === "active" ? (
+                <DropdownMenuItem onSelect={() => status.mutate("archived")}>
+                  <Archive className="size-4" aria-hidden="true" />В архив
+                </DropdownMenuItem>
+              ) : null}
+              {project.status !== "trash" ? (
+                <DropdownMenuItem destructive onSelect={() => status.mutate("trash")}>
+                  <Trash2 className="size-4" aria-hidden="true" />В корзину
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() => {
+                    void requestInput({
+                      title: "Удалить проект безвозвратно?",
+                      description:
+                        "Будут удалены рукопись, версии и связанные записи. Резервные копии внешних систем могут храниться по их правилам.",
+                      label: "Название проекта",
+                      requiredValue: project.title,
+                      icon: Trash2,
+                      tone: "danger",
+                      confirmLabel: "Удалить безвозвратно",
+                    }).then((confirmation) => {
+                      if (confirmation !== undefined) {
+                        purge.mutate(confirmation);
+                      }
+                    });
+                  }}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Удалить навсегда
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       <Link
         to="/projects/$projectId"
         params={{ projectId: project.id }}
-        className="mt-3 rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+        className="project-card-open focus-visible:outline-none"
       >
-        <h2 className="font-display text-[23px] leading-[1.25]">{project.title}</h2>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--ink-secondary)]">
-          {project.synopsis || "Новая рукопись ждёт первого абзаца."}
-        </p>
+        <h2>{project.title}</h2>
+        <p>{project.synopsis || "Новая рукопись ждёт первого абзаца."}</p>
       </Link>
-      <div className="mt-auto flex items-center justify-between pt-5 text-xs text-[var(--ink-tertiary)]">
-        <span className="flex items-center gap-1.5">
-          <BookOpen className="size-3.5" aria-hidden="true" />
+      <div className="project-card-footer">
+        <time
+          className="project-card-date"
+          dateTime={project.updatedAt}
+          title="Последнее изменение"
+        >
+          <Clock3 className="size-3" aria-hidden="true" />
           {new Intl.DateTimeFormat("ru", { day: "numeric", month: "long" }).format(
             new Date(project.updatedAt),
           )}
-        </span>
+        </time>
         <div className="flex items-center gap-1">
           <Button
             asChild
             variant="ghost"
             size="icon"
-            className="sm:hidden"
+            className="project-card-dictate sm:hidden"
             aria-label={`Диктовать в проект ${project.title}`}
           >
             <Link

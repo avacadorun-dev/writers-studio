@@ -15,7 +15,7 @@ import {
 
 const client = oramaStaticClient({
   from: "/docs/search.json",
-  initOrama: () => create({ schema: { _: "string" }, language: "russian" }),
+  initOrama: () => create({ schema: { _: "string" }, language: "english" }),
 });
 
 export function DocsSearchDialog(props: SharedProps) {
@@ -28,16 +28,16 @@ export function DocsSearchDialog(props: SharedProps) {
         <SearchDialogHeader>
           <SearchDialogIcon />
           <SearchDialogInput
-            placeholder="Найти в документации…"
-            aria-label="Поиск по документации"
+            placeholder="Search documentation…"
+            aria-label="Search documentation"
           />
-          <SearchDialogClose>Закрыть</SearchDialogClose>
+          <SearchDialogClose>Close</SearchDialogClose>
         </SearchDialogHeader>
         <SearchDialogList
           items={query.data !== "empty" ? query.data : null}
           Empty={() => (
             <p className="p-6 text-center text-sm text-fd-muted-foreground">
-              Ничего не нашлось. Попробуйте сформулировать запрос короче.
+              No results. Try a shorter search query.
             </p>
           )}
         />

@@ -7,16 +7,16 @@ import { cn } from "~shared/lib/cn";
 import { UiTooltip } from "./tooltip";
 
 const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50",
+  "studio-button inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
         primary:
-          "bg-[var(--accent-surface)] text-[var(--ink-on-solid)] hover:bg-[var(--accent-surface-hover)] active:bg-[var(--accent-surface-hover)]",
+          "studio-button-primary bg-[var(--accent-surface)] text-[var(--ink-on-solid)] hover:bg-[var(--accent-surface-hover)] active:bg-[var(--accent-surface-hover)]",
         creative:
           "bg-[var(--creative-surface)] text-[var(--ink-on-creative)] hover:bg-[var(--creative-surface-hover)] active:bg-[var(--creative-surface-hover)]",
         secondary:
-          "border border-[var(--border-strong)] bg-[var(--surface-raised)] text-[var(--ink-primary)] hover:bg-[var(--surface-subtle)]",
+          "border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-subtle)]",
         ghost:
           "bg-transparent text-[var(--ink-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink-primary)]",
         destructive:

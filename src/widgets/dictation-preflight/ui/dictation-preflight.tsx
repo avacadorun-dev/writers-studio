@@ -1,5 +1,6 @@
+import { useRouter } from "@tanstack/react-router";
 import { Mic, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getSTTCapabilities, type STTCapabilities } from "~entities/dictation";
 import type { DocumentNode, Project } from "~entities/project";
@@ -33,6 +34,7 @@ export function DictationPreflight({
   onClose,
   onStarted,
 }: DictationPreflightProps) {
+  const router = useRouter({ warn: false });
   const [destination, setDestination] = useState(destinationNodeId ?? "");
   const [preferences] = useState(loadWriterPreferences);
   const [language, setLanguage] = useState<"ru" | "en">(project.language || preferences.language);
@@ -59,6 +61,10 @@ export function DictationPreflight({
   const smoothedLevelRef = useRef(0);
   const signalDetectedRef = useRef(false);
   const streamHandedOff = useRef(false);
+  const mountedRef = useRef(false);
+  const microphoneRequestRef = useRef(0);
+  const openingMicrophoneRef = useRef(false);
+  const automaticMicrophoneRef = useRef(false);
 
   const secureOrigin = window.isSecureContext;
   const mediaSupported =
@@ -72,6 +78,18 @@ export function DictationPreflight({
     sttCapabilities?.modes.some((mode) => mode === "realtime" || mode === "chunked_live"),
   );
   const sttBlocked = online && (sttCheck.status !== "ready" || !languageSupported);
+
+  useEffect(() => {
+    if (!router) return;
+    // Load the recording screen while the author checks the microphone, so
+    // starting a local recording never waits for its first route download.
+    void router
+      .preloadRoute({
+        to: "/projects/$projectId/dictate/$localId",
+        params: { projectId: project.id, localId: "preflight" },
+      })
+      .catch(() => undefined);
+  }, [project.id, router]);
 
   useEffect(() => {
     if (!online) {
@@ -94,6 +112,14 @@ export function DictationPreflight({
   }, [online]);
 
   useEffect(() => {
+    let active = true;
+    let microphonePermission: PermissionStatus | undefined;
+    const updatePermission = () => {
+      if (active && microphonePermission) {
+        setPermission(microphonePermission.state);
+      }
+    };
+    mountedRef.current = true;
     const handleOnline = () => setOnline(navigator.onLine);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOnline);
@@ -112,16 +138,24 @@ export function DictationPreflight({
       void navigator.permissions
         .query({ name: "microphone" as PermissionName })
         .then((status) => {
-          setPermission(status.state as Exclude<PermissionState, "checking" | "unsupported">);
-          status.addEventListener("change", () => {
-            setPermission(status.state as Exclude<PermissionState, "checking" | "unsupported">);
-          });
+          if (!active) return;
+          microphonePermission = status;
+          updatePermission();
+          status.addEventListener("change", updatePermission);
         })
-        .catch(() => setPermission("prompt"));
+        .catch(() => {
+          if (active) setPermission("prompt");
+        });
     } else {
       setPermission("prompt");
     }
     return () => {
+      active = false;
+      mountedRef.current = false;
+      microphoneRequestRef.current += 1;
+      openingMicrophoneRef.current = false;
+      automaticMicrophoneRef.current = false;
+      microphonePermission?.removeEventListener("change", updatePermission);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOnline);
       window.cancelAnimationFrame(animation.current ?? 0);
@@ -132,8 +166,13 @@ export function DictationPreflight({
         for (const track of streamRef.current?.getTracks() ?? []) {
           track.stop();
         }
+        streamRef.current = undefined;
       }
       void audioContextRef.current?.close();
+      audioContextRef.current = undefined;
+      audioSourceRef.current = undefined;
+      analyserRef.current = undefined;
+      meterSinkRef.current = undefined;
     };
   }, [mediaSupported]);
 
@@ -141,105 +180,139 @@ export function DictationPreflight({
     await openMicrophone(microphoneId);
   };
 
-  const openMicrophone = async (requestedDeviceId: string) => {
-    setError(undefined);
-    setRequestingMicrophone(true);
-    try {
-      window.cancelAnimationFrame(animation.current ?? 0);
-      audioSourceRef.current?.disconnect();
-      analyserRef.current?.disconnect();
-      meterSinkRef.current?.disconnect();
-      audioSourceRef.current = undefined;
-      analyserRef.current = undefined;
-      meterSinkRef.current = undefined;
-      smoothedLevelRef.current = 0;
-      signalDetectedRef.current = false;
-      setLevel(0);
-      setSignalDetected(false);
-      setTrackMuted(false);
-      for (const track of streamRef.current?.getTracks() ?? []) {
-        track.stop();
-      }
-      streamRef.current = undefined;
-      setStream(undefined);
-      await audioContextRef.current?.close();
-      const media = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          ...(requestedDeviceId ? { deviceId: { exact: requestedDeviceId } } : {}),
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      streamRef.current = media;
-      setStream(media);
-      setPermission("granted");
-      const track = media.getAudioTracks()[0];
-      if (!track) {
-        throw new DOMException("Audio track is missing", "NotFoundError");
-      }
-      setTrackMuted(track.muted || !track.enabled || track.readyState !== "live");
-      track.addEventListener("mute", () => setTrackMuted(true));
-      track.addEventListener("unmute", () => setTrackMuted(false));
-      track.addEventListener("ended", () => setTrackMuted(true));
+  const openMicrophone = useCallback(
+    async function open(requestedDeviceId: string) {
+      const requestId = ++microphoneRequestRef.current;
+      const isCurrent = () => mountedRef.current && microphoneRequestRef.current === requestId;
+      openingMicrophoneRef.current = true;
+      setError(undefined);
+      setRequestingMicrophone(true);
       try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        setMicrophones(devices.filter((device) => device.kind === "audioinput"));
-      } catch {
-        setMicrophones([]);
-      }
-      const context = new AudioContext({ latencyHint: "interactive" });
-      audioContextRef.current = context;
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0;
-      const source = context.createMediaStreamSource(media);
-      const meterSink = context.createMediaStreamDestination();
-      source.connect(analyser);
-      analyser.connect(meterSink);
-      audioSourceRef.current = source;
-      analyserRef.current = analyser;
-      meterSinkRef.current = meterSink;
-      if (context.state === "suspended") {
-        await context.resume();
-      }
+        window.cancelAnimationFrame(animation.current ?? 0);
+        audioSourceRef.current?.disconnect();
+        analyserRef.current?.disconnect();
+        meterSinkRef.current?.disconnect();
+        audioSourceRef.current = undefined;
+        analyserRef.current = undefined;
+        meterSinkRef.current = undefined;
+        smoothedLevelRef.current = 0;
+        signalDetectedRef.current = false;
+        setLevel(0);
+        setSignalDetected(false);
+        setTrackMuted(false);
+        for (const track of streamRef.current?.getTracks() ?? []) {
+          track.stop();
+        }
+        streamRef.current = undefined;
+        setStream(undefined);
+        const previousContext = audioContextRef.current;
+        audioContextRef.current = undefined;
+        await previousContext?.close();
+        if (!isCurrent()) return;
+        const media = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            ...(requestedDeviceId ? { deviceId: { exact: requestedDeviceId } } : {}),
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        if (!isCurrent()) {
+          for (const track of media.getTracks()) track.stop();
+          return;
+        }
+        streamRef.current = media;
+        setStream(media);
+        setPermission("granted");
+        const track = media.getAudioTracks()[0];
+        if (!track) {
+          throw new DOMException("Audio track is missing", "NotFoundError");
+        }
+        setTrackMuted(track.muted || !track.enabled || track.readyState !== "live");
+        track.addEventListener("mute", () => isCurrent() && setTrackMuted(true));
+        track.addEventListener("unmute", () => isCurrent() && setTrackMuted(false));
+        track.addEventListener("ended", () => isCurrent() && setTrackMuted(true));
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          if (!isCurrent()) return;
+          setMicrophones(devices.filter((device) => device.kind === "audioinput"));
+        } catch {
+          if (!isCurrent()) return;
+          setMicrophones([]);
+        }
+        const context = new AudioContext({ latencyHint: "interactive" });
+        audioContextRef.current = context;
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0;
+        const source = context.createMediaStreamSource(media);
+        const meterSink = context.createMediaStreamDestination();
+        source.connect(analyser);
+        analyser.connect(meterSink);
+        audioSourceRef.current = source;
+        analyserRef.current = analyser;
+        meterSinkRef.current = meterSink;
+        if (context.state === "suspended") {
+          await context.resume();
+        }
+        if (!isCurrent()) return;
 
-      const samples = new Float32Array(analyser.fftSize);
-      let lastPaint = 0;
-      const update = (timestamp: number) => {
-        analyser.getFloatTimeDomainData(samples);
-        const measuredLevel = calculateMicrophoneLevel(samples);
-        smoothedLevelRef.current = smoothMicrophoneLevel(smoothedLevelRef.current, measuredLevel);
-        if (measuredLevel > 0.01 && !signalDetectedRef.current) {
-          signalDetectedRef.current = true;
-          setSignalDetected(true);
-          setTrackMuted(false);
-        }
-        if (timestamp - lastPaint >= 50) {
-          setLevel(smoothedLevelRef.current);
-          lastPaint = timestamp;
-        }
+        const samples = new Float32Array(analyser.fftSize);
+        let lastPaint = 0;
+        const update = (timestamp: number) => {
+          if (!isCurrent()) return;
+          analyser.getFloatTimeDomainData(samples);
+          const measuredLevel = calculateMicrophoneLevel(samples);
+          smoothedLevelRef.current = smoothMicrophoneLevel(smoothedLevelRef.current, measuredLevel);
+          if (measuredLevel > 0.01 && !signalDetectedRef.current) {
+            signalDetectedRef.current = true;
+            setSignalDetected(true);
+            setTrackMuted(false);
+          }
+          if (timestamp - lastPaint >= 50) {
+            setLevel(smoothedLevelRef.current);
+            lastPaint = timestamp;
+          }
+          animation.current = requestAnimationFrame(update);
+        };
         animation.current = requestAnimationFrame(update);
-      };
-      animation.current = requestAnimationFrame(update);
-    } catch (cause) {
-      const name = cause instanceof DOMException ? cause.name : "";
-      if (requestedDeviceId && (name === "NotFoundError" || name === "OverconstrainedError")) {
-        setMicrophoneId("");
-        saveWriterPreferences({ ...preferences, microphoneId: "" });
-        await openMicrophone("");
-        return;
+      } catch (cause) {
+        if (!isCurrent()) return;
+        const name = cause instanceof DOMException ? cause.name : "";
+        if (requestedDeviceId && (name === "NotFoundError" || name === "OverconstrainedError")) {
+          setMicrophoneId("");
+          saveWriterPreferences({ ...preferences, microphoneId: "" });
+          await open("");
+          return;
+        }
+        setPermission(name === "NotAllowedError" ? "denied" : "unsupported");
+        setError(
+          name === "NotAllowedError"
+            ? "Разрешите доступ к микрофону в настройках браузера и попробуйте снова."
+            : "Микрофон не найден. Подключите устройство и повторите проверку.",
+        );
+      } finally {
+        if (isCurrent()) {
+          openingMicrophoneRef.current = false;
+          setRequestingMicrophone(false);
+        }
       }
-      setPermission(name === "NotAllowedError" ? "denied" : "unsupported");
-      setError(
-        name === "NotAllowedError"
-          ? "Разрешите доступ к микрофону в настройках браузера и попробуйте снова."
-          : "Микрофон не найден. Подключите устройство и повторите проверку.",
-      );
-    } finally {
-      setRequestingMicrophone(false);
+    },
+    [preferences],
+  );
+
+  useEffect(() => {
+    if (
+      permission === "granted" &&
+      supported &&
+      !streamRef.current &&
+      !openingMicrophoneRef.current &&
+      !automaticMicrophoneRef.current
+    ) {
+      automaticMicrophoneRef.current = true;
+      void openMicrophone(microphoneId);
     }
-  };
+  }, [microphoneId, openMicrophone, permission, supported]);
 
   const start = async () => {
     setStarting(true);
@@ -262,6 +335,10 @@ export function DictationPreflight({
             autoGainControl: true,
           },
         });
+        if (!mountedRef.current) {
+          for (const track of activeStream.getTracks()) track.stop();
+          return;
+        }
         streamRef.current = activeStream;
         setStream(activeStream);
         setPermission("granted");
@@ -304,6 +381,7 @@ export function DictationPreflight({
             lowStorage ||
             sttBlocked ||
             permission === "denied" ||
+            permission === "checking" ||
             requestingMicrophone ||
             starting
           }

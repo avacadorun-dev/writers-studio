@@ -536,6 +536,7 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                   </Field>
                   <Field
                     label="Цветовая тема"
+                    className="sm:col-span-2"
                     hint="Палитра применяется независимо от светлого или тёмного режима. Наведите на цвет, чтобы увидеть его назначение."
                   >
                     <EditorThemePicker

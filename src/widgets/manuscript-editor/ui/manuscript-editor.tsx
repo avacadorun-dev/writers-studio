@@ -650,7 +650,7 @@ export function ManuscriptEditor({
       <div
         data-workspace-layout={integratedWorkspace ? "integrated" : "floating"}
         className={cn(
-          "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-[var(--surface-paper)]",
+          "manuscript-surface flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-[var(--surface-paper)]",
           !integratedWorkspace &&
             "mx-auto my-5 max-w-[800px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] lg:my-4 lg:max-w-[760px] xl:my-7 xl:max-w-[800px]",
         )}
@@ -680,7 +680,7 @@ export function ManuscriptEditor({
         <div ref={editorScrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
           <div
             className={cn(
-              "px-5 pt-8 sm:pt-10",
+              "manuscript-heading px-5 pt-8 sm:pt-10",
               integratedWorkspace ? "editor-shell-width mx-auto sm:px-14" : "w-full sm:px-[72px]",
             )}
           >
@@ -709,16 +709,16 @@ export function ManuscriptEditor({
                 }}
               />
             ) : (
-              <p
+              <h1
                 className="font-display mt-2 w-fit max-w-full cursor-text rounded px-1 text-[34px] leading-[1.25] hover:bg-[var(--surface-subtle)]"
                 title="Дважды нажмите, чтобы переименовать"
                 onDoubleClick={() => onRenameNode && setEditingNodeTitle(true)}
               >
                 <span className="sr-only">Название материала: </span>
                 {node.title}
-              </p>
+              </h1>
             )}
-            <div className="mt-6 h-0.5 w-11 bg-[var(--accent)]" aria-hidden="true" />
+            <div className="mt-6 h-px w-16 bg-[var(--border-strong)]" aria-hidden="true" />
             {assistantSelection ? (
               <div className="mt-5 flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-3 py-2 text-xs">
                 <Paperclip

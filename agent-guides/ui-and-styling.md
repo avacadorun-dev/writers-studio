@@ -1,67 +1,48 @@
-# UI, стили и доступность
+# UI, styling and accessibility
 
-## UI стек
+## Stack
 
-Проект использует Tailwind CSS 4 для стилей, Radix UI для доступного низкоуровневого поведения и shadcn/ui как набор проектных primitives. `shadcn/ui` добавляет исходный код компонентов в `shared/ui`, поэтому он остается адаптируемой частью приложения, а не внешним дизайн-системным runtime.
+Use Tailwind CSS 4, Radix UI primitives and the project's shadcn/ui source components.
+Do not introduce another UI or styling framework without an architectural decision.
+For substantially changed legacy UI, prefer the established stack.
 
-Не добавляй Ant Design, `styled-components`, CSS-in-JS или другую UI/styling библиотеку без отдельного архитектурного решения. Если в будущем появится legacy-код на этих технологиях, не расширяй его: при существенном рефакторинге переноси затронутый UI на Tailwind и shadcn/ui.
+Dependencies include `tailwindcss`, `@tailwindcss/vite`, the Radix packages actually
+used, `class-variance-authority`, `clsx`, `tailwind-merge` and `lucide-react`.
+Do not install entire component catalogs speculatively.
 
-Базовый набор зависимостей для UI:
+## Shared primitives
 
-- `tailwindcss` и `@tailwindcss/vite` для Tailwind CSS 4 в Vite;
-- нужные пакеты `@radix-ui/react-*` — только для добавленных primitives;
-- `class-variance-authority` для variants;
-- `clsx` и `tailwind-merge` для `cn` helper-а;
-- `lucide-react` для иконок.
+Keep `shared/ui` domain-independent. Components there must not know about assistant
+runs, providers, authentication entities or domain permissions. Put entity rendering
+in `entities`, user actions in `features`, substantial compositions in `widgets`,
+and route composition in `pages`. Store adapted shadcn components in kebab-case
+files and export them from the public API.
 
-Добавляй только компоненты и Radix packages, которые используются в runtime. Не устанавливай весь каталог Radix «на будущее».
+## Styling
 
-## Shared UI
+Keep Tailwind's entry point, resets and theme tokens in `shared/styles`. Use CSS
+custom properties for colors and radii. Prefer utility classes for layout, spacing,
+typography, responsive behavior and states. Extract recurring patterns into reusable
+components rather than global utility classes. Use `class-variance-authority` for
+variants and `cn` for merging classes. CSS is appropriate for complex animations,
+browser rules and third-party integrations. Nontrivial inline styles are reserved
+for dynamic values that cannot use a finite class set or CSS variables.
 
-`shared/ui` должен оставаться domain-agnostic.
-Не размещай там компоненты, которые знают про assistants, prompts, models, auth, OpenClaw или permissions конкретной сущности.
+## Accessibility
 
-Domain UI размещай в соответствующем slice:
+- Use semantic interactive elements and complete keyboard navigation.
+- Provide visible focus indicators and accessible names for icon-only buttons.
+- Associate input labels with controls. Add ARIA only where native semantics are insufficient.
+- Communicate state with text or icons as well as color.
+- Use `lucide-react` for icons; hide decorative icons from assistive technology.
+- Localize visible labels, accessible names, hints, validation messages and empty states.
 
-- `entities/*/ui` - отображение сущности.
-- `features/*/ui` - UI действия или сценария.
-- `widgets/*/ui` - крупные блоки экрана.
-- `pages/*` - screen composition.
+## Component boundaries
 
-Компоненты shadcn/ui храни в `shared/ui` с kebab-case именами и экспортируй через public API. Не меняй добавленный компонент без необходимости: domain-specific композицию и стили держи в соответствующем slice.
+Use one main component per file. At approximately 300–350 lines, look for meaningful
+subcomponents or model boundaries; do not split mechanically to satisfy a count.
+Avoid unnecessary DOM wrappers. Keep data fetching and complicated transforms out
+of presentation. Extract form normalization and defaults when the logic grows.
 
-## Стили
-
-- Глобальный entrypoint Tailwind, theme tokens и reset держи в `shared/styles`; для цветовых и радиусных tokens используй CSS custom properties, совместимые с Tailwind theme.
-- Для layout, spacing, typography, responsive и state styles используй Tailwind utility classes. Сложные повторяемые patterns сначала оформляй как shared primitive или domain component, а не как глобальный utility-класс.
-- Для variants компонентов используй `class-variance-authority`; классы собирай `cn` helper-ом (`clsx` + `tailwind-merge`). Не конкатенируй конфликтующие Tailwind классы вручную.
-- CSS modules или обычный CSS допустимы лишь для того, что Tailwind неудобно выразить: сложных keyframes, browser-specific rules или внешней библиотеки. Стили остаются рядом с компонентом или в `shared/styles`, если они глобальны.
-- Не добавляй inline `style` для нетривиальной стилизации. Динамические значения допустимы только если их нельзя представить ограниченным набором Tailwind classes или CSS variables.
-- Используй `lucide-react` для иконок. Для icon-only buttons обязательно задай доступное имя через `aria-label` или visually-hidden text.
-
-## Доступность
-
-Минимальный стандарт для новых UI:
-
-- Семантические HTML-элементы вместо `div` с обработчиками.
-- Keyboard navigation для интерактивных элементов.
-- Видимые focus states.
-- `aria-*` только когда семантики HTML недостаточно.
-- Текстовые labels для inputs, buttons и icon-only действий.
-- Не полагайся только на цвет для передачи состояния.
-
-## Компоненты
-
-- Один основной компонент на файл.
-- Если файл компонента становится больше 300-350 строк, раздели его на более мелкие составляющие. Разбивай по смысловым границам: самостоятельные блоки UI, повторяемые части, формы, таблицы, сложные панели.
-- Не дроби файл механически только ради числа строк: локальный подкомпонент должен иметь понятную ответственность и уменьшать сложность родителя.
-- Выноси большие части JSX в локальные подкомпоненты или slice UI.
-- Не создавай избыточные DOM-обертки. Стремись к минимальному дереву, если дополнительный элемент не нужен для семантики, layout, accessibility или интеграции со сторонней библиотекой.
-- Не смешивай data fetching, сложные преобразования и разметку в одном компоненте.
-- Для форм держи schema/normalization/default values отдельно от визуального слоя, если логика растет.
-
-## Assets
-
-Общие изображения и svg находятся в `shared/ui/assets`.
-Slice-specific assets держи внутри slice.
-Новые asset файлы называй в `kebab-case`; существующие файлы с пробелами или legacy naming не копируй как шаблон.
+Shared assets live in `shared/ui/assets`; slice-specific assets stay in their slice.
+Use kebab-case for new asset names without renaming unrelated existing files.

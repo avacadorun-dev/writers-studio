@@ -1,0 +1,3 @@
+# Reviewed false positive: synthetic object-storage path in an integration fixture.
+# This fingerprint applies only to the sanitized publication history.
+7681026902f23281f4bd621cd1d15ad339718306:internal/store/store_integration_test.go:generic-api-key:285

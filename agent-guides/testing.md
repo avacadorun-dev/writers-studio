@@ -1,80 +1,32 @@
-# Тестирование frontend
+# Frontend testing
 
-## Базовое правило
+Use the existing Bun test runner. Add behavior tests for new business rules, important
+boundaries and nontrivial state transitions. Avoid tests that merely restate types,
+pass-through implementations or third-party behavior.
 
-После реализации фичей добавляй unit-тесты для бизнес-логики.
-Тесты должны проверять поведение, а не внутреннюю реализацию компонента.
-Покрывай основные граничные случаи, но не раздувай тесты проверками, которые дублируют типы, библиотечное поведение или очевидные pass-through сценарии.
+## What to cover
 
-На момент написания отдельный test script в `package.json` не задан. Если добавляешь test runner, используй Bun-first подход и фиксируй команды в `package.json`.
+- Pure helpers, normalization, domain rules and transport adapters.
+- Hooks with branching, asynchronous state, cache invalidation or side effects.
+- Authentication and permission boundaries when behavior changes.
+- Empty inputs, absent optional fields, invalid data, fallbacks and access failures
+  where those cases change the user-visible result.
 
-## Что покрывать unit-тестами
+Do not add tests for re-exports, generated route trees, thin presentation or obvious
+library behavior without a concrete reason.
 
-- Чистые функции в `shared/lib`, `shared/utils`, `*/lib`, `*/utils`.
-- Domain/model логику в `entities/*/model` и `features/*/model`.
-- Hooks с ветвлениями, async состояниями, cache invalidation или side effects.
-- API adapters, маппинг DTO, нормализацию ошибок и fallback-значений.
-- Permission/auth helpers, если меняется поведение доступа.
+## Placement and approach
 
-## Что не тестировать unit-тестами без нужды
+Place `*.test.ts` or `*.test.tsx` beside the implementation, using kebab-case names.
+Test public behavior. Mock the network at the API boundary. Control time, storage
+and environment inputs; avoid real-network, timer-dependent or order-dependent tests.
+Snapshots must not be the principal proof of correctness. One meaningful behavior
+can cover several implementation branches.
 
-- Простые re-export файлы.
-- Generated файлы, включая `routeTree.gen.ts`.
-- Тонкие presentational компоненты без логики.
-- Поведение сторонних библиотек.
+Use `bun run test` for the frontend suite. The project script limits discovery to
+`src`, keeping Playwright specifications separate. Relevant integration and browser
+commands are documented in the README and verification guide.
 
-## Размещение
-
-Размещай тест рядом с кодом:
-
-```text
-format-relative-time.ts
-format-relative-time.test.ts
-```
-
-Для TSX:
-
-```text
-message-composer.tsx
-message-composer.test.tsx
-```
-
-Имена тестовых файлов тоже в `kebab-case`.
-
-## Подход
-
-- Проверяй публичный API модуля.
-- Мокай сеть на границе `api`, а не внутри бизнес-логики.
-- Для времени, storage и env задавай контролируемые inputs.
-- Не делай snapshot основным способом проверки поведения.
-- Не добавляй flaky тесты, завязанные на реальные таймеры, сеть или порядок выполнения.
-- Для бизнес-правил проверяй не только happy path, но и пустые входы, отсутствующие optional поля, некорректные значения, fallback-значения и ошибки доступа, если они меняют поведение пользователя.
-- Не добавляй отдельный тест на каждую строку реализации: один тест должен подтверждать значимое поведение или важную границу.
-
-## Коммиты с тестами
-
-- Если агент создает коммиты, тесты для новой или измененной бизнес-логики должны быть в том же коммите, что и изменение поведения.
-- Тесты для подготовительного рефакторинга держи в коммите рефакторинга, если они фиксируют сохранение поведения.
-- Не коммить падающие или `.skip`/`.only` тесты без явного согласования.
-- Перед коммитом с тестами запусти релевантный тестовый набор и полный frontend check, если изменение выходит за пределы одного изолированного helper.
-
-## Команды
-
-Если test script уже добавлен:
-
-```bash
-bun test
-```
-
-Если тестовый раннер вводится впервые, добавь scripts:
-
-```json
-{
-  "scripts": {
-    "test": "bun test",
-    "test:watch": "bun test --watch"
-  }
-}
-```
-
-После добавления тестов полный check перед коммитом должен включать `bun test`.
+When commits are authorized, include tests with the behavior they verify. Run the
+relevant suite and full frontend checks for changes spanning multiple areas. Never
+commit intentionally failing, focused or skipped tests without explicit agreement.

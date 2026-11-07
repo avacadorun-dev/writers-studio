@@ -1,5 +1,13 @@
 import type { LucideIcon } from "lucide-react";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Button } from "./button";
 import { ConfirmationDialog } from "./dialog";
@@ -62,29 +70,53 @@ const ActionDialogContext = createContext<ActionDialogContextValue | null>(null)
 export function ActionDialogProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingDialog>();
   const [value, setValue] = useState("");
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const dialogOpenRef = useRef(false);
+  const rememberInvoker = useCallback(() => {
+    const active = document.activeElement;
+    if (
+      !(active instanceof HTMLElement) ||
+      active === document.body ||
+      active.closest('[role="alertdialog"]')
+    )
+      return;
+    const menu = active.closest('[role="menu"]');
+    const menuTrigger = menu?.id
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>('[aria-haspopup="menu"][aria-controls]'),
+        ).find((element) => element.getAttribute("aria-controls") === menu.id)
+      : undefined;
+    returnFocusRef.current = menuTrigger ?? active;
+  }, []);
 
   const requestInput = useCallback(
     (options: InputDialogOptions) =>
       new Promise<string | undefined>((resolve) => {
+        rememberInvoker();
+        dialogOpenRef.current = true;
         setValue(options.defaultValue ?? "");
         setPending({ kind: "input", options, resolve });
       }),
-    [],
+    [rememberInvoker],
   );
   const requestConfirmation = useCallback(
     (options: BaseDialogOptions) =>
       new Promise<boolean>((resolve) => {
+        rememberInvoker();
+        dialogOpenRef.current = true;
         setPending({ kind: "confirmation", options, resolve });
       }),
-    [],
+    [rememberInvoker],
   );
   const requestSelect = useCallback(
     (options: SelectDialogOptions) =>
       new Promise<string | undefined>((resolve) => {
+        rememberInvoker();
+        dialogOpenRef.current = true;
         setValue(options.defaultValue ?? options.options[0]?.value ?? "");
         setPending({ kind: "select", options, resolve });
       }),
-    [],
+    [rememberInvoker],
   );
   const contextValue = useMemo(
     () => ({ requestInput, requestConfirmation, requestSelect }),
@@ -92,6 +124,7 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
   );
 
   const close = useCallback(() => {
+    dialogOpenRef.current = false;
     setPending((current) => {
       if (current?.kind === "confirmation") {
         current.resolve(false);
@@ -103,6 +136,7 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const confirm = useCallback(() => {
+    dialogOpenRef.current = false;
     setPending((current) => {
       if (!current) {
         return undefined;
@@ -138,6 +172,16 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
           cancelLabel={pending.options.cancelLabel}
           confirmDisabled={confirmDisabled}
           onConfirm={confirm}
+          onCloseAutoFocus={(event) => {
+            if (dialogOpenRef.current) {
+              event.preventDefault();
+              return;
+            }
+            if (returnFocusRef.current?.isConnected) {
+              event.preventDefault();
+              returnFocusRef.current.focus();
+            }
+          }}
         >
           {pending.kind === "input" ? (
             <form

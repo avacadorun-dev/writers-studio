@@ -8,6 +8,8 @@
       "!.source",
       "!coverage",
       "!dist",
+      "!artifacts",
+      "!tmp",
       "!playwright-report",
       "!playwright-report-real-stt",
       "!test-results",

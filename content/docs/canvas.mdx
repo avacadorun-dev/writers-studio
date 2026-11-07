@@ -1,81 +1,92 @@
 ---
-title: Canvas-доски
-description: От быстрых набросков и рисования до типизированных карт сюжета, GDD, анализа графа и презентации.
+title: Canvas boards
+description: Capture ideas, draw, connect documents and media, explore typed graphs and present a visual plan.
 ---
 
-Canvas — свободное пространство внутри проекта. На одной доске можно смешать короткие мысли, документы рукописи, референсы, рисунки и связи; на другой — собрать хронологию, дерево диалога или игровой цикл. Все доски остаются частью проекта и сохраняются вместе с ним.
+A Canvas is a visual workspace inside a project. Combine thoughts, manuscript
+documents, references, drawings and relationships. Use separate boards for a
+story timeline, dialogue graph or game loop. Explore the [demo](/docs/example-project)
+for a populated example.
 
-Если хочется сначала увидеть результат, скачайте готовый проект [«Эхо Предела»](/docs/example-project): в нём на реальном game-design примере собраны почти все возможности этой страницы.
+## Tools and capture
 
-## Вертикальная панель инструментов
+The vertical toolbar groups selection/hand, add, drawing, layout, views/analysis
+and selection actions. Hover or focus an icon for its label. Escape, another click
+on the group or a canvas click dismisses an open group.
 
-Основная панель находится слева и не отнимает высоту у холста. **Выбор**, **Рука**, отмена, повтор и приближение доступны сразу. Остальные инструменты собраны в раскрывающиеся группы:
+Double-click empty space to add a Markdown note; double-click text to edit it and
+use Cmd/Ctrl+Enter to finish. Paste text/images/URLs or drop a supported file.
+Document cards show title/status/excerpt and open Studio on double-click. Add one
+through the toolbar or drag it from the tree. Promote an idea to a document with
+an atomic operation that cannot leave a half-created result.
 
-- **Добавить** — связь, Markdown-заметка, шаблон, документ и media-файл;
-- **Рисование** — перо, маркер, ластик, прямоугольник, эллипс, ромб, линия и стрелка;
-- **Компоновка** — группы, фреймы, выравнивание, равные интервалы, tidy grid и автоматическая раскладка;
-- **Режимы и анализ** — представления, поиск объектов, диагностика, презентация, play-through и таймер;
-- **Действия с выделением** — типы карточек и связей, перенос в документ, цвет, порядок, копия и удаление.
+Supported resources include images, safe HTTP(S) previews, PDF up to 25 MiB,
+MP3/M4A/OGG/WAV and MP4/WebM, and links to another board without recursive live embeds.
 
-Наведите курсор или переведите клавиатурный фокус на иконку — появится подсказка. Открытая группа закрывается повторным нажатием, клавишей `Escape` или кликом по холсту.
+## Drawing and shortcuts
 
-## Быстрый захват идеи
+Pen preserves compatible stylus pressure; highlighter produces translucent strokes.
+A complete gesture is one history operation. Shapes support resize, rotation,
+color, copying and connections. Eraser removes shapes or splits freehand strokes.
+On supported tablets, stylus draws while two fingers pan/zoom and palm contact is
+ignored during a pen gesture.
 
-Дважды нажмите пустое место или выберите **Заметку**, чтобы создать Markdown-карточку. Текст редактируется двойным нажатием; `Cmd/Ctrl+Enter` завершает редактирование. Текст, изображение и URL также можно вставить из clipboard, а поддерживаемый файл — перетащить с компьютера.
+Use V for selection, H for hand, N for note, C for connection, P for pen, M for
+highlighter and E for eraser. R/O/D/L/A select shapes. Hold Space for temporary pan.
+Ordinary Cmd/Ctrl+C, X, V, D, Z, Shift+Z, A and Delete/Backspace remain available.
 
-Карточка **Документ** показывает название, статус и фрагмент текста. Дважды нажмите её, чтобы открыть материал в Studio. Документ можно добавить через панель или просто перетащить из дерева проекта. Команда **В документ** превращает отдельную идею Canvas в настоящий документ атомарно: если операция не завершилась, не останется половины результата.
+## Connections and layout
 
-Canvas понимает:
+Cards/shapes have four connection handles. Reconnect, color, type and double-click
+to label edges. Lasso selects multiple objects. Groups move enclosed cards but
+removing a group leaves those cards. Frames also define presentation order.
 
-- изображения и безопасные серверные previews HTTP(S)-ссылок;
-- PDF до 25 MiB с обложкой первой страницы и встроенным просмотром;
-- MP3, M4A, OGG, WAV, MP4 и WebM с ленивым воспроизведением;
-- ссылку на другую доску проекта без тяжёлого рекурсивного embed.
+Guides show aligned edges/centers and equal spacing; Alt temporarily disables
+snapping. Multi-selection supports alignment, distribution, tidy grid and automatic
+layout preview. Layout runs away from the UI thread and its application has one Undo.
+Copies retain only connections between copied objects.
 
-## Рисование, фигуры и стилус
+## Views and typed design
 
-**Перо** сохраняет давление совместимого стилуса, а для мыши формирует естественную толщину штриха. **Маркер** рисует полупрозрачную широкую линию. Один жест — одна операция истории и одно автосохранение, а не сотни мелких ревизий.
+View the same board as free Canvas, mind map, timeline, swimlanes, dependency graph
+or filtered projection. These views do not rewrite original coordinates.
 
-Фигуры можно выделять, менять по размеру, поворачивать, окрашивать, копировать и связывать с карточками. Ластик удаляет фигуру целиком, а свободный штрих разрезает на сохранившиеся сегменты. На планшете один стилус рисует, два пальца перемещают и масштабируют холст; касания ладонью во время pen-жеста игнорируются.
+The project catalog defines card types, fields, colors, icons and relationships.
+Built-ins include Idea, Question, Source, Character, Location, Beat/Event, Conflict,
+Theme, Mechanic, Quest, Dialogue, State, Level and Resource. Fields include text,
+Markdown, numbers, flags, choices, dates, duration and document/media/board links.
+Relationships such as causes, depends_on, blocks, reveals, transitions_to,
+consumes, produces and rewards support analysis; custom types coexist with them.
 
-Горячие клавиши: `V` — выбор, `H` — рука, `N` — заметка, `C` — связь, `P` — перо, `M` — маркер, `E` — ластик, `R/O/D/L/A` — фигуры. Удерживайте `Space`, чтобы временно включить руку.
+## Analysis, play-through and presentation
 
-## Связи, группы и порядок
+Diagnostics identify disconnected components, orphan nodes, cycles, roots/leaves,
+critical paths, unreachable quests/dialogue, states without exits and resources
+without producers/consumers. Warnings do not prevent saving. Select one to focus
+its related objects.
 
-У карточек и фигур есть четыре точки подключения. Перетащите связь от одной точки к другой; связь можно переподключить, окрасить, типизировать и подписать двойным нажатием. Направление и типы пригодятся позднее для диагностики графа.
+Manual play-through traces dialogue, quest or state choices. Presentation follows
+frames; object search and the minimap aid navigation. A local focus timer can
+bound a brainstorming session.
 
-Протяните рамку по пустому месту, чтобы выбрать несколько объектов. **Группа** создаёт пространственную область вокруг выделения: её перемещение переносит содержимое, а удаление рамки не удаляет карточки. **Фрейм** дополнительно участвует в порядке презентации.
+## Assistant review
 
-При перемещении появляются направляющие краёв, центров и равных интервалов. `Alt` временно отключает snapping. Для нескольких объектов доступны выравнивание, равные интервалы, tidy grid и preview автоматической раскладки. Раскладка выполняется вне UI-потока; применение целиком отменяется одним Undo.
+Select cards before opening the assistant. Its target includes board ID/revision,
+selection and viewport. It can propose analysis, grouping, connections, types,
+layout or document promotion. Ghost review shows proposed additions/deletions/moves.
+Only Apply changes the canonical board; stale proposals require refresh.
 
-Обычные команды тоже работают: `Cmd/Ctrl+C`, `X`, `V`, `D`, `Z`, `Shift+Z`, `A`, а также `Delete`/`Backspace`. При копировании связи с внешними объектами не переносятся.
+## Saving and portability
 
-## Представления и типизированный GDD
+Local recovery precedes server saves. Idle autosave and a maximum 15-second attempt
+interval retain continuous work. Offline/reload recovers unsynced snapshots; stale
+parallel writes create a separate conflict board.
 
-Одна модель доски может показываться без копирования данных как свободный Canvas, mind map, timeline, swimlanes, dependency graph или отфильтрованный вид. Проекционные виды не меняют исходные координаты; вернитесь в **Свободный Canvas**, чтобы продолжить ручную компоновку.
+Export a board/selection/frame to PNG/SVG/PDF or exchange the editable `.canvas`
+core. Full `.wstudio` archives carry documents, every board revision, type catalog
+and media. See [export and transfer](/docs/export).
 
-В каталоге Canvas настраиваются общие для проекта типы карточек, поля, цвета, иконки и допустимые связи. Встроены общие Idea, Question и Source; нарративные Character, Location, Beat/Event, Conflict и Theme; game-design типы Mechanic, Quest, Dialogue, State, Level и Resource. Поля поддерживают короткий текст, Markdown, число, флаг, выбор, дату, длительность и ссылки на document, media или canvas.
-
-Отношения `causes`, `depends_on`, `blocks`, `reveals`, `transitions_to`, `consumes`, `produces`, `rewards` и другие превращают визуальную карту в проверяемую модель. Свои типы и связи можно добавить рядом со встроенными.
-
-## Диагностика и play-through
-
-Диагностика находит несвязанные компоненты, сироты, циклы, корни, листья и критические пути. Специализированные проверки помогают заметить недостижимый квест, тупиковый диалог, состояние без выхода или ресурс без producer/consumer. Это предупреждения: они не блокируют сохранение. Нажмите проблему, чтобы сфокусировать связанные элементы.
-
-Play-through позволяет вручную пройти дерево диалога, квест или state graph и увидеть подсвеченный путь. Для показа доски без редактирования соберите фреймы и включите **Презентацию**. Список объектов и поиск помогают добраться до любой карточки с клавиатуры, minimap показывает масштаб, а локальный фокус-таймер ограничивает сессию брейншторма.
-
-## Ассистент на доске
-
-Выделите нужные карточки и откройте Ассистента. Он получает ID доски, её редакцию, выделение и видимую область; может проанализировать граф, предложить кластеризацию, связи, названия групп, типы, раскладку или перенос идей в документы.
-
-Предложение сначала появляется в review как ghost overlay: видно добавление, удаление и перемещение объектов. Каноническая доска меняется только после **Apply**. Если редакция уже устарела, предложение нужно пересчитать — старое изменение не будет молча наложено поверх новой работы.
-
-## Сохранность и перенос
-
-Изменения сначала сохраняются локально, затем отправляются на сервер после короткой паузы и не реже одного раза в 15 секунд во время непрерывной работы. Несинхронизированный снимок восстанавливается после reload или offline. Параллельные изменения не перетирают друг друга: второй вариант становится отдельной конфликтующей доской.
-
-Можно экспортировать всю доску, выделение или фрейм в PNG, SVG и PDF. Формат `.canvas` переносит редактируемое ядро JSON Canvas; расширения Writers Studio сохраняются без потерь. Полный `.wstudio` переносит документы, все редакции досок, каталог типов и media-файлы — подробнее в разделе [«Экспорт и перенос»](/docs/export).
-
-<Callout type="info" title="Desktop, планшет и телефон">
-  На desktop доступно всё. На экранах от 768 px можно рисовать стилусом, стирать, выделять и выполнять базовую компоновку. Телефон оставлен безопасным режимом просмотра, pan/zoom и открытия материалов.
+<Callout type="info" title="Desktop, tablet and phone">
+  Desktop provides the full tools. Screens from 768 px support stylus drawing and
+  basic layout. Phones use viewing, pan/zoom and resource navigation.
 </Callout>

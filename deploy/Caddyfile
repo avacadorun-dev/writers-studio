@@ -1,10 +1,19 @@
 {
   default_sni {$PUBLIC_HOST}
+  pki {
+    ca local {
+      intermediate_lifetime 730d
+    }
+  }
 }
 
 {$PUBLIC_HOST} {
   encode zstd gzip
-  tls internal
+  tls {
+    issuer internal {
+      lifetime 365d
+    }
+  }
 
 	@remote_mcp path /mcp
 	reverse_proxy @remote_mcp app:8080 {

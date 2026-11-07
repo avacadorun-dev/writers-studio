@@ -1,141 +1,58 @@
-# Навигация назад и перенос проекта
+# Project navigation and transfer
 
-Статус: реализованная спецификация, версии 1–6.
+## Navigation
 
-## 1. Цель
+Every secondary screen provides a visible, accessible return action with at least
+a 44×44 px target. Root login/library screens are exceptions. Global utilities
+return to the library; project utilities return to the project/Studio; dictation,
+versions and review return to their relevant document/project. Direct URLs must
+have a safe fallback rather than relying only on browser history.
 
-Пользователь должен иметь понятный выход с каждого вторичного экрана и уметь
-перенести отдельный проект между независимыми инстансами «Студии автора» одним
-локальным файлом, не прибегая к доступу к базе данных или системной резервной
-копии аккаунта.
+## Native project archive
 
-## 2. Навигация «Назад»
+The `.wstudio` container is an unencrypted ZIP with MIME
+`application/vnd.writers-studio.project+zip`. `project.json` declares
+`format: "writers-studio-project"` and `formatVersion`. The current exporter writes
+v8; the importer accepts v1–v8 and rejects future versions before mutation.
 
-### Правила
+| Version | Added compatibility contract |
+| --- | --- |
+| v1 | Project structure, revisions, versions, dictionary, dictation/audio, guide/memory |
+| v2 | Document annotations and exact anchors |
+| v3 | Project images and reference remapping |
+| v4 | Reader export profile and cover reference |
+| v5 | Markdown frontmatter/source paths and canonical internal links |
+| v6 | Canvas boards, trash and complete snapshot history |
+| v7 | Typed Canvas schemas |
+| v8 | Expanded Canvas media/resource support |
 
-- На каждом вторичном экране есть видимая кнопка со стрелкой и доступным именем
-  `Назад …`. Корневые экраны `/login` и `/projects` кнопку не показывают.
-- Экран внутри проекта возвращает в Studio/проект; глобальный служебный экран —
-  к списку проектов. Если экран уже находится в `ProjectUtilityShell`, эту роль
-  выполняет кнопка в `StudioHeader`.
-- Кнопка имеет область нажатия не меньше 44×44 px, доступна с клавиатуры и не
-  зависит от жестов браузера.
-- Экран сохраняет явный безопасный маршрут возврата, поэтому прямое открытие URL
-  не оставляет пользователя в тупике.
+Exports include available source audio and binary media with paths, sizes, SHA-256
+and MIME metadata. They exclude accounts/passwords/cookies, API keys, provider
+connections, server sessions, temporary chunks/jobs/idempotency keys and assistant
+execution history. Reader exports are reproducible and are not embedded as a
+substitute for canonical content. A project archive contains private author work;
+it is not safe to publish automatically.
 
-### Матрица возврата
+## Import guarantees
 
-| Экран | Безопасный маршрут |
-|---|---|
-| Создание проекта, настройки, восстановление | `/projects` |
-| Поиск, экспорт, словарь, правки в тексте, контекст ассистента | текущий проект/Studio |
-| Версии, review и diff диктовки | соответствующий документ/проект |
-| Сессия и review ассистента | Studio или предыдущая сессия |
+Import creates an independent active copy, including when a project name matches.
+Validate the unique manifest, version, size/expansion limits, safe ZIP paths, enums,
+references, hierarchy, IDs and binary integrity before exposing a project.
+Unexpected files, symlinks, traversal, invalid anchors and future versions fail.
+The upload limit is 512 MiB and manifest limit is 64 MiB.
 
-## 3. Нативный файл проекта
+Remap all project/entity IDs and internal references in one transaction. Never
+import source ownership/provider/run identities. Remove uploaded objects if the
+transaction fails. Normalize unfinished dictation to safe terminal states without
+starting jobs. Legacy versions omit their unavailable features rather than
+modifying old text/revisions. Fail export when declared required audio is missing
+rather than returning a misleading partial success.
 
-### Пользовательский сценарий
+## Acceptance references
 
-1. В разделе экспорта пользователь нажимает «Скачать проект» и получает один
-   файл `<project>.wstudio`.
-2. На экране проектов пользователь нажимает «Импортировать», выбирает файл и
-   после успешной проверки открывает новую независимую копию проекта.
-3. Исходный проект и его файл не изменяются. Повторный импорт создаёт ещё одну
-   копию; совпадающее название допустимо.
-
-### Контейнер и версия
-
-- Расширение: `.wstudio`.
-- MIME: `application/vnd.writers-studio.project+zip`.
-- Контейнер: ZIP без шифрования.
-- `project.json` содержит `format: "writers-studio-project"`. Текущий экспорт —
-  `formatVersion: 6`; importer принимает версии 1–6. Опциональный
-  `assistantStepLimit` переносит проектный бюджет шагов; отсутствие поля означает
-  выполнение без ограничения.
-- Аудио хранится в `audio/…`; для каждого объекта manifest фиксирует путь,
-  SHA-256, размер, длительность и media type.
-- Изображения проекта в версии 3 хранятся в `media/…`; manifest фиксирует ID,
-  путь, SHA-256, размер, media type, исходное имя и размеры изображения.
-- Версия 4 добавляет профиль экспорта, версия 5 — исходный frontmatter/path и
-  перенос внутренних ссылок, версия 6 — Canvas-доски и все их revisions.
-- Неизвестная будущая major-версия отклоняется до любых изменений данных.
-
-### Состав версий
-
-Файл содержит:
-
-- метаданные и динамическую схему структуры проекта;
-- дерево документов, включая корзину;
-- все document revisions и именованные версии;
-- проектный словарь;
-- версия 2: ссылки словаря и заметки на полях рукописи с exact anchors;
-- версия 3: изображения проекта, на которые ссылаются rich-документы;
-- версия 4: профиль экспорта и cover reference;
-- версия 5: исходный Markdown frontmatter/path и канонические внутренние ссылки;
-- версия 6: все Canvas-доски, их корзина и полная история snapshots;
-- сессии диктовки, immutable transcript artifacts, редактируемые drafts и их
-  историю;
-- доступное собранное исходное аудио;
-- руководство ассистента и его историю;
-- память проекта и её историю.
-
-Не включаются:
-
-- аккаунт, пароль, cookie, пользовательские настройки;
-- API-ключи, custom provider connections и любые другие секреты;
-- временные chunks, background jobs, idempotency keys и логи выполнения;
-- assistant run/tool/event history: это журнал выполнения, который
-  может содержать provider-specific служебные данные, а не каноническое
-  состояние проекта;
-- готовые DOCX/Markdown/TXT — они воспроизводимы из импортированного проекта.
-
-### Импорт и целостность
-
-- Сервер проверяет MIME/ZIP, единственный manifest, формат и версию, лимиты,
-  допустимые enum/размеры, уникальность ссылок, отсутствие циклов дерева и
-  наличие каждой связанной сущности.
-- Все аудиофайлы сверяются по размеру и SHA-256. Изображения дополнительно
-  проверяются по реальному MIME и размерам. Необъявленные файлы и опасные пути
-  ZIP отклоняются.
-- Все project/entity ID создаются заново, а ссылки атомарно переназначаются.
-  Внешние owner/provider/assistant-run ID не импортируются.
-- Проект становится видимым только после успешной транзакции. Загруженные в
-  object storage объекты удаляются при ошибке БД.
-- Импортированный проект получает статус `active`. Незавершённые диктовки
-  нормализуются в безопасное терминальное состояние и не запускают фоновые
-  задания автоматически.
-- Максимальный размер входного файла — 512 MiB; manifest — 64 MiB.
-- Импорт v1 создаёт проект без аннотаций. В v2 node/term IDs аннотаций
-  переназначаются вместе с остальными сущностями; anchor проверяется против
-  указанной base revision.
-- В v3 media ID создаются заново, а `assetId` и локальный `src` переписываются
-  во всех document/transcript draft revisions до атомарного commit.
-- В v6 canvas ID создаются заново; document/media IDs внутри
-  `x-writers-studio.resource` и `writers-studio://…` file reference
-  переназначаются во всех Canvas revisions. Импорт v1–v5 создаёт проект без досок.
-
-## 4. Ошибки и UX
-
-- Неподдерживаемый/повреждённый файл показывает понятную ошибку и не создаёт
-  частичный проект.
-- Во время импорта повторный выбор файла блокируется.
-- После успеха кэш списка проектов сбрасывается, показывается уведомление и
-  открывается первый доступный документ импортированной копии.
-- Экспорт не обещает успех, если часть заявленного аудио недоступна: файл не
-  скачивается частично.
-
-## 5. Acceptance criteria
-
-- AC-NAV-01: с поиска и центра восстановления видна кнопка «Назад».
-- AC-NAV-02: все остальные вторичные реализованные экраны имеют собственную
-  кнопку или получают её через общий shell; `/projects` и `/login` исключены.
-- AC-PT-01: экспорт создаёт валидный `.wstudio` с manifest версии 6; импорт
-  поддерживает legacy v1–v5.
-- AC-PT-02: импорт в новом аккаунте/инстансе создаёт новый active-проект с теми
-  же текстами, деревом, revisions, versions, словарём, диктовками, аудио,
-  руководством, памятью, пометками рукописи, изображениями и — для v6 — всеми
-  досками и их revisions.
-- AC-PT-03: внутренние ID исходника и копии различаются, ссылки копии валидны.
-- AC-PT-04: неправильный формат, версия, ссылка или checksum отклоняются без
-  частичных записей.
-- AC-PT-05: ни один credential или account-level объект не присутствует в файле.
+- AC-NAV-01/02: search, recovery and every secondary route expose an explicit return.
+- AC-PT-01: current archives validate and supported legacy versions import.
+- AC-PT-02: copied projects preserve canonical material and applicable history/media.
+- AC-PT-03: copied IDs differ and every internal reference remains valid.
+- AC-PT-04: invalid format/reference/checksum leaves no partial project.
+- AC-PT-05: no account-level credential or provider connection enters the archive.

@@ -21,6 +21,7 @@ coverage/
 .source/
 *.tsbuildinfo
 /public/docs/search.json
+/public/docs/search-*.json
 
 # Test and review artifacts
 playwright-report/
@@ -44,6 +45,7 @@ tmp/
 # Local tooling metadata and derived handoff packages
 /.soba/
 /deploy/windows/Archive.zip
+/goal.md
 
 # OS and editor temporary files
 .DS_Store
@@ -52,3 +54,8 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Private design sources and local desktop wrapper (maintained separately)
+*.pen
+/desktop/
+/scripts/build-macos.sh

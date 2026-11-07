@@ -1,84 +1,54 @@
-# Canvas-доски
+# Canvas boards
 
-Статус: реализованная спецификация первого card-first выпуска.  
-Версия продукта: 0.4.0.  
-Дата: 5 августа 2026.
+The original card-first release was 0.4.0. Later Go/web releases add drawing,
+media, nested boards, typed graphs and assistant review. This reference describes
+the frozen edition and distinguishes those later extensions from the first release.
 
-## 1. Scope
+## Model and interaction
 
-Проект содержит несколько независимых досок. Первый выпуск включает Markdown-
-заметки, ссылки на документы проекта, изображения, spatial-группы, цвета и
-направленные связи. Desktop поддерживает компоновку; mobile — просмотр, pan/zoom
-и открытие документов.
+A project has independent boards backed by React Flow and JSON Canvas-compatible
+snapshots. Markdown text, document/media references, links, spatial groups and edges
+share a viewport. Namespaced `x-writers-studio` metadata preserves resource/type
+information; unknown compatible extension fields survive codec round-trips.
 
-Не входят: freehand/фигуры/eraser, web/PDF/audio/video cards, вложенные canvas,
-`.canvas` import/export, image export, collaboration, Assistant tools и глобальный
-поиск по standalone-тексту доски.
+Desktop supports pan/zoom, grid, lasso/multiselect, resize, z-order, reconnection,
+labels/colors, fit, copy/cut/paste, duplication and 100-operation history. Copies
+remap IDs and retain only edges whose endpoints are selected. Moving a spatial
+group moves enclosed cards; deleting the group preserves them. Mobile permits
+viewing, navigation and pan/zoom without changing board layout.
 
-## 2. Клиентская модель
+Later whiteboard capabilities include pen/highlighter, eraser, shapes, frames,
+media/link cards, nested boards, portable `.canvas`, image output, templates,
+typed card/relation schemas, timeline/swimlane/dependency projections, graph
+analysis and manual play-through. Projections do not rewrite canonical coordinates.
+Assistant Canvas mutations use staged review/ghost previews before Apply.
 
-- viewport и selection реализованы на официальном пакете React Flow
-  `@xyflow/react`;
-- канонический snapshot совместим с JSON Canvas 1.0: `text`, `file`, `group` и
-  edges;
-- document/media reference живёт в `x-writers-studio.resource`; неизвестные
-  top-level и namespaced поля codec сохраняет без потерь;
-- SVG drawing-layer в следующем этапе может использовать ту же систему координат
-  через `ViewportPortal`, не меняя движок карточек и viewport.
+## Persistence, validation and transfer
 
-Поддерживаются grid snapping, multiselect/lasso, resize, z-order, четыре connection
-handles, reconnect, label/color, fit-all/fit-selection, copy/cut/paste, duplicate и
-history на 100 операций. Копирование создаёт новые IDs и переносит только связи,
-оба конца которых входят в selection. Перемещение spatial-группы переносит
-полностью заключённые карточки; удаление группы оставляет карточки.
+`canvases` and immutable `canvas_revisions` store canonical snapshots. Stale
+`baseRevision` writes preserve an alternate conflict board rather than overwriting.
+Local recovery saves after approximately 300 ms; server autosave waits about 1.5 s
+of idle time, with a 15 s maximum attempt interval. Reconnect retries unsynced work.
 
-## 3. Persistency и конфликты
+Routes include project board list/create, board get/patch/delete, duplicate,
+restore and revision writes. Reads batch authorized resource previews. Validation
+checks ownership, resource project membership, unique IDs, geometry and dangling
+edges. Limits include 2,000 nodes, 4,000 edges and 100,000 Unicode code points per
+text card. Check the current validator for additional media/schema bounds.
 
-Таблицы `canvases` и `canvas_revisions` хранят summary и immutable JSONB snapshots.
-Mutation отправляет `baseRevision`. При stale base сервер атомарно создаёт доску
-`— конфликтующая копия`; ни один вариант не теряется.
+Native archives have included boards/revisions since v6. Current v8 also transfers
+typed schemas/media. Import remaps board/document/media IDs and namespaced/local
+resource references atomically; older archives can create projects without boards.
 
-Autosave:
+## Acceptance references
 
-- IndexedDB — через 300 мс;
-- server revision — через 1,5 с покоя;
-- максимум между попытками server save — 15 с;
-- online event повторяет несинхронизированную попытку;
-- reload восстанавливает несинхронизированный `canvasSnapshots` record.
+- CAN-01: create/open/rename/duplicate/trash/restore independent boards.
+- CAN-02: cards, edges and extension metadata survive reload.
+- CAN-03: deterministic copy/paste remap, spatial movement and Undo/Redo.
+- CAN-04: offline recovery and stale conflict copies preserve both versions.
+- CAN-05: mobile viewing leaves layout unchanged and opens linked documents.
+- CAN-06: native round-trips preserve revisions and remap resources.
+- CAN-07: a 500-card/1,000-edge board uses visible-only rendering.
+- CAN-08: critical Canvas logic targets at least 90% coverage.
 
-## 4. API
-
-- `GET/POST /api/projects/{projectId}/canvases`;
-- `GET/PATCH/DELETE /api/canvases/{canvasId}`;
-- `POST /api/canvases/{canvasId}/duplicate`;
-- `POST /api/canvases/{canvasId}/restore`;
-- `PUT /api/canvases/{canvasId}/revisions`.
-
-`GET` одной доски возвращает текущий snapshot и разрешённые previews всех
-связанных документов/media батчами без N+1. Сервер проверяет ownership, уникальные
-node/edge IDs, геометрию, dangling edges и принадлежность resources проекту.
-Лимит snapshot: 2 000 nodes, 4 000 edges, 100 000 Unicode code points в text card.
-
-## 5. Перенос проекта
-
-`.wstudio` v6 содержит все `canvases` и `canvasRevisions`, включая корзину.
-При импорте canvas/document/media IDs создаются заново; namespaced resource IDs и
-локальные `writers-studio://…` file references переписываются атомарно. Импорт
-legacy v1–v5 остаётся допустимым и создаёт проект без досок.
-
-## 6. Acceptance и coverage
-
-- CAN-01: несколько досок создаются, открываются, переименовываются,
-  дублируются, удаляются и восстанавливаются независимо;
-- CAN-02: text/document/image/group cards и edges переживают reload без потери
-  extensions;
-- CAN-03: copy/paste remap, spatial group geometry и undo/redo детерминированы;
-- CAN-04: offline snapshot восстанавливается, stale revision создаёт отдельный
-  конфликтующий canvas;
-- CAN-05: mobile не мутирует layout, но позволяет pan/zoom и переход в Studio;
-- CAN-06: `.wstudio` v6 round-trip сохраняет все revisions и remap resources;
-- CAN-07: 500 cards / 1 000 edges используют visible-only rendering;
-- CAN-08: line/statement coverage новой критической Canvas-логики не ниже 90%.
-
-Команда `bun run test:canvas:coverage` проверяет порог автоматически. Текущий
-результат: frontend 99,51% lines, Go canvas validator 97,2% statements.
+Run `bun run test:canvas:coverage`; historical coverage values are not current evidence.

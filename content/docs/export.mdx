@@ -1,58 +1,60 @@
 ---
-title: Экспорт и перенос
-description: Как подготовить читательский файл, сохранить полный .wstudio и проверить резервную копию реальным импортом.
+title: Export and transfer
+description: Create reader files, save a complete .wstudio archive and test backups by importing them.
 ---
 
-Экспорт решает две разные задачи. Читательский файл нужен редактору, типографии или владельцу электронной книги. Полный `.wstudio` нужен вам самим: он переносит рабочий проект так, чтобы можно было продолжить редактирование.
+Reader exports share a manuscript with an editor, reader or printer. A native
+`.wstudio` archive preserves your working project so editing can continue elsewhere.
 
-## Читательские форматы
+## Reader formats
 
-Откройте экспорт проекта, выберите документы и расположите их в нужном порядке. Исключите рабочие заметки, если они не должны попасть читателю. Затем настройте заголовки, метаданные и оформление и обязательно перелистайте предпросмотр.
+Open project export, choose and order documents, exclude private working notes,
+then review metadata, formatting and preview before generating the file.
 
 <figure>
-  <img src="/docs/images/export.webp" alt="Экран экспорта синтетического проекта с форматами, составом и предпросмотром" />
-  <figcaption>Сначала проверьте состав, затем оформление и только после этого перелистайте предпросмотр.</figcaption>
+  <img src="/docs/images/export.png" alt="Reader export settings for a synthetic project" />
+  <figcaption>Check the selected materials, formatting and page preview.</figcaption>
 </figure>
 
-- **TXT** — чистый текст без сложного оформления;
-- **Markdown** — переносимая разметка заголовков, списков и ссылок;
-- **DOCX** — дальнейшая работа с редактором;
-- **EPUB** — электронные книги с оглавлением и обложкой;
-- **PDF** — фиксированные страницы для чтения и печати.
+- **TXT:** plain text.
+- **Markdown:** portable headings, lists and links.
+- **DOCX:** further editorial work.
+- **EPUB:** an ebook with navigation and cover.
+- **PDF:** fixed pages for reading or printing.
 
-После скачивания откройте файл подходящей программой. Проверьте начало и конец нескольких глав, таблицы, изображения, разрывы и оглавление. Экспорт не меняет исходную рукопись, поэтому настройки можно поправить и запустить снова.
+Open the downloaded file and inspect chapter boundaries, tables, images, breaks
+and contents. Export does not change the source manuscript; adjust the profile
+and regenerate instead of editing source text to fix one output format.
 
-## Что переносит `.wstudio`
+## Complete native archives
 
-Текущий архив проекта включает не только видимые документы:
+Current `.wstudio` v8 transfers the document tree and revisions, every Canvas
+revision, typed card/relation catalog, images, PDF, supported audio/video, dictionary,
+project settings and internal document/media/board references. The importer also
+accepts supported older v1–v7 archives.
 
-- дерево материалов, содержимое и редакции документов;
-- Canvas-доски и **все** их immutable revisions;
-- каталог типов карточек и связей со своей историей;
-- изображения, PDF, MP3/M4A/OGG/WAV и MP4/WebM;
-- ссылки между документами, media и вложенными Canvas;
-- словарь, настройки проекта и другие связанные данные формата.
+Import creates an independent copy with new IDs and remapped internal references.
+It never replaces an existing project. Account credentials and provider keys are
+not part of a project archive.
 
-При импорте создаётся независимая копия с новыми ID. Ссылки внутри документов и типизированных Canvas-полей переназначаются на объекты новой копии. Существующий проект не переписывается. Старые архивы версий v1–v7 остаются импортируемыми; актуальный экспорт использует v8.
-
-<Callout type="warning" title="Архив может содержать неопубликованные материалы">
-  Храните `.wstudio` отдельно от рабочего устройства, но не публикуйте личный архив без проверки. Внутри могут быть черновики, записи, визуальные референсы и настройки проекта.
+<Callout type="warning" title="An archive can contain unpublished work">
+  Store backups separately from your working device. Review them before sharing:
+  drafts, recordings, visual references and project metadata may be included.
 </Callout>
 
-## Как проверить резервную копию
+## Test a backup
 
-Наличие файла ещё не доказывает, что резервная копия полезна. Периодически выполните полный цикл:
+1. Export the project as `.wstudio` and import an independent copy.
+2. Open several documents and every board.
+3. Check images, PDF, audio/video and nested-board navigation.
+4. Export the copy and import it again.
 
-1. экспортируйте проект в `.wstudio`;
-2. импортируйте файл как независимую копию;
-3. откройте несколько документов и каждую Canvas-доску;
-4. проверьте изображения, PDF, audio/video и переход на вложенную доску;
-5. экспортируйте импортированную копию ещё раз и убедитесь, что второй архив тоже импортируется.
+A second round-trip can reveal problems a successful download cannot. Practice
+with the [synthetic demo project](/docs/example-project).
 
-Такой двойной round-trip ловит ошибки, которые не видны при простом скачивании ZIP. Готовый безопасный архив для тренировки и список проверок находятся на странице [«Демонстрационный проект»](/docs/example-project).
+## Individual boards
 
-## Экспорт отдельной доски
-
-На Canvas можно экспортировать всю доску, текущее выделение или отдельный фрейм в PNG, SVG и PDF. SVG сохраняет векторные штрихи и связи; PDF может следовать порядку фреймов. `.canvas` подходит для обмена редактируемым ядром по JSON Canvas 1.0. Для полноценной резервной копии с документами и media всё равно используйте `.wstudio`.
-
-Если итоговый файл выглядит неверно, сначала вернитесь к настройкам экспорта. Не исправляйте исходную рукопись ради одного формата, пока не проверены состав, профиль оформления и предпросмотр.
+Canvas can export a board, selection or frame to PNG, SVG or PDF. SVG retains
+vector strokes/connections; PDF can follow frame order. `.canvas` exchanges the
+editable JSON Canvas core and compatible extensions. Use `.wstudio` for a full
+backup containing documents and binary resources.

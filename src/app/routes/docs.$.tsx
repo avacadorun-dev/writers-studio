@@ -40,11 +40,14 @@ function DocsRoute() {
 
   useEffect(() => {
     const previous = document.title;
+    const previousLanguage = document.documentElement.lang;
+    document.documentElement.lang = "en";
     document.title = page
-      ? `${page.data.title} — Студия автора`
-      : "Материал не найден — Студия автора";
+      ? `${page.data.title} — Writer’s Studio`
+      : "Page not found — Writer’s Studio";
     return () => {
       document.title = previous;
+      document.documentElement.lang = previousLanguage;
     };
   }, [page]);
 
@@ -52,46 +55,46 @@ function DocsRoute() {
     return (
       <main
         aria-busy="true"
-        aria-label="Загрузка документации"
+        aria-label="Loading documentation"
         className="grid min-h-dvh place-items-center bg-[var(--surface-app)] text-sm text-[var(--ink-secondary)]"
       >
-        Открываем документацию…
+        Opening documentation…
       </main>
     );
   }
 
   return (
-    <div className="ws-docs">
+    <div className="ws-docs" lang="en">
       <RootProvider
         theme={{ enabled: false }}
         i18n={{
-          locale: "ru",
+          locale: "en",
           translations: {
-            "Search(search dialog)": "Поиск",
-            "Search(search trigger)": "Поиск",
-            "Open Search(search trigger)(aria-label)": "Открыть поиск",
-            "Close Search(search dialog)(aria-label)": "Закрыть поиск",
-            "On this page(table of contents)": "На этой странице",
-            "No Headings(table of contents)": "На странице нет разделов",
-            "Copy Anchor Link(heading anchor)(aria-label)": "Скопировать ссылку на раздел",
-            "Open Sidebar(aria-label)": "Открыть оглавление",
-            "Open Sidebar(sidebar)(aria-label)": "Открыть оглавление",
-            "Close Sidebar(aria-label)": "Закрыть оглавление",
-            "Close Sidebar(sidebar)(aria-label)": "Закрыть оглавление",
-            "Collapse Sidebar(sidebar)(aria-label)": "Свернуть оглавление",
-            "Show Sidebar(sidebar)": "Показать оглавление",
-            "Hide Sidebar(sidebar)": "Скрыть оглавление",
-            "Toggle Menu(mobile menu)(aria-label)": "Открыть меню",
-            "Next Page(pagination)": "Следующая статья",
-            "Previous Page(pagination)": "Предыдущая статья",
-            "No results found(search dialog)": "Ничего не найдено",
+            "Search(search dialog)": "Search",
+            "Search(search trigger)": "Search",
+            "Open Search(search trigger)(aria-label)": "Open search",
+            "Close Search(search dialog)(aria-label)": "Close search",
+            "On this page(table of contents)": "On this page",
+            "No Headings(table of contents)": "No sections on this page",
+            "Copy Anchor Link(heading anchor)(aria-label)": "Copy section link",
+            "Open Sidebar(aria-label)": "Open contents",
+            "Open Sidebar(sidebar)(aria-label)": "Open contents",
+            "Close Sidebar(aria-label)": "Close contents",
+            "Close Sidebar(sidebar)(aria-label)": "Close contents",
+            "Collapse Sidebar(sidebar)(aria-label)": "Collapse contents",
+            "Show Sidebar(sidebar)": "Show contents",
+            "Hide Sidebar(sidebar)": "Hide contents",
+            "Toggle Menu(mobile menu)(aria-label)": "Open menu",
+            "Next Page(pagination)": "Next article",
+            "Previous Page(pagination)": "Previous article",
+            "No results found(search dialog)": "No results found",
           },
         }}
         search={{
           SearchDialog: DocsSearchDialog,
           links: [
-            ["Начало работы", "/docs"],
-            ["Если что-то пошло не так", "/docs/help"],
+            ["Getting started", "/docs"],
+            ["Troubleshooting", "/docs/help"],
           ],
         }}
       >
@@ -101,7 +104,7 @@ function DocsRoute() {
             title: (
               <span className="flex items-center gap-2 font-semibold">
                 <BookOpen className="size-5" aria-hidden="true" />
-                Помощь по Студии
+                Studio help
               </span>
             ),
             url: "/docs",
@@ -109,7 +112,7 @@ function DocsRoute() {
           links={[
             {
               type: "main",
-              text: "Вернуться в Студию",
+              text: "Return to Studio",
               url: "/projects",
               icon: <ArrowLeft className="size-4" aria-hidden="true" />,
             },
@@ -140,18 +143,17 @@ function DocsNotFound() {
   return (
     <main className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-6 text-center">
       <section>
-        <p className="text-sm font-semibold text-fd-muted-foreground">Материал не найден</p>
-        <h1 className="mt-3 text-3xl font-semibold">Похоже, эта страница переехала</h1>
+        <p className="text-sm font-semibold text-fd-muted-foreground">Page not found</p>
+        <h1 className="mt-3 text-3xl font-semibold">This page may have moved</h1>
         <p className="mt-4 leading-7 text-fd-muted-foreground">
-          Вернитесь к началу документации или воспользуйтесь поиском — нужная подсказка, скорее
-          всего, осталась рядом.
+          Return to the documentation home or use search to find the guide you need.
         </p>
         <Link
           to="/docs/$"
           params={{ _splat: "" }}
           className="mt-6 inline-flex min-h-11 items-center rounded-md bg-fd-primary px-4 text-sm font-medium text-fd-primary-foreground"
         >
-          Открыть начало документации
+          Documentation home
         </Link>
       </section>
     </main>

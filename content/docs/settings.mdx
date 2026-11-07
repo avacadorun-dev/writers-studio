@@ -1,33 +1,37 @@
 ---
-title: Настройки
-description: Внешний вид, редактор, AI-провайдеры и безопасное подключение внешних инструментов.
+title: Settings
+description: Interface language, appearance, editor preferences, AI providers, and external tools.
 ---
 
-Настройки помогают приспособить Студию к вашему способу работы. Меняйте их по одной: так проще понять эффект и вернуть прежний вариант.
+Settings adapt the Studio to your way of working. Change one preference at a time so its effect is easy to assess and reverse.
 
-## Внешний вид и редактор
+## Interface language
 
-Выберите светлую или тёмную тему, удобный шрифт, размер текста, ширину строки и другие доступные параметры редактора. Изменения оформления не переписывают рукопись — меняется только то, как она показана на вашем экране.
+Use the language selector to choose Russian, English, Japanese, Simplified Chinese, Spanish, or French. Your choice is saved in this browser and also applies to this guide and documentation search. Changing the interface language leaves your manuscripts, project names, and dictation language unchanged. Example screenshots and the downloadable demo show their original Russian content.
 
-После настройки откройте длинный документ, прочитайте несколько абзацев и проверьте редактор на обычном и узком экране. Если стало тяжелее читать, верните предыдущий вариант или восстановите значения по умолчанию.
+## Appearance and editor
+
+Choose a light or dark theme, a comfortable font, text size, line width, and other available editor settings. Appearance changes affect how the manuscript looks on your screen; the text is preserved.
+
+Open a long document afterward, read a few paragraphs, and try both a normal and a narrow screen. Restore the previous choice or defaults if reading becomes harder.
 
 <figure>
-  <img src="/docs/images/settings.webp" alt="Настройки внешнего вида и редактора в синтетическом аккаунте" />
-  <figcaption>Настройки собраны по смысловым разделам. Меняйте один параметр за раз и сохраняйте только после того, как проверили чтение в обычном документе.</figcaption>
+  <img src="/docs/images/settings.png" alt="Appearance and editor settings for a fictional account" />
+  <figcaption>Settings are grouped by purpose. Change one item at a time and check a normal document before saving. Screenshots illustrate the Russian interface.</figcaption>
 </figure>
 
-## Ассистент и поставщики AI
+## Assistant and AI providers
 
-Системный поставщик AI уже настроен владельцем сервера. Пользовательского поставщика подключайте, если вам нужен собственный тариф, модель или отдельные правила обработки данных. Поставщик — это сервис, который выполняет запросы ассистента или распознавания речи.
+The server owner configures the system AI provider. Add a personal provider if you need your own plan, model, or data processing terms. A provider is the service that handles assistant or speech recognition requests.
 
-Вводите ключ только в предназначенное поле настроек. Студия скрывает значение после сохранения; не вставляйте ключ в рукопись, чат, скриншот или текст обращения в поддержку. Проверьте подключение встроенной кнопкой и убедитесь, что выбранный сервис отвечает, прежде чем начинать важную работу.
+Enter a key in its dedicated settings field. The Studio hides its value after saving. Keep it out of manuscripts, chat, screenshots, and support messages. Test the connection with the built-in button before relying on the service for important work.
 
-## Внешние инструменты MCP
+## External MCP tools
 
-MCP — способ безопасно дать ассистенту доступ к отдельно подключённому инструменту, например базе заметок. Подключайте только известный сервер, внимательно читайте список возможностей и выдавайте минимально необходимый доступ.
+MCP gives the assistant access to a separately connected tool, such as a notes database. Connect a server you trust, read its capabilities carefully, and grant the access required for your task.
 
-Токен MCP — такой же секрет, как пароль. Не публикуйте его и не включайте в документацию. Чтобы отключить инструмент, удалите подключение в настройках и при необходимости отзовите токен на стороне сервиса. После отключения проверьте, что инструмент больше не предлагается ассистенту.
+Treat an MCP token like a password. Keep it private and out of documentation. To disconnect a tool, remove the connection in settings and revoke its token at the service if needed. Check afterward that the tool is no longer offered to the assistant.
 
-<Callout type="warning" title="Секреты не должны попадать в текст">
-  Ни сотруднику поддержки, ни ассистенту не нужен полный API-ключ или пароль. Для диагностики достаточно названия сервиса и текста ошибки без секретных значений.
+<Callout type="warning" title="Keep secrets out of text">
+  Support staff and the assistant do not need your full API key or password. A service name and error message with secret values removed are enough for diagnosis.
 </Callout>

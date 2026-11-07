@@ -20,8 +20,8 @@ export function PageShell({
   return (
     <RequireSession>
       <div className="min-h-full">
-        <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-panel)]">
-          <div className="mx-auto flex min-h-16 max-w-[1120px] items-center gap-3 px-4 lg:px-8">
+        <header className="workspace-chrome border-b border-[var(--border-subtle)]">
+          <div className="mx-auto flex min-h-20 max-w-[1120px] items-center gap-3 px-4 lg:px-8">
             <Button asChild variant="ghost" size="icon" aria-label="Назад">
               <Link to={backTo}>
                 <ArrowLeft className="size-4" aria-hidden="true" />

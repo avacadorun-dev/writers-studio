@@ -18,17 +18,17 @@ export function WorkspaceHeader() {
     .toUpperCase();
 
   return (
-    <header className="flex h-[60px] items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-4 sm:px-7">
+    <header className="workspace-chrome flex h-[72px] items-center justify-between border-b border-[var(--border-subtle)] px-4 sm:px-8 xl:px-12">
       <Link
         to="/projects"
         aria-label="Студия автора — проекты"
         className="flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
       >
         <BrandMark className="size-10 shrink-0" aria-hidden="true" />
-        <span className="font-display hidden text-[19px] leading-6 sm:inline">Студия автора</span>
+        <span className="font-display hidden text-[20px] leading-6 sm:inline">Студия автора</span>
       </Link>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
         <Button asChild variant="ghost" size="icon" tooltip="Открыть документацию">
           <a href="/docs" aria-label="Открыть документацию">
             <BookOpen className="size-4" aria-hidden="true" />

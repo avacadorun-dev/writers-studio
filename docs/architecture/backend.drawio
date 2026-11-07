@@ -9,7 +9,7 @@
         <mxCell id="title" value="Writer's Studio — Backend (Go Modular Monolith)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=20;fontColor=#1F2937;" vertex="1" parent="1">
           <mxGeometry x="40" y="20" width="720" height="36" as="geometry" />
         </mxCell>
-        <mxCell id="subtitle" value="Один процесс: HTTP API + WebSocket gateway + background worker&#xa;Источник: cmd/server, internal/httpapi, ARC42 §3–5" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=12;fontColor=#6B7280;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="One process: HTTP API + WebSocket gateway + background worker&#xa;Source: cmd/server, internal/httpapi, ARC42 sections 3–5" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=12;fontColor=#6B7280;" vertex="1" parent="1">
           <mxGeometry x="40" y="56" width="640" height="40" as="geometry" />
         </mxCell>
 
@@ -117,7 +117,7 @@
         <mxCell id="purge_job" value="Purge / cleanup&#xa;expired audio&#xa;abandoned runs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F87171;fontSize=11;" vertex="1" parent="worker">
           <mxGeometry x="606" y="48" width="140" height="64" as="geometry" />
         </mxCell>
-        <mxCell id="worker_note" value="Live Deepgram finalization does not auto-spend OpenRouter. Batch finalizer / «Повторить расшифровку» — отдельный job path.&#xa;Artifacts: live_final ≠ draft ≠ manuscript revision — batch never overwrites author edits." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#FECACA;fontColor=#7F1D1D;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="worker">
+        <mxCell id="worker_note" value="Live Deepgram finalization does not auto-spend OpenRouter. Batch finalizer / explicit re-transcription uses a separate job path.&#xa;Artifacts: live_final ≠ draft ≠ manuscript revision — batch never overwrites author edits." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#FECACA;fontColor=#7F1D1D;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="worker">
           <mxGeometry x="16" y="136" width="730" height="72" as="geometry" />
         </mxCell>
 

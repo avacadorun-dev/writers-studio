@@ -1,167 +1,76 @@
-# Ссылки словаря и заметки на полях рукописи
+# Dictionary links and manuscript annotations
 
-Статус: реализованная спецификация, версия 2.  
-Дизайн: `design.pen`, экраны S-31, S-31B, S-32…S-36 и Assistant review S-37.
+Annotations connect a precise manuscript quote to a real dictionary entry or an
+editorial note. They are author metadata, separate from Tiptap JSON, reader text,
+document schema versions and manual editing Undo/Redo.
 
-## 1. Цель и границы
+## Data and anchoring
 
-Автор может связать точный фрагмент рукописи с реальным термином словаря либо
-оставить к фрагменту редакторскую заметку. Все заметки проекта доступны в одном
-списке и открывают исходный документ на точной цитате.
+`document_annotations` records project/node, `dictionary_link` or `note`, optional
+term ID, lifecycle (`open`, `resolved`, legacy `needs_attention`), independent
+anchor state (`attached`/`detached`), note/target snapshot, revisions and timestamps.
+An exact anchor contains block ID, Unicode code-point offsets, literal text and
+prefix/suffix context. Creation/reattachment validates it against a base revision.
+`document_annotation_history` keeps immutable before/after changes and provenance;
+run-history deletion clears execution references without losing the audit content.
 
-Пометки являются рабочими метаданными автора. Они не входят в читательский текст,
-не меняют Tiptap schema version 1, не попадают в обычный экспорт рукописи и не
-должны влиять на Undo/Redo текста.
+## Invariants
 
-## 2. Модель данных и инварианты
+1. Decorations never enter canonical document JSON or mutate past revisions.
+2. Manual revision and mapped anchors commit in one transaction.
+3. An omitted `annotationAnchors` field means a legacy client: retain metadata and
+   detach uncertain anchors. An explicit empty array means no anchors were mapped.
+4. Deleted, partially overlapping or unprovable quotes retain their original text
+   and detach; never guess a similar passage. Lifecycle remains independent.
+5. Conflict copies and duplicates retain annotations. Deleting a dictionary term
+   preserves its readable snapshot and clears the live reference.
+6. Exact whole-range replacement updates anchor text/context deterministically;
+   edits before the range shift it, and edits after it leave it unchanged.
+7. Assistant Apply updates text, anchors, lifecycle and history atomically. Undo
+   appends compensating document revisions and restores annotation snapshots.
 
-`document_annotations` хранится отдельно от `document_revisions` и содержит:
+## Interaction and API
 
-- `kind`: `dictionary_link` или `note`;
-- `project_id`, `node_id` и необязательный `dictionary_term_id`;
-- жизненный `status`: `open`, `resolved` или legacy `needs_attention`;
-- независимый `anchor_status`: `attached` или `detached`;
-- якорь `blockId + start/end + exactText + prefix/suffix`;
-- текст заметки либо неизменяемый snapshot цели словаря;
-- `base_revision`, собственную монотонную `revision`, время создания, изменения и
-  решения.
+A nonempty single-block selection opens context actions with right-click,
+Shift+F10/context-menu key or touch long press. Selection alone adds no permanent
+toolbar. Actions link an existing dictionary term, add a note or attach the quote
+to the assistant. Multi-block ambiguity is explained rather than silently anchored.
+Desktop uses a side panel; mobile uses a sheet with equivalent actions.
 
-`document_annotation_history` хранит неизменяемые пары `before/after` для каждой
-ассистентской перепривязки, решения, потери якоря и Undo. Запись содержит revision
-аннотации и документа, operation/change-set provenance и переживает удаление
-истории Assistant run: ссылочные IDs очищаются, но исходная цитата и результат
-остаются.
+Project-wide annotation search filters type, lifecycle and document. Deep links
+use `annotationId` and open the exact quote/panel. Resolved notes can reopen.
 
-Offsets считаются в Unicode code points. Перед созданием и повторной привязкой
-сервер проверяет, что `exactText` буквально совпадает с диапазоном указанного
-блока в `base_revision`.
+Routes include project/node annotation lists, node annotation creation,
+annotation patch/delete and node revision saves with optional anchor mapping.
+Every endpoint validates ownership through the project and omits content from logs.
 
-Критические гарантии:
+Assistant `annotation.list`/`annotation.get` are scoped reads.
+`annotation.propose_fixes` accepts at most 50 annotation IDs/revisions, expected
+text, replacements and resolution choices. The model supplies no block offsets;
+the server validates and groups fixes by document. Review displays note and exact
+before/after with independent resolve toggles. Stale note/document versions fail
+before any canonical change.
 
-1. Аннотация никогда не записывается внутрь Tiptap JSON и не меняет прежние
-   revisions.
-2. Редактор отображает аннотации transient ProseMirror decorations; canonical
-   document JSON от этого byte-for-byte не меняется.
-3. При ручном autosave редактор передаёт отображённые позиции всех аннотаций.
-   Новая revision и новые anchors фиксируются одной SQL-транзакцией.
-4. Отсутствующее поле `annotationAnchors` означает старый клиент: пометки не
-   удаляются и не переписываются, их жизненный статус сохраняется, а
-   `anchor_status` становится `detached`.
-5. Пустой массив отличается от отсутствующего поля и означает, что новый клиент
-   осознанно не смог сопоставить ни одной активной пометки.
-6. Удалённый диапазон, частичное пересечение и неизвестное изменение не переносят
-   пометку на похожий текст. Сохраняются исходная цитата и контекст,
-   `anchor_status` становится `detached`, а `open/resolved` не подменяется.
-7. Revision conflict создаёт отдельный документ вместе с копиями всех пометок.
-   Duplicate также копирует пометки и сохраняет валидные anchors.
-8. Удаление термина не удаляет ссылку: FK становится `NULL`, сохранённый snapshot
-   остаётся читаемым, ссылка требует внимания.
-9. Exact replacement всего диапазона детерминированно заменяет `exactText`,
-   offsets и context windows на новый фрагмент. Правка до диапазона только сдвигает
-   offsets; правка после него не меняет якорь.
-10. Assistant Apply одной SQL-транзакцией создаёт document revision, обновляет
-    anchors/status и пишет историю. Undo создаёт компенсирующую document revision и
-    восстанавливает snapshot каждой затронутой пометки.
+## Compatibility and acceptance
 
-## 3. UX в Studio
+Additive migrations 013/015 do not rewrite document text/history. Annotation
+transfers began in native archive v2 and remain supported through current v8 with
+atomic node/term remapping. v1 imports without annotations. Invalid references,
+anchors or future formats fail before partial creation.
 
-- Выделение само по себе не добавляет панель или кнопки над рукописью. Правая
-  кнопка мыши по выделению открывает компактное контекстное меню с действиями
-  «Связать со словарём», «Добавить заметку» и «Прикрепить к ассистенту».
-- То же меню доступно с клавиатуры через `Shift+F10`/клавишу контекстного меню,
-  а на touch-устройствах — долгим нажатием. `Escape`, клик вне меню, resize и
-  scroll закрывают его без потери текста или изменения документа.
-- Ссылка словаря подчёркнута акцентным цветом; заметка имеет спокойную подсветку.
-- Клик по пометке открывает панель полей, выделяет точный диапазон и показывает
-  термин или редактируемую заметку.
-- В панели можно сохранить текст заметки, пометить её исправленной, вернуть,
-  удалить и открыть список всего проекта.
-- `detached`/legacy `needs_attention` имеет отдельное предупреждение и не маскируется под валидный
-  диапазон.
-- На mobile панель открывается нижним sheet; все функции доступны без desktop
-  context rail.
+| IDs | Required checks |
+| --- | --- |
+| AC-MA-01/02 | Single-block exact context actions; clear rejection of cross-block anchors |
+| AC-MA-03/04 | Dictionary link and editable/resolvable note interaction |
+| AC-MA-05/06 | Noncanonical decorations and transactional anchor mapping |
+| AC-MA-07/08 | Deterministic detach and legacy-client preservation |
+| AC-MA-09/10 | Duplicate/conflict retention and deleted-term snapshots |
+| AC-MA-11/12/13 | Project search, exact deep link and reopening resolved notes |
+| AC-MA-14 | Owner isolation |
+| AC-MA-15/16/17 | Legacy/native transfer remapping and pre-commit rejection |
+| AC-MA-18 | Critical coverage target, database integration and browser tests |
+| AC-MA-19/20 | Scoped reads, no model offsets, up to 50 staged grouped fixes |
+| AC-MA-21/22 | Atomic text/lifecycle/history and deterministic overlap detach |
+| AC-MA-23 | Undo snapshots and audit retention after run-history deletion |
 
-## 4. Все правки проекта
-
-Маршрут `/projects/:projectId/annotations` показывает заметки и словарные ссылки
-всех неудалённых документов. Доступны поиск, фильтры по статусу, типу и
-документу. Действие «Перейти» открывает
-`/projects/:projectId/studio/:nodeId?annotationId=:id`; Studio открывает панель,
-ставит ProseMirror selection на точную цитату и прокручивает её в центр.
-
-## 5. API
-
-- `GET /api/projects/{projectID}/annotations` — все пометки проекта;
-- `GET /api/nodes/{nodeID}/annotations` — пометки документа;
-- `POST /api/nodes/{nodeID}/annotations` — создать с обязательной base revision;
-- `PATCH /api/annotations/{annotationID}` — изменить note/status или перепривязать;
-- `DELETE /api/annotations/{annotationID}` — удалить только пометку;
-- `PUT /api/nodes/{nodeID}/revisions` — необязательный `annotationAnchors` для
-  атомарного сохранения текста и сопоставленных якорей.
-
-Все endpoints проверяют ownership через проект. Сырая рукопись и заметки не
-добавляются в application logs.
-
-### 5.1. Assistant MCP
-
-- `annotation.list` (A0) читает пометки всего проекта с фильтрами по kind,
-  lifecycle status, anchor status и document;
-- `annotation.get` (A0) возвращает одну пометку и её versioned Assistant history;
-- `annotation.propose_fixes` (A1) принимает до 50 пар
-  `annotationId + annotation revision + expectedText + replacement + resolve`.
-
-Модель никогда не передаёт block ID или offsets в `annotation.propose_fixes`.
-Сервер сам читает текущий exact anchor, проверяет ownership/revisions, объединяет
-все исправления одного документа в одну operation и показывает note/old quote/new
-quote/будущий lifecycle status в review. `resolve=true` действует только после
-Apply; заметка не удаляется. Изменившаяся после staging заметка делает change set
-stale.
-
-## 6. Совместимость и перенос
-
-- Существующие БД сначала получили additive migration 013; migration 015 только
-  добавляет `revision`, `anchor_status` и отдельную history table. Текстовые таблицы
-  не переписываются, а
-  document schema остаётся 1.
-- Старый проект и старый клиент продолжают читаться/сохраняться без обязательных
-  полей аннотаций.
-- Аннотации появились в `.wstudio` `formatVersion: 2` как массив
-  `documentAnnotations`; текущий v3 сохраняет тот же контракт и добавляет media.
-- Importer принимает v1 как проект без пометок, а v2/v3 — с полной проверкой
-  node/term/revision/anchor references и атомарным remap ID.
-- Старый importer предсказуемо отклоняет v2 до создания проекта; поэтому новый
-  файл не может быть частично импортирован старой версией.
-
-## 7. Acceptance criteria
-
-- AC-MA-01. Контекстное меню открывается только для непустого выделения в одном
-  блоке и создаёт Unicode-safe exact anchor; постоянной панели действий нет.
-- AC-MA-02. Выделение через границу блоков отклоняется с понятным сообщением.
-- AC-MA-03. Ссылка словаря видна inline и открывает актуальный термин.
-- AC-MA-04. Заметка видна inline, редактируется и решается из панели полей.
-- AC-MA-05. Decorations не меняют document JSON и историю Undo.
-- AC-MA-06. Ручная правка переносит anchors в той же транзакции, что и revision.
-- AC-MA-07. Удалённый фрагмент сохраняет заметку с
-  `anchor_status=detached`, не меняя `open/resolved`.
-- AC-MA-08. Старый save без anchor field не удаляет и не смещает пометки наугад.
-- AC-MA-09. Conflict copy и Duplicate не теряют пометки.
-- AC-MA-10. Удаление термина сохраняет ссылку и snapshot цели.
-- AC-MA-11. Общий экран ищет и фильтрует пометки всего проекта.
-- AC-MA-12. Deep link открывает нужный node, панель и точную selection.
-- AC-MA-13. Решённые пометки доступны отдельно и могут быть возвращены.
-- AC-MA-14. Текст/ссылки/заметки недоступны другому owner.
-- AC-MA-15. Старый `.wstudio` v1 импортируется без изменений текста и revisions.
-- AC-MA-16. `.wstudio` v2 переносит пометки с remap node/term IDs.
-- AC-MA-17. Повреждённая ссылка/anchor/future version отклоняется до commit.
-- AC-MA-18. Новая доменная логика и критические переходы имеют line coverage не
-  ниже 90%, плюс PostgreSQL integration и browser E2E.
-- AC-MA-19. Assistant читает все открытые заметки проекта без прямого DB/tool
-  доступа провайдера и без model-supplied offsets.
-- AC-MA-20. Один MCP call группирует до 50 исправлений по документам и оставляет
-  canonical state неизменным до review/Apply.
-- AC-MA-21. Apply атомарно заменяет текст, обновляет exact anchor, lifecycle и
-  immutable history; failure/stale не оставляет частичный результат.
-- AC-MA-22. Partial overlap не угадывает новое место и переводит только anchor в
-  `detached`.
-- AC-MA-23. Undo восстанавливает текст и прежний anchor/status, а история хранит
-  оба перехода даже после удаления Assistant run history.
+Workflow AC-143–AC-167 provide the corresponding end-to-end criteria.
