@@ -1,5 +1,9 @@
 # Writer's Studio
 
+[![CI](https://github.com/avacadorun-dev/writers-studio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/avacadorun-dev/writers-studio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Project status: frozen](https://img.shields.io/badge/Status-Frozen-lightgrey.svg)
+
 A self-hosted writing workspace built with Go and React. Organize long-form work,
 dictate drafts, check the original audio, develop ideas on visual boards, and
 review assistant proposals before they change a manuscript.
