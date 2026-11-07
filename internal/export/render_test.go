@@ -61,6 +61,37 @@ func TestRenderPortableFormatsContainSnapshotContent(t *testing.T) {
 	}
 }
 
+func TestConcurrentRenderDoesNotMutateSnapshotContent(t *testing.T) {
+	t.Parallel()
+
+	legacy := json.RawMessage(`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Run ` + "`go run`" + `."}]}]}`)
+	original := bytes.Clone(legacy)
+	snapshot := fixtureSnapshot()
+	snapshot.Documents[0].NodeID = "chapter"
+	snapshot.Documents[0].Content = legacy
+	snapshot.TreeNodes = []SnapshotTreeNode{{
+		NodeID: "chapter", Kind: "chapter", Title: "Chapter One", ContentBearing: true,
+		Content: legacy, PlainText: "Run go run.",
+	}}
+	t.Cleanup(func() {
+		if !bytes.Equal(snapshot.Documents[0].Content, original) {
+			t.Error("rendering changed the input document content")
+		}
+		if !bytes.Equal(snapshot.TreeNodes[0].Content, original) {
+			t.Error("rendering changed the input tree-node content")
+		}
+	})
+
+	for _, format := range []string{"txt", "markdown", "markdown_tree", "docx", "epub"} {
+		t.Run(format, func(t *testing.T) {
+			t.Parallel()
+			if _, _, err := Render(format, snapshot); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestExportMigratesLegacyInlineCodeBeforeEveryPublicationRenderer(t *testing.T) {
 	t.Parallel()
 	legacy := json.RawMessage(`{

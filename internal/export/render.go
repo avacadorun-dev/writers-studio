@@ -117,6 +117,10 @@ func RenderWithAssets(
 }
 
 func normalizeLegacyCodeFormatting(snapshot Snapshot) Snapshot {
+	// Concurrent renders can share the input slices. Own their elements before
+	// replacing content so normalization leaves the caller's snapshot unchanged.
+	snapshot.Documents = append([]SnapshotDocument(nil), snapshot.Documents...)
+	snapshot.TreeNodes = append([]SnapshotTreeNode(nil), snapshot.TreeNodes...)
 	for index := range snapshot.Documents {
 		content := snapshot.Documents[index].Content
 		if normalized, err := editor.NormalizeFencedCodeBlocks(content); err == nil {
