@@ -35,5 +35,5 @@ modal bounds, direct Apply/Undo and compact typography.
 
 Changing these contracts requires a new architectural decision. In particular,
 review must not hide/remount the manuscript or bypass server revision checks.
-See [workflows](../specification/WORKFLOWS.md) and
+See [workflows](../../openspec/README.md) and
 [design reference](../design/DESIGN_HANDOFF.md).

@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Clipboard, KeyRound, Network, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-
 import { listProjects, type Project } from "~entities/project";
 import { apiRequest } from "~shared/api";
+import { interfaceLanguage, t } from "~shared/i18n";
 import { Banner, Button, Checkbox, Field, Input, Select, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 
@@ -42,26 +42,30 @@ interface MCPSecretResponse {
 }
 
 const scopeOptions: Array<{ scope: MCPScope; label: string; body: string }> = [
-  { scope: "projects:list", label: "Список проектов", body: "Видит только выбранные проекты." },
+  {
+    scope: "projects:list",
+    label: t("Список проектов"),
+    body: t("Видит только выбранные проекты."),
+  },
   {
     scope: "projects:read",
-    label: "Чтение",
-    body: "Читает структуру, документы, версии и контекст.",
+    label: t("Чтение"),
+    body: t("Читает структуру, документы, версии и контекст."),
   },
   {
     scope: "projects:stage",
-    label: "Подготовка изменений",
-    body: "Создаёт diff без изменения проекта.",
+    label: t("Подготовка изменений"),
+    body: t("Создаёт diff без изменения проекта."),
   },
   {
     scope: "projects:apply",
-    label: "Apply, Reject и Undo",
-    body: "Может завершить цикл прямо из агента.",
+    label: t("Apply, Reject и Undo"),
+    body: t("Может завершить цикл прямо из агента."),
   },
   {
     scope: "projects:actions",
-    label: "Действия",
-    body: "Экспорт и повторная расшифровка после preview.",
+    label: t("Действия"),
+    body: t("Экспорт и повторная расшифровка после preview."),
   },
 ];
 
@@ -82,7 +86,7 @@ export function MCPSettingsPage() {
       return [...active.projects, ...archived.projects];
     },
   });
-  const [name, setName] = useState("Мой локальный агент");
+  const [name, setName] = useState(t("Мой локальный агент"));
   const [clientName, setClientName] = useState("Local MCP agent");
   const [expiresDays, setExpiresDays] = useState(90);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -106,7 +110,7 @@ export function MCPSettingsPage() {
       setSecret(result);
       await invalidate();
     },
-    onError: (error) => showToast({ title: "Доступ не создан", description: error.message }),
+    onError: (error) => showToast({ title: t("Доступ не создан"), description: error.message }),
   });
   const revoke = useMutation({
     mutationFn: (grantId: string) =>
@@ -125,20 +129,21 @@ export function MCPSettingsPage() {
     },
   });
 
-  if (grants.isPending || projects.isPending) return <Spinner label="Загружаем MCP-доступы…" />;
+  if (grants.isPending || projects.isPending)
+    return <Spinner label={t("Загружаем MCP-доступы…")} />;
   if (!grants.data || projects.isError) {
     return (
       <Banner
         variant="danger"
-        title="MCP недоступен"
-        body="Обновите страницу или проверьте конфигурацию сервера."
+        title={t("MCP недоступен")}
+        body={t("Обновите страницу или проверьте конфигурацию сервера.")}
       />
     );
   }
 
   const copy = async (value: string, title: string) => {
     await navigator.clipboard.writeText(value);
-    showToast({ title, description: "Скопировано в буфер обмена." });
+    showToast({ title, description: t("Скопировано в буфер обмена.") });
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -150,27 +155,28 @@ export function MCPSettingsPage() {
     <RequireSession>
       <div className="min-h-full bg-[var(--surface-app)]">
         <header className="flex h-14 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-4">
-          <Button asChild variant="ghost" size="icon" aria-label="Назад в настройки">
+          <Button asChild variant="ghost" size="icon" aria-label={t("Назад в настройки")}>
             <Link to="/settings">
               <ArrowLeft className="size-4" aria-hidden="true" />
             </Link>
           </Button>
           <Network className="size-5 text-[var(--accent)]" aria-hidden="true" />
-          <p className="text-sm font-semibold">Агенты и MCP</p>
+          <p className="text-sm font-semibold">{t("Агенты и MCP")}</p>
         </header>
         <main className="mx-auto grid w-full max-w-[980px] gap-6 px-4 py-8 sm:px-8">
           <div>
-            <h1 className="font-display text-4xl">Удалённый доступ для локальных агентов</h1>
+            <h1 className="font-display text-4xl">{t("Удалённый доступ для локальных агентов")}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-secondary)]">
-              Агент в локальной сети или VPN может открыть выбранный проект, подготовить diff,
-              применить либо отклонить его и выполнить Undo без открытия интерфейса студии.
+              {t(
+                "Агент в локальной сети или VPN может открыть выбранный проект, подготовить diff, применить либо отклонить его и выполнить Undo без открытия интерфейса студии.",
+              )}
             </p>
           </div>
           {!grants.data.enabled ? (
             <Banner
               variant="warning"
-              title="Remote MCP выключен"
-              body="Оператор должен установить MCP_ENABLED=true и перезапустить сервер."
+              title={t("Remote MCP выключен")}
+              body={t("Оператор должен установить MCP_ENABLED=true и перезапустить сервер.")}
             />
           ) : null}
           <section className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5 sm:p-6">
@@ -184,27 +190,27 @@ export function MCPSettingsPage() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => copy(grants.data.endpoint, "Endpoint скопирован")}
+                onClick={() => copy(grants.data.endpoint, t("Endpoint скопирован"))}
               >
                 <Clipboard className="size-4" aria-hidden="true" />
-                Копировать
+                {t("Копировать")}
               </Button>
             </div>
           </section>
 
           {secret ? (
             <section className="rounded-[var(--radius-lg)] border border-[var(--warning)]/40 bg-[var(--warning-soft)] p-5">
-              <h2 className="font-medium">Сохраните токен сейчас</h2>
+              <h2 className="font-medium">{t("Сохраните токен сейчас")}</h2>
               <p className="mt-1 text-sm text-[var(--ink-secondary)]">
-                После закрытия этого блока сервер больше не покажет секрет.
+                {t("После закрытия этого блока сервер больше не покажет секрет.")}
               </p>
               <code className="mt-4 block overflow-x-auto rounded bg-[var(--surface-raised)] p-3 text-xs">
                 {secret.token}
               </code>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" onClick={() => copy(secret.token, "Токен скопирован")}>
+                <Button type="button" onClick={() => copy(secret.token, t("Токен скопирован"))}>
                   <KeyRound className="size-4" aria-hidden="true" />
-                  Копировать токен
+                  {t("Копировать токен")}
                 </Button>
                 <Button
                   type="button"
@@ -219,15 +225,15 @@ export function MCPSettingsPage() {
                         null,
                         2,
                       ),
-                      "Конфигурация скопирована",
+                      t("Конфигурация скопирована"),
                     )
                   }
                 >
                   <Clipboard className="size-4" aria-hidden="true" />
-                  Копировать config
+                  {t("Копировать config")}
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setSecret(undefined)}>
-                  Я сохранил
+                  {t("Я сохранил")}
                 </Button>
               </div>
             </section>
@@ -237,9 +243,9 @@ export function MCPSettingsPage() {
             onSubmit={submit}
             className="grid gap-5 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5 sm:p-6"
           >
-            <h2 className="font-medium">Новый ручной токен</h2>
+            <h2 className="font-medium">{t("Новый ручной токен")}</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Название доступа">
+              <Field label={t("Название доступа")}>
                 <Input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
@@ -247,7 +253,7 @@ export function MCPSettingsPage() {
                   maxLength={120}
                 />
               </Field>
-              <Field label="Имя клиента">
+              <Field label={t("Имя клиента")}>
                 <Input
                   value={clientName}
                   onChange={(event) => setClientName(event.target.value)}
@@ -255,19 +261,19 @@ export function MCPSettingsPage() {
                   maxLength={160}
                 />
               </Field>
-              <Field label="Срок действия">
+              <Field label={t("Срок действия")}>
                 <Select
                   value={expiresDays}
                   onChange={(event) => setExpiresDays(Number(event.target.value))}
                 >
-                  <option value={7}>7 дней</option>
-                  <option value={30}>30 дней</option>
-                  <option value={90}>90 дней — по умолчанию</option>
-                  <option value={365}>1 год</option>
+                  <option value={7}>{t("7 дней")}</option>
+                  <option value={30}>{t("30 дней")}</option>
+                  <option value={90}>{t("90 дней — по умолчанию")}</option>
+                  <option value={365}>{t("1 год")}</option>
                 </Select>
               </Field>
             </div>
-            <ChoiceList title="Проекты">
+            <ChoiceList title={t("Проекты")}>
               {(projects.data ?? []).map((project: Project) => (
                 <Choice
                   key={project.id}
@@ -280,11 +286,11 @@ export function MCPSettingsPage() {
                     )
                   }
                   label={project.title}
-                  body={project.status === "archived" ? "Архив · только чтение" : "Активный"}
+                  body={project.status === "archived" ? t("Архив · только чтение") : t("Активный")}
                 />
               ))}
             </ChoiceList>
-            <ChoiceList title="Права">
+            <ChoiceList title={t("Права")}>
               {scopeOptions.map((item) => (
                 <Choice
                   key={item.scope}
@@ -310,14 +316,14 @@ export function MCPSettingsPage() {
                 create.isPending
               }
             >
-              Создать и показать токен
+              {t("Создать и показать токен")}
             </Button>
           </form>
 
           <section className="grid gap-3">
-            <h2 className="font-medium">Выданные доступы</h2>
+            <h2 className="font-medium">{t("Выданные доступы")}</h2>
             {issuedGrants.length === 0 ? (
-              <p className="text-sm text-[var(--ink-tertiary)]">Доступов пока нет.</p>
+              <p className="text-sm text-[var(--ink-tertiary)]">{t("Доступов пока нет.")}</p>
             ) : (
               issuedGrants.map((grant) => (
                 <article
@@ -328,15 +334,20 @@ export function MCPSettingsPage() {
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium">{grant.name}</h3>
                       <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
-                        {grant.authKind === "oauth" ? "OAuth" : "Bearer"} · проектов{" "}
-                        {grant.projectIds.length} ·{" "}
+                        {grant.authKind === "oauth" ? "OAuth" : "Bearer"}
+                        {t(" · проектов")} {grant.projectIds.length} ·{" "}
                         {grant.revokedAt
-                          ? "отозван"
-                          : `до ${grant.expiresAt ? new Date(grant.expiresAt).toLocaleDateString("ru-RU") : "отзыва"}`}{" "}
-                        · использован{" "}
+                          ? t("отозван")
+                          : t(
+                              "до {0}",
+                              grant.expiresAt
+                                ? new Date(grant.expiresAt).toLocaleDateString(interfaceLanguage)
+                                : t("отзыва"),
+                            )}{" "}
+                        {t("· использован")}{" "}
                         {grant.lastUsedAt
-                          ? new Date(grant.lastUsedAt).toLocaleString("ru-RU")
-                          : "никогда"}
+                          ? new Date(grant.lastUsedAt).toLocaleString(interfaceLanguage)
+                          : t("никогда")}
                       </p>
                     </div>
                     {!grant.revokedAt && grant.authKind === "manual" ? (
@@ -348,7 +359,7 @@ export function MCPSettingsPage() {
                         disabled={rotate.isPending}
                       >
                         <RefreshCw className="size-4" aria-hidden="true" />
-                        Сменить токен
+                        {t("Сменить токен")}
                       </Button>
                     ) : null}
                     {!grant.revokedAt ? (
@@ -360,7 +371,7 @@ export function MCPSettingsPage() {
                         disabled={revoke.isPending}
                       >
                         <Trash2 className="size-4" aria-hidden="true" />
-                        Отозвать
+                        {t("Отозвать")}
                       </Button>
                     ) : null}
                   </div>

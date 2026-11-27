@@ -1,9 +1,6 @@
 # Documentation
 
-These English documents describe the frozen Go/web edition. They consolidate
-older planning and implementation notes into a public reference. They are not a
-roadmap for the independently developed desktop application. The application UI
-and synthetic fixture text may still use Russian.
+These English documents describe the Go/web edition of Writer's Studio.
 
 ## Start here
 
@@ -24,13 +21,7 @@ and synthetic fixture text may still use Russian.
 
 ## Specifications
 
-- [Workflows and acceptance](specification/WORKFLOWS.md).
-- [Assistant mode](specification/ASSISTANT_MODE.md).
-- [Rich document editor](specification/RICH_DOCUMENT_EDITOR.md).
-- [Manuscript annotations](specification/MANUSCRIPT_ANNOTATIONS.md).
-- [Project navigation and transfer](specification/PROJECT_NAVIGATION_AND_TRANSFER.md).
-- [Markdown tree migration](specification/MARKDOWN_TREE_MIGRATION.md).
-- [Canvas boards](specification/CANVAS_BOARDS.md).
+- [OpenSpec capabilities](../openspec/README.md).
 - [Design reference](design/DESIGN_HANDOFF.md).
 
 ## Verification and publication

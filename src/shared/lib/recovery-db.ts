@@ -1,6 +1,6 @@
 import { type DBSchema, deleteDB, type IDBPDatabase, openDB } from "idb";
-
 import type { TiptapNode } from "~entities/project";
+import { t } from "~shared/i18n";
 
 export interface EditorSnapshot {
   nodeId: string;
@@ -95,7 +95,7 @@ export async function withLocalRecoveryTimeout<T>(
       operation,
       new Promise<never>((_, reject) => {
         timeout = window.setTimeout(
-          () => reject(new Error("Локальное хранилище восстановления не ответило вовремя")),
+          () => reject(new Error(t("Локальное хранилище восстановления не ответило вовремя"))),
           timeoutMs,
         );
       }),

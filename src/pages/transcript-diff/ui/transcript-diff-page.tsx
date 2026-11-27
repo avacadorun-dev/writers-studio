@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Headphones, RotateCcw, ShieldCheck } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-
 import { getDictation, getDictationAudio, saveTranscriptDraft } from "~entities/dictation";
 import { getProject, type TiptapNode } from "~entities/project";
+import { t } from "~shared/i18n";
 import { createClientId } from "~shared/lib";
 import { Banner, Button, Checkbox, Spinner, useToast } from "~shared/ui";
 import { ProjectUtilityShell } from "~widgets/project-utility-shell";
@@ -77,15 +77,15 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
       const previousContent = draft?.content;
       await queryClient.invalidateQueries({ queryKey: ["dictation", sessionId] });
       showToast({
-        title: "Выбранные изменения применены",
-        description: "Исходная расшифровка сохранена отдельно.",
-        actionLabel: previousContent ? "Отменить" : undefined,
+        title: t("Выбранные изменения применены"),
+        description: t("Исходная расшифровка сохранена отдельно."),
+        actionLabel: previousContent ? t("Отменить") : undefined,
         onAction: previousContent
           ? () => {
               void saveTranscriptDraft(sessionId, previousContent, "final_batch_undo").then(
                 async () => {
                   await queryClient.invalidateQueries({ queryKey: ["dictation", sessionId] });
-                  showToast({ title: "Применение отменено" });
+                  showToast({ title: t("Применение отменено") });
                 },
               );
             }
@@ -99,26 +99,26 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
   });
 
   if (session.isPending) {
-    return <Spinner label="Сравниваем варианты…" />;
+    return <Spinner label={t("Сравниваем варианты…")} />;
   }
   if (!draft) {
     return (
       <main className="grid min-h-full place-items-center p-5">
         <Banner
           variant="warning"
-          title="Нет черновика для сравнения"
-          body="Дождитесь обработки записи."
+          title={t("Нет черновика для сравнения")}
+          body={t("Дождитесь обработки записи.")}
         />
       </main>
     );
   }
   if (project.isPending) {
-    return <Spinner label="Открываем проект…" />;
+    return <Spinner label={t("Открываем проект…")} />;
   }
   if (!project.data || !session.data?.session) {
     return (
       <main className="grid min-h-full place-items-center p-5">
-        <Banner variant="danger" title="Проект недоступен" body="Сравнение сохранено." />
+        <Banner variant="danger" title={t("Проект недоступен")} body={t("Сравнение сохранено.")} />
       </main>
     );
   }
@@ -133,26 +133,26 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Сравнение расшифровок
+              {t("Сравнение расшифровок")}
             </p>
             <h1 className="font-display mt-2 text-[34px] leading-tight">
-              Что уточнила финальная расшифровка
+              {t("Что уточнила финальная расшифровка")}
             </h1>
           </div>
           <Button type="button" variant="secondary" onClick={() => window.history.back()}>
-            Закрыть
+            {t("Закрыть")}
           </Button>
         </div>
         <Banner
           className="mt-5"
           variant="info"
-          title="Ваш текущий текст не изменится, пока вы не примените правки"
-          body="Можно принять только выбранные группы."
+          title={t("Ваш текущий текст не изменится, пока вы не примените правки")}
+          body={t("Можно принять только выбранные группы.")}
         />
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5 sm:p-8">
             <p className="text-xs font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Уточнённая версия
+              {t("Уточнённая версия")}
             </p>
             <div className="font-manuscript mt-5 text-xl leading-[1.9]">
               {diff.map((token) => {
@@ -179,9 +179,12 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
             </div>
           </section>
           <aside className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5">
-            <h2 className="text-sm font-semibold">{groups.length} групп изменений</h2>
+            <h2 className="text-sm font-semibold">
+              {groups.length}
+              {t(" групп изменений")}
+            </h2>
             <p className="mt-1 text-xs leading-5 text-[var(--ink-tertiary)]">
-              Выберите только те уточнения, которые хотите внести в редактируемый черновик.
+              {t("Выберите только те уточнения, которые хотите внести в редактируемый черновик.")}
             </p>
             <div className="mt-4 grid gap-2">
               {groups.map((group, index) => {
@@ -211,7 +214,8 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
                           })
                         }
                       />
-                      Изменение {index + 1}
+                      {t("Изменение ")}
+                      {index + 1}
                     </label>
                     {range && audio.data ? (
                       <button
@@ -224,7 +228,8 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
                         }}
                       >
                         <Headphones className="size-3.5" aria-hidden="true" />
-                        Аудио · {formatClock(range.startMs)}–{formatClock(range.endMs)}
+                        {t("Аудио · ")}
+                        {formatClock(range.startMs)}–{formatClock(range.endMs)}
                       </button>
                     ) : null}
                   </div>
@@ -243,16 +248,16 @@ export function TranscriptDiffPage({ sessionId }: { sessionId: string }) {
                 onClick={() => apply.mutate()}
               >
                 <Check className="size-4" aria-hidden="true" />
-                {apply.isPending ? "Применяем…" : "Применить выбранное"}
+                {apply.isPending ? t("Применяем…") : t("Применить выбранное")}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setAcceptedGroups(new Set())}>
                 <RotateCcw className="size-4" aria-hidden="true" />
-                Сбросить выбор
+                {t("Сбросить выбор")}
               </Button>
             </div>
             <div className="mt-6 flex items-start gap-2 border-t border-[var(--border-subtle)] pt-4 text-xs leading-5 text-[var(--ink-tertiary)]">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" aria-hidden />
-              Исходная и текущая версии останутся в истории.
+              {t("Исходная и текущая версии останутся в истории.")}
             </div>
           </aside>
         </div>

@@ -2,6 +2,7 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertTriangle, type LucideIcon, X } from "lucide-react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { t } from "~shared/i18n";
 
 import { cn } from "~shared/lib/cn";
 
@@ -52,7 +53,7 @@ export function ModalDialog({
               variant="ghost"
               size="icon"
               className="absolute top-3 right-3 size-9 min-h-9"
-              aria-label="Закрыть диалог"
+              aria-label={t("Закрыть диалог")}
             >
               <X className="size-4" aria-hidden="true" />
             </Button>
@@ -107,7 +108,7 @@ export function ConfirmationDialog({
   tone = "default",
   children,
   confirmLabel,
-  cancelLabel = "Отмена",
+  cancelLabel = t("Отмена"),
   onConfirm,
   confirmDisabled,
   pending,
@@ -154,7 +155,7 @@ export function ConfirmationDialog({
                 disabled={confirmDisabled || pending}
                 onClick={onConfirm}
               >
-                {pending ? "Выполняем…" : confirmLabel}
+                {pending ? t("Выполняем…") : confirmLabel}
               </Button>
             </AlertDialogPrimitive.Action>
           </div>

@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bot, MessageSquarePlus, MessagesSquare, Plus, X } from "lucide-react";
-
 import { type AssistantRun, listAssistantRuns } from "~entities/assistant";
 import type { DocumentNode } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import { Banner, Button, Spinner } from "~shared/ui";
 import {
@@ -25,9 +25,9 @@ interface AssistantThreadSwitcherProps {
 }
 
 const sectionLabels: Record<AssistantThreadBucket, string> = {
-  attention: "Нужно внимание",
-  working: "В работе",
-  recent: "Недавние",
+  attention: t("Нужно внимание"),
+  working: t("В работе"),
+  recent: t("Недавние"),
 };
 
 export function AssistantThreadSwitcher({
@@ -49,7 +49,7 @@ export function AssistantThreadSwitcher({
 
   return (
     <aside
-      aria-label="Чаты ассистента"
+      aria-label={t("Чаты ассистента")}
       data-testid="assistant-thread-switcher"
       className="flex h-full min-h-0 w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-panel)]"
     >
@@ -59,11 +59,17 @@ export function AssistantThreadSwitcher({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase">
-            Ассистент · чаты проекта
+            {t("Ассистент · чаты проекта")}
           </p>
-          <p className="truncate text-sm font-semibold">Все поручения</p>
+          <p className="truncate text-sm font-semibold">{t("Все поручения")}</p>
         </div>
-        <Button type="button" variant="ghost" size="icon" onClick={onNew} aria-label="Новый чат">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onNew}
+          aria-label={t("Новый чат")}
+        >
           <Plus className="size-4" aria-hidden="true" />
         </Button>
         <Button
@@ -71,7 +77,7 @@ export function AssistantThreadSwitcher({
           variant="ghost"
           size="icon"
           onClick={onClose}
-          aria-label="Скрыть панель"
+          aria-label={t("Скрыть панель")}
         >
           <X className="size-4" aria-hidden="true" />
         </Button>
@@ -80,25 +86,25 @@ export function AssistantThreadSwitcher({
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <Button type="button" className="w-full" onClick={onNew} data-testid="assistant-new-thread">
           <MessageSquarePlus className="size-4" aria-hidden="true" />
-          Новый чат
+          {t("Новый чат")}
         </Button>
 
         {runs.isPending ? (
           <div className="py-12">
-            <Spinner label="Загружаем чаты…" />
+            <Spinner label={t("Загружаем чаты…")} />
           </div>
         ) : runs.isError ? (
           <Banner
             variant="danger"
-            title="Чаты недоступны"
-            body="Обновите список или продолжите работу с открытой рукописью."
+            title={t("Чаты недоступны")}
+            body={t("Обновите список или продолжите работу с открытой рукописью.")}
           />
         ) : runs.data.runs.length === 0 ? (
           <div className="mt-4 rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-paper)] p-5 text-center">
             <Bot className="mx-auto size-5 text-[var(--accent)]" aria-hidden="true" />
-            <p className="mt-3 text-sm font-semibold">Пока нет поручений</p>
+            <p className="mt-3 text-sm font-semibold">{t("Пока нет поручений")}</p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--ink-secondary)]">
-              Начните чат — рукопись и контекст проекта останутся общими.
+              {t("Начните чат — рукопись и контекст проекта останутся общими.")}
             </p>
           </div>
         ) : (
@@ -138,8 +144,8 @@ export function AssistantThreadSwitcher({
       </div>
 
       <footer className="shrink-0 border-t border-[var(--border-subtle)] px-4 py-3 text-center text-[10px] leading-4 text-[var(--ink-tertiary)]">
-        {assistantThreadCountLabel(runs.data?.runs.length ?? 0)} · рукопись общая, выполнение
-        независимое
+        {assistantThreadCountLabel(runs.data?.runs.length ?? 0)}
+        {t(" · рукопись общая, выполнение независимое")}
       </footer>
     </aside>
   );
@@ -189,7 +195,7 @@ function AssistantThreadRow({
           {assistantThreadTitle(run)}
         </span>
         <span className="mt-0.5 block truncate text-[10px] text-[var(--ink-tertiary)]">
-          {targetTitle ?? "Весь проект"} · {assistantThreadUpdatedLabel(run.updatedAt)}
+          {targetTitle ?? t("Весь проект")} · {assistantThreadUpdatedLabel(run.updatedAt)}
         </span>
       </span>
       <span

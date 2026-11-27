@@ -33,7 +33,6 @@ import {
   useRef,
   useState,
 } from "react";
-
 import {
   type AssistantEvent,
   type AssistantInputMode,
@@ -54,6 +53,7 @@ import {
 import { getProject } from "~entities/project";
 import { LivePCMStream } from "~features/dictation";
 import { APIError } from "~shared/api";
+import { localizeMessage, t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import { AssistantMessage, Banner, Button, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
@@ -313,7 +313,8 @@ export function AssistantSessionPage({
       void queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] });
       void queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] });
     },
-    onError: (error) => showToast({ title: "Поручение не отправлено", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Поручение не отправлено"), description: error.message }),
   });
   const stopRun = useMutation({
     mutationFn: () => stopAssistantRun(runId),
@@ -344,10 +345,10 @@ export function AssistantSessionPage({
           queryKey: ["assistant-change-set", runId, changeSet.id],
         }),
       ]);
-      showToast({ title: "Изменение отменено" });
+      showToast({ title: t("Изменение отменено") });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось отменить изменение", description: error.message }),
+      showToast({ title: t("Не удалось отменить изменение"), description: error.message }),
   });
   const applyReadyChange = useMutation({
     mutationFn: ({
@@ -367,9 +368,9 @@ export function AssistantSessionPage({
         }),
       ]);
       showToast({
-        title: "Изменение применено",
-        description: "Рукопись обновлена без выхода из Studio.",
-        actionLabel: "Отменить",
+        title: t("Изменение применено"),
+        description: t("Рукопись обновлена без выхода из Studio."),
+        actionLabel: t("Отменить"),
         onAction: () => undoAppliedChange.mutate(changeSet.id),
       });
     },
@@ -381,12 +382,12 @@ export function AssistantSessionPage({
           queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
         ]);
         showToast({
-          title: "Предложение устарело",
-          description: "Другой чат или ручная правка уже изменили рукопись.",
+          title: t("Предложение устарело"),
+          description: t("Другой чат или ручная правка уже изменили рукопись."),
         });
         return;
       }
-      showToast({ title: "Изменение не применено", description: error.message });
+      showToast({ title: t("Изменение не применено"), description: error.message });
     },
   });
   const pendingBaseStale = useMemo(() => {
@@ -409,13 +410,12 @@ export function AssistantSessionPage({
       const originalTurn =
         turns.data?.turns.find((turn) => turn.id === staleTurnId) ?? turns.data?.turns.at(-1);
       const originalInstruction = originalTurn?.instruction.trim();
-      if (!originalInstruction) throw new Error("Исходное поручение недоступно");
+      if (!originalInstruction) throw new Error(t("Исходное поручение недоступно"));
       return createAssistantTurn(runId, {
-        instruction:
-          `Обнови предложение по текущей версии рукописи. Исходное поручение: ${originalInstruction}`.slice(
-            0,
-            32_000,
-          ),
+        instruction: t(
+          "Обнови предложение по текущей версии рукописи. Исходное поручение: {0}",
+          originalInstruction,
+        ).slice(0, 32_000),
         inputMode: "chat",
         requireConfirmation: false,
         execute: true,
@@ -429,12 +429,12 @@ export function AssistantSessionPage({
         queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] }),
       ]);
       showToast({
-        title: "Предложение обновляется",
-        description: "Другие чаты продолжают работу.",
+        title: t("Предложение обновляется"),
+        description: t("Другие чаты продолжают работу."),
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось обновить предложение", description: error.message }),
+      showToast({ title: t("Не удалось обновить предложение"), description: error.message }),
   });
   const staleChangeSetRef = useRef("");
   useEffect(() => {
@@ -535,7 +535,7 @@ export function AssistantSessionPage({
         void queryClient.invalidateQueries({ queryKey: ["assistant-turns", runId] });
       }
       if (payload.type === "stream_degraded") {
-        setVoiceError("Распознавание речи временно недоступно. Переключитесь в чат.");
+        setVoiceError(t("Распознавание речи временно недоступно. Переключитесь в чат."));
       }
       if (payload.type === "live_flushed") resolveVoiceFlush();
       if (payload.type === "confirmation_dismissed") {
@@ -543,16 +543,18 @@ export function AssistantSessionPage({
         setVoiceState("listening");
       }
       if (payload.type === "command_recognized") {
-        showToast({ title: payload.label ?? "Голосовая команда распознана" });
+        showToast({
+          title: payload.label ? localizeMessage(payload.label) : t("Голосовая команда распознана"),
+        });
       }
       if (payload.type === "command_rejected") {
         showToast({
-          title: "Команда не выполнена",
-          description: "Сначала надиктуйте поручение.",
+          title: t("Команда не выполнена"),
+          description: t("Сначала надиктуйте поручение."),
         });
       }
     };
-    socket.onerror = () => setVoiceError("Не удалось открыть голосовой поток.");
+    socket.onerror = () => setVoiceError(t("Не удалось открыть голосовой поток."));
     socket.onclose = () => {
       resolveVoiceFlush();
       if (socketRef.current === socket) socketRef.current = undefined;
@@ -613,7 +615,7 @@ export function AssistantSessionPage({
           socket.send(JSON.stringify({ type: "edit_transcript", text: value }));
         })
         .catch(() => {
-          setVoiceError("Не удалось сохранить исправление стенограммы.");
+          setVoiceError(t("Не удалось сохранить исправление стенограммы."));
         });
     }, 250);
   };
@@ -623,7 +625,7 @@ export function AssistantSessionPage({
     voiceAttemptRef.current = attempt;
     setVoiceError(undefined);
     if (!voiceClientAvailable) {
-      setVoiceError("Для голоса откройте приложение по HTTPS или через localhost.");
+      setVoiceError(t("Для голоса откройте приложение по HTTPS или через localhost."));
       return;
     }
     setVoiceState("connecting");
@@ -684,7 +686,7 @@ export function AssistantSessionPage({
       if (voiceAttemptRef.current !== attempt) return;
       await closeVoice();
       setVoiceState("idle");
-      setVoiceError("Разрешите доступ к микрофону или используйте чат.");
+      setVoiceError(t("Разрешите доступ к микрофону или используйте чат."));
     }
   };
 
@@ -718,7 +720,7 @@ export function AssistantSessionPage({
       setVoiceState("idle");
       void queryClient.invalidateQueries({ queryKey: ["assistant-turns", runId] });
     } catch {
-      setVoiceError("Не удалось закрыть голосовой черновик. Вернитесь к голосу и повторите.");
+      setVoiceError(t("Не удалось закрыть голосовой черновик. Вернитесь к голосу и повторите."));
       localStorage.setItem(assistantModeKey, "voice");
       setMode("voice");
     }
@@ -750,20 +752,20 @@ export function AssistantSessionPage({
     onLivePreviewChange(livePreview);
   }, [livePreview, onLivePreviewChange]);
 
-  if (run.isPending || project.isPending) return <Spinner label="Открываем ассистента…" />;
+  if (run.isPending || project.isPending) return <Spinner label={t("Открываем ассистента…")} />;
   if (run.isError || !run.data || project.isError || !project.data) {
     return (
       <Banner
         variant="danger"
-        title="Сессия недоступна"
-        body="Вернитесь в проект и начните новую."
+        title={t("Сессия недоступна")}
+        body={t("Вернитесь в проект и начните новую.")}
       />
     );
   }
   const currentRun = run.data.run;
   const isRemoteMCP = currentRun.origin === "remote_mcp";
   const remoteAgentLabel = isRemoteMCP
-    ? `Внешний агент · ${currentRun.agent?.clientName ?? currentRun.provider.name}`
+    ? t("Внешний агент · {0}", currentRun.agent?.clientName ?? currentRun.provider.name)
     : undefined;
   const targetNode = currentRun.targetNodeId
     ? project.data.nodes.find((node) => node.id === currentRun.targetNodeId)
@@ -800,7 +802,7 @@ export function AssistantSessionPage({
     return (
       <RequireSession>
         <aside
-          aria-label="Панель ассистента"
+          aria-label={t("Панель ассистента")}
           data-testid="assistant-docked-panel"
           className="flex h-full min-h-0 w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-panel)] xl:w-[360px] xl:shrink-0"
         >
@@ -811,14 +813,18 @@ export function AssistantSessionPage({
               onClick={onOpenThreads}
               disabled={!onOpenThreads}
               className="min-w-0 flex-1 rounded-[var(--radius-sm)] px-1 py-1 text-left outline-none hover:bg-[var(--surface-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--focus)] disabled:hover:bg-transparent"
-              aria-label="Открыть список чатов проекта"
+              aria-label={t("Открыть список чатов проекта")}
             >
               <span className="block truncate text-[9px] font-semibold tracking-[0.1em] text-[var(--ink-tertiary)] uppercase">
-                {remoteAgentLabel ?? "Ассистент"} ·{" "}
-                {isWorking ? "работает" : durableStale ? "нужно обновить" : "готов"}
+                {remoteAgentLabel ?? t("Ассистент")} ·{" "}
+                {isWorking ? t("работает") : durableStale ? t("нужно обновить") : t("готов")}
               </span>
               <span className="flex min-w-0 items-center gap-1 text-sm font-semibold">
-                <span className="truncate">{currentRun.title || "Новый чат"}</span>
+                <span className="truncate">
+                  {currentRun.title && currentRun.title !== "Новый чат"
+                    ? currentRun.title
+                    : t("Новый чат")}
+                </span>
                 {onOpenThreads ? (
                   <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
                 ) : null}
@@ -828,7 +834,7 @@ export function AssistantSessionPage({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Остановить ассистента"
+                aria-label={t("Остановить ассистента")}
                 onClick={() => stopRun.mutate()}
                 disabled={stopRun.isPending}
               >
@@ -840,7 +846,7 @@ export function AssistantSessionPage({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Новый чат"
+                aria-label={t("Новый чат")}
                 onClick={onNewThread}
               >
                 <Plus className="size-4" aria-hidden="true" />
@@ -850,7 +856,7 @@ export function AssistantSessionPage({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Закрыть панель ассистента"
+              aria-label={t("Закрыть панель ассистента")}
               onClick={() => {
                 if (voiceState === "listening" || voiceState === "connecting") {
                   void pauseListening();
@@ -865,25 +871,25 @@ export function AssistantSessionPage({
           <div className="border-b border-[var(--border-subtle)] px-3 py-3">
             <fieldset
               className="grid grid-cols-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-1"
-              aria-label="Режим общения"
+              aria-label={t("Режим общения")}
               disabled={isRemoteMCP}
             >
               <ModeButton
                 active={mode === "voice"}
                 icon={Mic2}
-                label="Голосом"
+                label={t("Голосом")}
                 disabled={!voiceClientAvailable}
                 onClick={() => void selectMode("voice")}
               />
               <ModeButton
                 active={mode === "chat"}
                 icon={MessageCircle}
-                label="Чат"
+                label={t("Чат")}
                 onClick={() => void selectMode("chat")}
               />
             </fieldset>
             <p className="mt-2 truncate text-center text-[10px] text-[var(--ink-tertiary)]">
-              {targetNode?.title ?? targetLabel ?? "Весь проект"} ·{" "}
+              {targetNode?.title ?? targetLabel ?? t("Весь проект")} ·{" "}
               {remoteAgentLabel ?? currentRun.provider.model}
             </p>
             {selectionAttachment ? (
@@ -893,7 +899,9 @@ export function AssistantSessionPage({
                   aria-hidden="true"
                 />
                 <div className="min-w-0">
-                  <p className="font-semibold text-[var(--accent-ink)]">Фрагмент прикреплён</p>
+                  <p className="font-semibold text-[var(--accent-ink)]">
+                    {t("Фрагмент прикреплён")}
+                  </p>
                   <p className="mt-0.5 line-clamp-2 text-[var(--ink-secondary)]">
                     {selectionAttachment.quote}
                   </p>
@@ -903,7 +911,7 @@ export function AssistantSessionPage({
           </div>
 
           <section
-            aria-label="Стенограмма сессии"
+            aria-label={t("Стенограмма сессии")}
             className="relative min-h-0 flex-1 overflow-hidden bg-[var(--surface-paper)]"
           >
             <div
@@ -943,7 +951,8 @@ export function AssistantSessionPage({
                 onClick={() => scrollTranscriptToEnd()}
                 className="absolute right-3 bottom-3 inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface-paper)] px-3 text-[11px] font-medium shadow-lg"
               >
-                <ArrowDown className="size-3.5" aria-hidden="true" />К новым
+                <ArrowDown className="size-3.5" aria-hidden="true" />
+                {t("К новым")}
               </button>
             ) : null}
           </section>
@@ -956,16 +965,20 @@ export function AssistantSessionPage({
               >
                 <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.08em] text-[var(--warning)] uppercase">
                   <GitCompareArrows className="size-3.5" aria-hidden="true" />
-                  Конфликт версий
+                  {t("Конфликт версий")}
                 </div>
-                <p className="mt-2 text-sm font-semibold">Предложение устарело</p>
+                <p className="mt-2 text-sm font-semibold">{t("Предложение устарело")}</p>
                 <p className="mt-1 text-[11px] leading-4 text-[var(--ink-secondary)]">
-                  Другой чат или ручная правка уже изменили {conflictTarget?.title ?? "рукопись"}.
-                  Старый preview применить нельзя.
+                  {t("Другой чат или ручная правка уже изменили ")}
+                  {conflictTarget?.title ?? t("рукопись")}
+                  {t(". Старый preview применить нельзя.")}
                 </p>
                 <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--surface-paper)] px-2 py-1.5 text-[10px] text-[var(--warning)]">
                   <RefreshCw className="size-3" aria-hidden="true" />
-                  Основа r{conflictBaseRevision ?? "—"} · сейчас r{conflictCurrentRevision ?? "—"}
+                  {t("Основа r")}
+                  {conflictBaseRevision ?? "—"}
+                  {t(" · сейчас r")}
+                  {conflictCurrentRevision ?? "—"}
                 </div>
                 <Button
                   type="button"
@@ -974,7 +987,7 @@ export function AssistantSessionPage({
                   disabled={refreshStaleProposal.isPending || isWorking}
                 >
                   <RefreshCw className="size-4" aria-hidden="true" />
-                  {refreshStaleProposal.isPending ? "Обновляем…" : "Обновить предложение"}
+                  {refreshStaleProposal.isPending ? t("Обновляем…") : t("Обновить предложение")}
                 </Button>
                 {onOpenThreads ? (
                   <Button
@@ -984,11 +997,13 @@ export function AssistantSessionPage({
                     className="mt-1 w-full"
                     onClick={onOpenThreads}
                   >
-                    Отложить и открыть другие чаты
+                    {t("Отложить и открыть другие чаты")}
                   </Button>
                 ) : null}
                 <p className="mt-2 text-[10px] leading-4 text-[var(--ink-tertiary)]">
-                  Конфликт относится только к этому предложению; остальные чаты продолжают работу.
+                  {t(
+                    "Конфликт относится только к этому предложению; остальные чаты продолжают работу.",
+                  )}
                 </p>
               </div>
             ) : pending ? (
@@ -996,14 +1011,15 @@ export function AssistantSessionPage({
                 className="rounded-[var(--radius-md)] border border-[var(--info)] bg-[var(--info-soft)] p-3"
                 data-testid="assistant-change-set-card"
               >
-                <p className="text-sm font-semibold">Изменение готово к проверке</p>
+                <p className="text-sm font-semibold">{t("Изменение готово к проверке")}</p>
                 <p className="mt-1 text-[11px] text-[var(--ink-secondary)]">
-                  {pending.operations.length} операций · рукопись ещё не изменена
+                  {pending.operations.length}
+                  {t(" операций · рукопись ещё не изменена")}
                 </p>
                 {onReview ? (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button variant="secondary" onClick={() => onReview(pending.id)}>
-                      Проверить изменения
+                      {t("Проверить изменения")}
                     </Button>
                     <Button
                       onClick={() =>
@@ -1017,7 +1033,7 @@ export function AssistantSessionPage({
                       disabled={applyReadyChange.isPending}
                     >
                       <Check className="size-4" aria-hidden="true" />
-                      {applyReadyChange.isPending ? "Применяем…" : "Применить сразу"}
+                      {applyReadyChange.isPending ? t("Применяем…") : t("Применить сразу")}
                     </Button>
                   </div>
                 ) : (
@@ -1026,7 +1042,7 @@ export function AssistantSessionPage({
                       to="/projects/$projectId/assistant/$runId/review/$changeSetId"
                       params={{ projectId, runId, changeSetId: pending.id }}
                     >
-                      Проверить изменения
+                      {t("Проверить изменения")}
                       <ArrowRight className="size-4" aria-hidden="true" />
                     </Link>
                   </Button>
@@ -1038,7 +1054,7 @@ export function AssistantSessionPage({
               <form onSubmit={submitChat}>
                 {voiceDraft ? (
                   <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--warning)]/35 bg-[var(--warning-soft)] p-3">
-                    <p className="text-xs font-semibold">Голосовой черновик сохранён</p>
+                    <p className="text-xs font-semibold">{t("Голосовой черновик сохранён")}</p>
                     <p className="mt-1 line-clamp-2 text-[11px] text-[var(--ink-secondary)]">
                       {voiceDraft}
                     </p>
@@ -1048,7 +1064,7 @@ export function AssistantSessionPage({
                         size="compact"
                         onClick={() => void resolveVoiceDraft("transfer")}
                       >
-                        Перенести в чат
+                        {t("Перенести в чат")}
                       </Button>
                       <Button
                         type="button"
@@ -1056,7 +1072,7 @@ export function AssistantSessionPage({
                         variant="ghost"
                         onClick={() => void selectMode("voice")}
                       >
-                        Вернуться
+                        {t("Вернуться")}
                       </Button>
                       <Button
                         type="button"
@@ -1064,19 +1080,19 @@ export function AssistantSessionPage({
                         variant="ghost"
                         onClick={() => void resolveVoiceDraft("discard")}
                       >
-                        Удалить
+                        {t("Удалить")}
                       </Button>
                     </div>
                   </div>
                 ) : null}
                 <label htmlFor="assistant-message-docked" className="sr-only">
-                  Поручение ассистенту
+                  {t("Поручение ассистенту")}
                 </label>
                 <textarea
                   id="assistant-message-docked"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  placeholder="Напишите, что изменить в рукописи…"
+                  placeholder={t("Напишите, что изменить в рукописи…")}
                   rows={3}
                   maxLength={32_000}
                   className="w-full resize-none rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] px-3 py-2 text-sm leading-5 outline-none focus:border-[var(--focus)]"
@@ -1102,7 +1118,7 @@ export function AssistantSessionPage({
                     }
                   >
                     <Send className="size-3.5" aria-hidden="true" />
-                    Отправить
+                    {t("Отправить")}
                   </Button>
                 </div>
               </form>
@@ -1121,7 +1137,7 @@ export function AssistantSessionPage({
             asChild
             variant="ghost"
             size="icon"
-            aria-label={targetNode ? "Вернуться в студию" : "Вернуться в проект"}
+            aria-label={targetNode ? t("Вернуться в студию") : t("Вернуться в проект")}
           >
             <Link
               to={targetNode ? "/projects/$projectId/studio/$nodeId" : "/projects/$projectId"}
@@ -1133,11 +1149,11 @@ export function AssistantSessionPage({
           <Bot className="size-5 text-[var(--accent)]" aria-hidden="true" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">
-              {remoteAgentLabel ?? "Ассистент"} · {project.data.project.title}
+              {remoteAgentLabel ?? t("Ассистент")} · {project.data.project.title}
             </p>
             <p className="truncate text-[11px] text-[var(--ink-tertiary)]">
-              {targetNode ? `Пишет в «${targetNode.title}»` : "Работает по всему проекту"} · читает{" "}
-              {project.data.project.structure.rootLabel.toLocaleLowerCase()}
+              {targetNode ? t("Пишет в «{0}»", targetNode.title) : t("Работает по всему проекту")}
+              {t(" · читает")} {project.data.project.structure.rootLabel.toLocaleLowerCase()}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -1152,7 +1168,7 @@ export function AssistantSessionPage({
                 disabled={stopRun.isPending}
               >
                 <Square className="size-3.5" aria-hidden="true" />
-                Остановить
+                {t("Остановить")}
               </Button>
             ) : null}
           </div>
@@ -1163,20 +1179,20 @@ export function AssistantSessionPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <fieldset
                 className="inline-flex rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-1"
-                aria-label="Режим общения"
+                aria-label={t("Режим общения")}
                 disabled={isRemoteMCP}
               >
                 <ModeButton
                   active={mode === "voice"}
                   icon={Mic2}
-                  label="Голосом"
+                  label={t("Голосом")}
                   disabled={!voiceClientAvailable}
                   onClick={() => void selectMode("voice")}
                 />
                 <ModeButton
                   active={mode === "chat"}
                   icon={MessageCircle}
-                  label="Чат"
+                  label={t("Чат")}
                   onClick={() => void selectMode("chat")}
                 />
               </fieldset>
@@ -1185,7 +1201,7 @@ export function AssistantSessionPage({
                   {remoteAgentLabel ?? `${currentRun.provider.name} · ${currentRun.provider.model}`}
                 </span>
                 <span className="rounded-full bg-[var(--surface-subtle)] px-3 py-2">
-                  {currentRun.targetKind === "node" ? "Точная цель" : "Весь проект"}
+                  {currentRun.targetKind === "node" ? t("Точная цель") : t("Весь проект")}
                 </span>
               </div>
             </div>
@@ -1193,8 +1209,10 @@ export function AssistantSessionPage({
             {!voiceClientAvailable ? (
               <Banner
                 variant="warning"
-                title="Голос заблокирован текущим адресом"
-                body="Браузер разрешает микрофон только по HTTPS или на localhost. Чат и проверка изменений продолжают работать без микрофона."
+                title={t("Голос заблокирован текущим адресом")}
+                body={t(
+                  "Браузер разрешает микрофон только по HTTPS или на localhost. Чат и проверка изменений продолжают работать без микрофона.",
+                )}
                 action={
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1206,10 +1224,10 @@ export function AssistantSessionPage({
                         setMode("chat");
                       }}
                     >
-                      Открыть чат
+                      {t("Открыть чат")}
                     </Button>
                     <Button asChild variant="secondary" size="compact">
-                      <a href={assistantLocalhostURL()}>Открыть localhost</a>
+                      <a href={assistantLocalhostURL()}>{t("Открыть localhost")}</a>
                     </Button>
                   </div>
                 }
@@ -1218,7 +1236,7 @@ export function AssistantSessionPage({
           </div>
 
           <section
-            aria-label="Стенограмма сессии"
+            aria-label={t("Стенограмма сессии")}
             className="relative min-h-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)]"
           >
             <div
@@ -1269,7 +1287,8 @@ export function AssistantSessionPage({
                 onClick={() => scrollTranscriptToEnd()}
                 className="absolute right-4 bottom-4 inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface-paper)] px-4 text-xs font-medium text-[var(--accent-ink)] shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
               >
-                <ArrowDown className="size-4" aria-hidden="true" />К новым сообщениям
+                <ArrowDown className="size-4" aria-hidden="true" />
+                {t("К новым сообщениям")}
               </button>
             ) : null}
           </section>
@@ -1281,9 +1300,10 @@ export function AssistantSessionPage({
                   <FileSearch className="size-5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">Изменение готово к проверке</p>
+                  <p className="font-semibold">{t("Изменение готово к проверке")}</p>
                   <p className="mt-1 text-[12px] text-[var(--ink-secondary)]">
-                    {pending.operations.length} операций · пока ничего не применено
+                    {pending.operations.length}
+                    {t(" операций · пока ничего не применено")}
                   </p>
                 </div>
                 <Button asChild variant="secondary">
@@ -1291,7 +1311,7 @@ export function AssistantSessionPage({
                     to="/projects/$projectId/assistant/$runId/review/$changeSetId"
                     params={{ projectId, runId, changeSetId: pending.id }}
                   >
-                    Проверить
+                    {t("Проверить")}
                     <ArrowRight className="size-4" aria-hidden="true" />
                   </Link>
                 </Button>
@@ -1305,7 +1325,7 @@ export function AssistantSessionPage({
               >
                 {voiceDraft ? (
                   <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning)]/35 bg-[var(--warning-soft)] p-3">
-                    <p className="text-sm font-semibold">Голосовой черновик сохранён</p>
+                    <p className="text-sm font-semibold">{t("Голосовой черновик сохранён")}</p>
                     <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-[var(--ink-secondary)]">
                       {voiceDraft}
                     </p>
@@ -1315,7 +1335,7 @@ export function AssistantSessionPage({
                         size="compact"
                         onClick={() => void resolveVoiceDraft("transfer")}
                       >
-                        Перенести в чат
+                        {t("Перенести в чат")}
                       </Button>
                       <Button
                         type="button"
@@ -1323,7 +1343,7 @@ export function AssistantSessionPage({
                         variant="secondary"
                         onClick={() => void selectMode("voice")}
                       >
-                        Вернуться к голосу
+                        {t("Вернуться к голосу")}
                       </Button>
                       <Button
                         type="button"
@@ -1331,19 +1351,21 @@ export function AssistantSessionPage({
                         variant="ghost"
                         onClick={() => void resolveVoiceDraft("discard")}
                       >
-                        Удалить черновик
+                        {t("Удалить черновик")}
                       </Button>
                     </div>
                   </div>
                 ) : null}
                 <label htmlFor="assistant-message" className="sr-only">
-                  Поручение ассистенту
+                  {t("Поручение ассистенту")}
                 </label>
                 <textarea
                   id="assistant-message"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  placeholder="Напишите поручение: «Сделай диалог менее прямолинейным, но не меняй последнюю реплику»"
+                  placeholder={t(
+                    "Напишите поручение: «Сделай диалог менее прямолинейным, но не меняй последнюю реплику»",
+                  )}
                   rows={3}
                   maxLength={32_000}
                   className="w-full resize-none bg-transparent text-[14px] leading-[1.5] outline-none placeholder:text-[var(--ink-tertiary)]"
@@ -1357,7 +1379,7 @@ export function AssistantSessionPage({
                 />
                 <div className="mt-3 flex items-center justify-between">
                   <p className="text-[11px] text-[var(--ink-tertiary)]">
-                    Ctrl/⌘ + Enter · изменения всегда через review
+                    {t("Ctrl/⌘ + Enter · изменения всегда через review")}
                   </p>
                   <Button
                     type="submit"
@@ -1370,7 +1392,7 @@ export function AssistantSessionPage({
                     }
                   >
                     <Send className="size-4" aria-hidden="true" />
-                    Отправить
+                    {t("Отправить")}
                   </Button>
                 </div>
               </form>
@@ -1455,19 +1477,21 @@ function VoiceComposer({
           )}
         />
         {connecting
-          ? "Подключаю голос"
+          ? t("Подключаю голос")
           : listening
-            ? "Слушаю поручение"
+            ? t("Слушаю поручение")
             : state === "confirming"
-              ? "Проверьте стенограмму"
-              : "Голосовой live-режим"}
+              ? t("Проверьте стенограмму")
+              : t("Голосовой live-режим")}
       </div>
-      {error ? <Banner variant="warning" title="Голос недоступен" body={error} /> : null}
+      {error ? <Banner variant="warning" title={t("Голос недоступен")} body={error} /> : null}
       <textarea
-        aria-label="Стенограмма поручения"
+        aria-label={t("Стенограмма поручения")}
         value={transcript}
         onChange={(event) => onTranscript(event.target.value)}
-        placeholder="Нажмите «Начать» и говорите свободно. Здесь появится точная стенограмма поручения…"
+        placeholder={t(
+          "Нажмите «Начать» и говорите свободно. Здесь появится точная стенограмма поручения…",
+        )}
         className={cn(
           "font-ui flex-1 resize-none bg-transparent outline-none placeholder:text-[var(--ink-disabled)]",
           compact
@@ -1483,7 +1507,7 @@ function VoiceComposer({
             compact ? "text-[13px] leading-5" : "text-[16px]",
           )}
         >
-          <span className="mr-2 text-[9px] tracking-wider uppercase">Распознаётся</span>
+          <span className="mr-2 text-[9px] tracking-wider uppercase">{t("Распознаётся")}</span>
           {partial}
         </div>
       ) : null}
@@ -1500,7 +1524,7 @@ function VoiceComposer({
           )}
         >
           <ShieldCheck className="size-4 text-[var(--accent)]" aria-hidden="true" />
-          Поручение не отправлено, пока вы не нажмёте «Выполнить»
+          {t("Поручение не отправлено, пока вы не нажмёте «Выполнить»")}
         </div>
         <div className="flex gap-2">
           {capturing ? (
@@ -1510,12 +1534,12 @@ function VoiceComposer({
               ) : (
                 <Pause className="size-4" aria-hidden="true" />
               )}
-              {connecting ? "Отмена" : "Пауза"}
+              {connecting ? t("Отмена") : t("Пауза")}
             </Button>
           ) : (
             <Button type="button" variant="secondary" onClick={onStart} disabled={disabled}>
               <Mic2 className="size-4" aria-hidden="true" />
-              {transcript ? "Продолжить" : "Начать"}
+              {transcript ? t("Продолжить") : t("Начать")}
             </Button>
           )}
           <Button
@@ -1524,7 +1548,7 @@ function VoiceComposer({
             disabled={!transcript.trim() || capturing || disabled}
           >
             <Check className="size-4" aria-hidden="true" />
-            Выполнить
+            {t("Выполнить")}
           </Button>
         </div>
       </div>
@@ -1556,10 +1580,11 @@ function Conversation({
         <div className="grid min-h-72 place-items-center text-center">
           <div>
             <MessageCircle className="mx-auto size-8 text-[var(--accent)]" aria-hidden="true" />
-            <h2 className="font-display mt-4 text-2xl">Поручите работу, не покидая поток</h2>
+            <h2 className="font-display mt-4 text-2xl">{t("Поручите работу, не покидая поток")}</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-[var(--ink-secondary)]">
-              Ассистент видит структуру этого типа проекта, словарь, guide и память. Любая запись
-              сначала станет проверяемым предложением.
+              {t(
+                "Ассистент видит структуру этого типа проекта, словарь, guide и память. Любая запись сначала станет проверяемым предложением.",
+              )}
             </p>
           </div>
         </div>
@@ -1583,12 +1608,12 @@ function Conversation({
                   )}
                 >
                   <p className="mb-2 text-[9px] font-semibold tracking-wider text-[var(--accent)] uppercase">
-                    {focusedVoiceTurn ? "Стенограмма поручения" : "Вы"} ·{" "}
+                    {focusedVoiceTurn ? t("Стенограмма поручения") : t("Вы")} ·{" "}
                     {turn.inputMode === "voice"
-                      ? "голосом"
+                      ? t("голосом")
                       : turn.inputMode === "mcp"
-                        ? "через MCP"
-                        : "в чате"}
+                        ? t("через MCP")
+                        : t("в чате")}
                   </p>
                   <AssistantMessage
                     compact={compact}
@@ -1608,7 +1633,7 @@ function Conversation({
                 {turn.assistantText ? (
                   <article className="mt-3 max-w-[92%] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-5 py-4 text-[14px]">
                     <p className="mb-2 text-[9px] font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
-                      Ассистент
+                      {t("Ассистент")}
                     </p>
                     <AssistantMessage
                       compact={compact}
@@ -1632,7 +1657,7 @@ function Conversation({
                       aria-hidden="true"
                     />
                     <div>
-                      <p className="font-semibold">Шаг не завершён</p>
+                      <p className="font-semibold">{t("Шаг не завершён")}</p>
                       <p className="text-[var(--ink-secondary)]">
                         {assistantFailureMessage(turn.errorCode)}
                       </p>
@@ -1645,7 +1670,7 @@ function Conversation({
         </div>
       )}
       {nativeActions.length > 0 ? (
-        <section aria-label="Действия в приложении" className="mt-5 space-y-3">
+        <section aria-label={t("Действия в приложении")} className="mt-5 space-y-3">
           {nativeActions.map((action) => (
             <AssistantNativeActionCard key={action.id} action={action} />
           ))}
@@ -1656,7 +1681,9 @@ function Conversation({
         <details className="mt-5 border-t border-[var(--border-subtle)] pt-3">
           <summary className="flex cursor-pointer items-center gap-2 text-[11px] text-[var(--ink-tertiary)]">
             <History className="size-3.5" aria-hidden="true" />
-            Ход выполнения · {activity.length} шагов
+            {t("Ход выполнения · ")}
+            {activity.length}
+            {t(" шагов")}
           </summary>
           <ol className="mt-3 space-y-1 text-[12px] text-[var(--ink-secondary)]">
             {activity.map((item) => (
@@ -1687,28 +1714,32 @@ function AssistantNativeActionCard({ action }: { action: AssistantNativeAction }
     { title: string; description: string; action: string }
   > = {
     archive_node: {
-      title: "Архивация требует подтверждения",
-      description:
+      title: t("Архивация требует подтверждения"),
+      description: t(
         "Ассистент ничего не архивировал. Откройте документ и подтвердите действие в его меню.",
-      action: "Открыть документ",
+      ),
+      action: t("Открыть документ"),
     },
     restore_version: {
-      title: "Восстановление версии требует подтверждения",
-      description:
+      title: t("Восстановление версии требует подтверждения"),
+      description: t(
         "Текущий текст не изменён. Сравните версию с текущей и подтвердите восстановление в истории.",
-      action: "Открыть версии",
+      ),
+      action: t("Открыть версии"),
     },
     retranscribe: {
-      title: "Повторная обработка требует подтверждения",
-      description:
+      title: t("Повторная обработка требует подтверждения"),
+      description: t(
         "Исходная стенограмма сохранена. Запустите повторную обработку на штатном экране диктовки.",
-      action: "Открыть стенограмму",
+      ),
+      action: t("Открыть стенограмму"),
     },
     export: {
-      title: "Экспорт готов к настройке",
-      description:
+      title: t("Экспорт готов к настройке"),
+      description: t(
         "Файл ещё не создан. Проверьте формат и состав проекта на штатном экране экспорта.",
-      action: "Настроить экспорт",
+      ),
+      action: t("Настроить экспорт"),
     },
   };
   const content = copy[action.kind];
@@ -1802,7 +1833,7 @@ function AssistantActivity({
     <section
       role="status"
       aria-live="polite"
-      aria-label="Ход работы ассистента"
+      aria-label={t("Ход работы ассистента")}
       className="mt-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/45"
     >
       <div className={cn("flex items-start gap-3", compact ? "px-4 py-3" : "px-5 py-4")}>
@@ -1811,13 +1842,13 @@ function AssistantActivity({
         </span>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold tracking-[0.12em] text-[var(--accent)] uppercase">
-            Ассистент работает
+            {t("Ассистент работает")}
           </p>
           <p className={cn("mt-1 font-medium", compact ? "text-[13px]" : "text-sm")}>
-            {current?.label ?? "Разбирает поручение и планирует безопасные шаги"}
+            {current?.label ?? t("Разбирает поручение и планирует безопасные шаги")}
           </p>
           <p className="mt-1 text-[11px] text-[var(--ink-secondary)]">
-            Все изменения появятся в отдельном просмотре до применения.
+            {t("Все изменения появятся в отдельном просмотре до применения.")}
           </p>
         </div>
       </div>

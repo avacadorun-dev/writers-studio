@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-
 import type { DocumentNode, Project } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import { type SaveState, SaveStatus } from "~shared/ui";
 import { ProjectTree } from "~widgets/project-tree";
@@ -39,7 +39,7 @@ export function ProjectUtilityShell({
     return (
       <RequireSession>
         <main className="grid min-h-full place-items-center p-6 text-sm text-[var(--ink-secondary)]">
-          Сначала создайте документ в проекте.
+          {t("Сначала создайте документ в проекте.")}
         </main>
       </RequireSession>
     );

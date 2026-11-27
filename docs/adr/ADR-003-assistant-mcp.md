@@ -55,4 +55,4 @@ scoped retrieval. Requiring provider-hosted MCP would create unnecessary couplin
 The local catalog adds schema/orchestration work but keeps domain invariants
 consistent. Remote MCP is a separately authenticated gateway described in
 [ADR-008](ADR-008-remote-mcp-gateway.md). Detailed behavior is in the
-[assistant specification](../specification/ASSISTANT_MODE.md).
+[assistant specification](../../openspec/specs/assistant/spec.md).

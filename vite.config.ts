@@ -58,9 +58,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
       manifest: {
-        name: "Студия автора",
-        short_name: "Студия",
-        description: "Голос, черновик и рукопись в одном безопасном пространстве.",
+        name: "Writer's Studio",
+        short_name: "Studio",
+        description: "A workspace for voice capture, drafts and manuscripts.",
+        lang: "en",
         display: "standalone",
         start_url: "/projects",
         icons: [

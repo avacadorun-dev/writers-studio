@@ -6,6 +6,7 @@ import { NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
 import katex from "katex";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { t } from "~shared/i18n";
 
 import { Button } from "~shared/ui";
 
@@ -29,17 +30,17 @@ export function renderMathSafely(
   description = "",
 ): SafeMathResult {
   const source = latex.trim();
-  const accessibleText = description.trim() || `Формула: ${source || "не задана"}`;
+  const accessibleText = description.trim() || t("Формула: {0}", source || t("не задана"));
   if (!source) {
-    return { ok: false, error: "Введите исходник формулы.", accessibleText };
+    return { ok: false, error: t("Введите исходник формулы."), accessibleText };
   }
   if (source.length > maxMathSourceLength) {
-    return { ok: false, error: "Формула слишком длинная.", accessibleText };
+    return { ok: false, error: t("Формула слишком длинная."), accessibleText };
   }
   if (unsafeMathCommand.test(source)) {
     return {
       ok: false,
-      error: "Эта команда отключена для безопасного отображения формул.",
+      error: t("Эта команда отключена для безопасного отображения формул."),
       accessibleText,
     };
   }
@@ -59,7 +60,7 @@ export function renderMathSafely(
   } catch {
     return {
       ok: false,
-      error: "Не удалось отобразить формулу. Проверьте синтаксис LaTeX.",
+      error: t("Не удалось отобразить формулу. Проверьте синтаксис LaTeX."),
       accessibleText,
     };
   }
@@ -214,7 +215,7 @@ function normalizedMathAttributes(attributes: MathAttributes): MathAttributes {
 
 function mathAccessibleText(node: ProseMirrorNode): string {
   const description = String(node.attrs.description ?? "").trim();
-  return description || `Формула: ${String(node.attrs.latex ?? "")}`;
+  return description || t("Формула: {0}", String(node.attrs.latex ?? ""));
 }
 
 function InlineMathView({ node, selected, updateAttributes }: NodeViewProps) {
@@ -244,7 +245,7 @@ function InlineMathView({ node, selected, updateAttributes }: NodeViewProps) {
             <span>LaTeX</span>
             <input
               value={source}
-              aria-label="Исходник строчной формулы"
+              aria-label={t("Исходник строчной формулы")}
               spellCheck={false}
               onChange={(event) => setSource(event.target.value)}
               onBlur={() =>
@@ -253,10 +254,10 @@ function InlineMathView({ node, selected, updateAttributes }: NodeViewProps) {
             />
           </label>
           <label>
-            <span>Описание</span>
+            <span>{t("Описание")}</span>
             <input
               value={description}
-              aria-label="Описание строчной формулы"
+              aria-label={t("Описание строчной формулы")}
               onChange={(event) => setDescription(event.target.value)}
               onBlur={() =>
                 updateAttributes(normalizedMathAttributes({ latex: source, description }))
@@ -292,14 +293,14 @@ function MathBlockView({ node, selected, updateAttributes, deleteNode }: NodeVie
       aria-label={rendered.accessibleText}
     >
       <div className="ws-rich-block-heading" contentEditable={false}>
-        <span>Формула</span>
+        <span>{t("Формула")}</span>
         {selected ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="size-8 min-h-8"
-            aria-label="Удалить формулу"
+            aria-label={t("Удалить формулу")}
             onClick={deleteNode}
           >
             <Trash2 className="size-4" aria-hidden="true" />
@@ -308,10 +309,10 @@ function MathBlockView({ node, selected, updateAttributes, deleteNode }: NodeVie
       </div>
       <MathPreview result={rendered} source={source} />
       <label className="ws-rich-block-field">
-        <span>Исходник LaTeX</span>
+        <span>{t("Исходник LaTeX")}</span>
         <textarea
           value={source}
-          aria-label="Исходник блочной формулы"
+          aria-label={t("Исходник блочной формулы")}
           spellCheck={false}
           rows={3}
           onChange={(event) => setSource(event.target.value)}
@@ -319,11 +320,11 @@ function MathBlockView({ node, selected, updateAttributes, deleteNode }: NodeVie
         />
       </label>
       <label className="ws-rich-block-field">
-        <span>Описание для скринридера</span>
+        <span>{t("Описание для скринридера")}</span>
         <input
           value={description}
-          aria-label="Описание блочной формулы"
-          placeholder="Необязательно — по умолчанию читается исходник"
+          aria-label={t("Описание блочной формулы")}
+          placeholder={t("Необязательно — по умолчанию читается исходник")}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={commit}
         />

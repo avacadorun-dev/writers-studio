@@ -1,7 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { Mic, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-
 import { getSTTCapabilities, type STTCapabilities } from "~entities/dictation";
 import type { DocumentNode, Project } from "~entities/project";
 import {
@@ -9,6 +8,7 @@ import {
   recorderController,
   smoothMicrophoneLevel,
 } from "~features/dictation";
+import { t } from "~shared/i18n";
 import { loadWriterPreferences, saveWriterPreferences } from "~shared/lib";
 import { Banner, Button, Field, ModalDialog, Select, Switch } from "~shared/ui";
 
@@ -288,8 +288,8 @@ export function DictationPreflight({
         setPermission(name === "NotAllowedError" ? "denied" : "unsupported");
         setError(
           name === "NotAllowedError"
-            ? "Разрешите доступ к микрофону в настройках браузера и попробуйте снова."
-            : "Микрофон не найден. Подключите устройство и повторите проверку.",
+            ? t("Разрешите доступ к микрофону в настройках браузера и попробуйте снова.")
+            : t("Микрофон не найден. Подключите устройство и повторите проверку."),
         );
       } finally {
         if (isCurrent()) {
@@ -321,8 +321,8 @@ export function DictationPreflight({
       if (sttBlocked) {
         throw new Error(
           languageSupported
-            ? "Распознавание речи сейчас недоступно. Проверьте настройки провайдера."
-            : "Выбранный язык не поддерживается настроенным распознаванием речи.",
+            ? t("Распознавание речи сейчас недоступно. Проверьте настройки провайдера.")
+            : t("Выбранный язык не поддерживается настроенным распознаванием речи."),
         );
       }
       let activeStream = stream;
@@ -358,7 +358,7 @@ export function DictationPreflight({
       streamHandedOff.current = true;
       onStarted(localId);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось начать запись");
+      setError(cause instanceof Error ? cause.message : t("Не удалось начать запись"));
       setStarting(false);
     }
   };
@@ -369,8 +369,8 @@ export function DictationPreflight({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Подготовка диктовки"
-      description="Проверьте место, язык, микрофон и распознавание речи."
+      title={t("Подготовка диктовки")}
+      description={t("Проверьте место, язык, микрофон и распознавание речи.")}
       className="sm:h-[650px] sm:w-[min(520px,calc(100vw-40px))] sm:p-7"
       footer={
         <Button
@@ -388,14 +388,14 @@ export function DictationPreflight({
           onClick={start}
         >
           <Mic className="size-4" aria-hidden="true" />
-          {starting ? "Начинаем…" : "Начать запись"}
+          {starting ? t("Начинаем…") : t("Начать запись")}
         </Button>
       }
     >
       <div className="grid gap-4">
-        <Field label="Куда вставить после проверки">
+        <Field label={t("Куда вставить после проверки")}>
           <Select value={destination} onChange={(event) => setDestination(event.target.value)}>
-            <option value="">Только в голосовые сессии</option>
+            <option value="">{t("Только в голосовые сессии")}</option>
             {nodes
               .filter((node) => !node.trashedAt)
               .map((node) => (
@@ -407,12 +407,12 @@ export function DictationPreflight({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-[1fr_1.15fr]">
-          <Field label="Язык">
+          <Field label={t("Язык")}>
             <Select
               value={language}
               onChange={(event) => setLanguage(event.target.value as "ru" | "en")}
             >
-              <option value="ru">Русский</option>
+              <option value="ru">{t("Русский")}</option>
               <option value="en">English</option>
             </Select>
           </Field>
@@ -421,15 +421,16 @@ export function DictationPreflight({
             className="flex min-h-[70px] cursor-pointer items-end justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] px-3 py-2.5"
           >
             <span className="min-w-0">
-              <span className="block text-sm font-medium">Голосовые команды</span>
+              <span className="block text-sm font-medium">{t("Голосовые команды")}</span>
               <span className="mt-0.5 block truncate text-xs text-[var(--ink-tertiary)]">
-                Префикс «{preferences.commandPrefix}»
+                {t("Префикс «")}
+                {preferences.commandPrefix}»
               </span>
             </span>
             <Switch
               id="preflight-commands"
               checked={commandsEnabled}
-              aria-label="Голосовые команды"
+              aria-label={t("Голосовые команды")}
               onCheckedChange={(value) => {
                 setCommandsEnabled(value);
                 saveWriterPreferences({ ...preferences, commandsEnabled: value });
@@ -438,7 +439,7 @@ export function DictationPreflight({
           </label>
         </div>
 
-        <Field label="Микрофон">
+        <Field label={t("Микрофон")}>
           <Select
             value={microphoneId}
             onChange={(event) => {
@@ -450,13 +451,13 @@ export function DictationPreflight({
               }
             }}
           >
-            <option value="">Системный по умолчанию</option>
+            <option value="">{t("Системный по умолчанию")}</option>
             {microphoneId && !microphones.some((device) => device.deviceId === microphoneId) ? (
-              <option value={microphoneId}>Сохранённый микрофон сейчас недоступен</option>
+              <option value={microphoneId}>{t("Сохранённый микрофон сейчас недоступен")}</option>
             ) : null}
             {microphones.map((device, index) => (
               <option key={device.deviceId} value={device.deviceId}>
-                {device.label || `Микрофон ${index + 1}`}
+                {device.label || t("Микрофон {0}", index + 1)}
               </option>
             ))}
           </Select>
@@ -468,23 +469,23 @@ export function DictationPreflight({
               <Mic className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Проверка сигнала</p>
+              <p className="text-sm font-medium">{t("Проверка сигнала")}</p>
               <p className="text-xs text-[var(--ink-tertiary)]">
                 {requestingMicrophone
-                  ? "Ждём разрешения браузера…"
+                  ? t("Ждём разрешения браузера…")
                   : permission === "granted"
                     ? signalDetected
-                      ? "Доступ разрешён, сигнал поступает"
+                      ? t("Доступ разрешён, сигнал поступает")
                       : trackMuted
-                        ? "Доступ есть, но микрофон не передаёт звук"
-                        : "Доступ разрешён — скажите несколько слов"
+                        ? t("Доступ есть, но микрофон не передаёт звук")
+                        : t("Доступ разрешён — скажите несколько слов")
                     : permission === "denied"
-                      ? "Доступ запрещён"
+                      ? t("Доступ запрещён")
                       : permission === "insecure"
-                        ? "Нужен HTTPS или localhost"
+                        ? t("Нужен HTTPS или localhost")
                         : supported
-                          ? "Нужно проверить доступ"
-                          : "Запись не поддерживается"}
+                          ? t("Нужно проверить доступ")
+                          : t("Запись не поддерживается")}
               </p>
             </div>
             {supported && (permission !== "granted" || !signalDetected) ? (
@@ -496,17 +497,17 @@ export function DictationPreflight({
                 onClick={requestMicrophone}
               >
                 {requestingMicrophone
-                  ? "Ждём…"
+                  ? t("Ждём…")
                   : permission === "granted"
-                    ? "Повторить"
-                    : "Проверить"}
+                    ? t("Повторить")
+                    : t("Проверить")}
               </Button>
             ) : null}
           </div>
 
           <meter
             className="sr-only"
-            aria-label="Уровень микрофона"
+            aria-label={t("Уровень микрофона")}
             min={0}
             max={100}
             value={Math.round(level * 100)}
@@ -523,10 +524,10 @@ export function DictationPreflight({
           <p className="mt-2 flex justify-between text-[11px] text-[var(--ink-tertiary)]">
             <span>
               {requestingMicrophone
-                ? "Разрешите доступ во всплывающем окне браузера"
+                ? t("Разрешите доступ во всплывающем окне браузера")
                 : permission === "granted"
-                  ? "Скажите несколько слов"
-                  : "Проверка ещё не запущена"}
+                  ? t("Скажите несколько слов")
+                  : t("Проверка ещё не запущена")}
             </span>
             <span>{Math.round(level * 100)}%</span>
           </p>
@@ -538,13 +539,13 @@ export function DictationPreflight({
             aria-hidden="true"
           />
           <p>
-            Аудио сначала сохраняется на устройстве
-            {availableBytes === undefined ? "" : ` · свободно ${formatBytes(availableBytes)}`}
-            {online ? " · отправка доступна" : " · отправим после восстановления сети"}
+            {t("Аудио сначала сохраняется на устройстве")}
+            {availableBytes === undefined ? "" : t(" · свободно {0}", formatBytes(availableBytes))}
+            {online ? t(" · отправка доступна") : t(" · отправим после восстановления сети")}
             {online && sttCheck.status === "ready"
               ? liveTranscriptionAvailable
-                ? " · live-текст готов"
-                : " · текст после завершения"
+                ? t(" · live-текст готов")
+                : t(" · текст после завершения")
               : ""}
             .
           </p>
@@ -555,73 +556,81 @@ export function DictationPreflight({
         <Banner
           className="mt-4"
           variant="info"
-          title="Проверяем распознавание речи"
-          body="Начать запись можно после подтверждения рабочего STT-провайдера."
+          title={t("Проверяем распознавание речи")}
+          body={t("Начать запись можно после подтверждения рабочего STT-провайдера.")}
         />
       ) : null}
       {online && sttCheck.status === "unavailable" ? (
         <Banner
           className="mt-4"
           variant="danger"
-          title="Распознавание речи не настроено"
-          body="Запись не запустится с шаблонным текстом. Настройте Deepgram для live-режима или OpenRouter для расшифровки аудио."
+          title={t("Распознавание речи не настроено")}
+          body={t(
+            "Запись не запустится с шаблонным текстом. Настройте Deepgram для live-режима или OpenRouter для расшифровки аудио.",
+          )}
         />
       ) : null}
       {online && sttCheck.status === "error" ? (
         <Banner
           className="mt-4"
           variant="danger"
-          title="Не удалось проверить распознавание речи"
-          body="Обновите страницу или проверьте соединение с сервером — до успешной проверки запись не начнётся."
+          title={t("Не удалось проверить распознавание речи")}
+          body={t(
+            "Обновите страницу или проверьте соединение с сервером — до успешной проверки запись не начнётся.",
+          )}
         />
       ) : null}
       {online && sttCheck.status === "ready" && !languageSupported ? (
         <Banner
           className="mt-4"
           variant="danger"
-          title="Выбранный язык не поддерживается"
-          body="Выберите язык, который заявлен настроенным STT-провайдером."
+          title={t("Выбранный язык не поддерживается")}
+          body={t("Выберите язык, который заявлен настроенным STT-провайдером.")}
         />
       ) : null}
       {online && sttCheck.status === "ready" && !liveTranscriptionAvailable ? (
         <Banner
           className="mt-4"
           variant="warning"
-          title="Без live-текста"
-          body="Аудио будет записано надёжно, а расшифровка появится после завершения сессии."
+          title={t("Без live-текста")}
+          body={t("Аудио будет записано надёжно, а расшифровка появится после завершения сессии.")}
         />
       ) : null}
       {!online ? (
         <Banner
           className="mt-4"
           variant="warning"
-          title="Можно записывать без сети"
-          body="Живая расшифровка появится после восстановления соединения. Не очищайте данные сайта."
+          title={t("Можно записывать без сети")}
+          body={t(
+            "Живая расшифровка появится после восстановления соединения. Не очищайте данные сайта.",
+          )}
         />
       ) : null}
       {lowStorage ? (
         <Banner
           className="mt-4"
           variant="danger"
-          title="Недостаточно свободного места"
-          body="Освободите не менее 100 МБ, чтобы запись не оборвалась."
+          title={t("Недостаточно свободного места")}
+          body={t("Освободите не менее 100 МБ, чтобы запись не оборвалась.")}
         />
       ) : null}
       {permission === "insecure" ? (
         <Banner
           className="mt-4"
           variant="warning"
-          title="Браузер блокирует микрофон на HTTP-адресе"
-          body="Откройте приложение по HTTPS. Если сервер запущен на этом же компьютере, используйте localhost — браузер считает его безопасным origin."
+          title={t("Браузер блокирует микрофон на HTTP-адресе")}
+          body={t(
+            "Откройте приложение по HTTPS. Если сервер запущен на этом же компьютере, используйте localhost — браузер считает его безопасным origin.",
+          )}
           action={
             <Button asChild variant="secondary" size="compact">
-              <a href={localhostURL()}>Открыть localhost</a>
+              <a href={localhostURL()}>{t("Открыть localhost")}</a>
             </Button>
           }
         />
       ) : null}
       {error ? (
-        <Banner className="mt-4" variant="danger" title="Проверка не пройдена" body={error} />
+        <Banner className="mt-4" variant="danger" title={t("Проверка не пройдена")} body={error} />
       ) : null}
     </ModalDialog>
   );
@@ -631,9 +640,9 @@ const meterSteps = Array.from({ length: 24 }, (_, index) => String(index + 1));
 
 function formatBytes(bytes: number): string {
   if (bytes > 1024 * 1024 * 1024) {
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} ГБ`;
+    return t("{0} ГБ", (bytes / 1024 / 1024 / 1024).toFixed(1));
   }
-  return `${Math.max(0, Math.round(bytes / 1024 / 1024))} МБ`;
+  return t("{0} МБ", Math.max(0, Math.round(bytes / 1024 / 1024)));
 }
 
 function localhostURL(): string {

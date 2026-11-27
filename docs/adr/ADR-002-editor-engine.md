@@ -43,4 +43,4 @@ The engine provides schema-aware transactions and mapping at the cost of explici
 extension design and validation. Test rich content round-trips, paste sanitization,
 exact Unicode ranges, block-ID remapping, selection preservation, source playback,
 conflict recovery and export fallbacks. See
-[rich-document specification](../specification/RICH_DOCUMENT_EDITOR.md).
+[rich-document specification](../../openspec/specs/manuscript/spec.md).

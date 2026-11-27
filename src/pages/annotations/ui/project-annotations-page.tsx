@@ -9,8 +9,8 @@ import {
   Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-
 import { type DocumentAnnotation, getProject, listProjectAnnotations } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import { Banner, Button, Input, Select, Spinner } from "~shared/ui";
 import { ProjectUtilityShell } from "~widgets/project-utility-shell";
@@ -60,7 +60,7 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
     });
   }, [annotations.data?.annotations, kind, nodeId, query, status]);
 
-  if (project.isPending || !project.data) return <Spinner label="Собираем правки проекта…" />;
+  if (project.isPending || !project.data) return <Spinner label={t("Собираем правки проекта…")} />;
 
   const all = annotations.data?.annotations ?? [];
   const activeCount = all.filter((item) => item.status !== "resolved").length;
@@ -82,12 +82,13 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Весь проект · быстрые переходы
+              {t("Весь проект · быстрые переходы")}
             </p>
-            <h1 className="font-display mt-2 text-[34px] leading-tight">Правки в тексте</h1>
+            <h1 className="font-display mt-2 text-[34px] leading-tight">{t("Правки в тексте")}</h1>
             <p className="mt-2 text-sm text-[var(--ink-secondary)]">
-              {activeCount} открытых пометок
-              {attentionCount ? ` · ${attentionCount} требуют внимания` : ""}
+              {activeCount}
+              {t(" открытых пометок")}
+              {attentionCount ? t(" · {0} требуют внимания", attentionCount) : ""}
             </p>
           </div>
           <Button asChild variant="secondary">
@@ -98,7 +99,7 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
                 nodeId: project.data.nodes.find((node) => !node.trashedAt)?.id ?? "",
               }}
             >
-              Открыть рукопись
+              {t("Открыть рукопись")}
             </Link>
           </Button>
         </div>
@@ -107,8 +108,10 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
           <Banner
             className="mt-5"
             variant="warning"
-            title="Некоторые пометки нужно проверить"
-            body="Текст или термин изменился. Мы сохранили исходную цитату и не переносили пометку наугад."
+            title={t("Некоторые пометки нужно проверить")}
+            body={t(
+              "Текст или термин изменился. Мы сохранили исходную цитату и не переносили пометку наугад.",
+            )}
           />
         ) : null}
 
@@ -122,25 +125,25 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="pl-10"
-              placeholder="Найти заметку, цитату или термин"
-              aria-label="Поиск по правкам"
+              placeholder={t("Найти заметку, цитату или термин")}
+              aria-label={t("Поиск по правкам")}
             />
           </div>
           <Select
             value={kind}
             onChange={(event) => setKind(event.target.value as DocumentAnnotation["kind"] | "all")}
-            aria-label="Тип пометки"
+            aria-label={t("Тип пометки")}
           >
-            <option value="all">Все типы</option>
-            <option value="note">Заметки</option>
-            <option value="dictionary_link">Ссылки на словарь</option>
+            <option value="all">{t("Все типы")}</option>
+            <option value="note">{t("Заметки")}</option>
+            <option value="dictionary_link">{t("Ссылки на словарь")}</option>
           </Select>
           <Select
             value={nodeId}
             onChange={(event) => setNodeId(event.target.value)}
-            aria-label="Документ"
+            aria-label={t("Документ")}
           >
-            <option value="all">Все документы</option>
+            <option value="all">{t("Все документы")}</option>
             {noteNodes.map((node) => (
               <option key={node.id} value={node.id}>
                 {node.title}
@@ -150,13 +153,13 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
         </div>
 
         <fieldset className="mt-3 flex flex-wrap gap-2">
-          <legend className="sr-only">Статус правок</legend>
+          <legend className="sr-only">{t("Статус правок")}</legend>
           {(
             [
-              ["active", `Открытые · ${activeCount}`],
-              ["needs_attention", `Нужно проверить · ${attentionCount}`],
-              ["resolved", `Исправлено · ${all.length - activeCount}`],
-              ["all", `Все · ${all.length}`],
+              ["active", t("Открытые · {0}", activeCount)],
+              ["needs_attention", t("Нужно проверить · {0}", attentionCount)],
+              ["resolved", t("Исправлено · {0}", all.length - activeCount)],
+              ["all", t("Все · {0}", all.length)],
             ] as const
           ).map(([value, label]) => (
             <Button
@@ -175,8 +178,8 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
           <Banner
             className="mt-6"
             variant="danger"
-            title="Не удалось загрузить правки"
-            body="Проверьте соединение и обновите страницу."
+            title={t("Не удалось загрузить правки")}
+            body={t("Проверьте соединение и обновите страницу.")}
           />
         ) : items.length === 0 ? (
           <div className="mt-8 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-paper)] px-6 py-14 text-center">
@@ -184,9 +187,9 @@ export function ProjectAnnotationsPage({ projectId }: { projectId: string }) {
               className="mx-auto size-7 text-[var(--ink-tertiary)]"
               aria-hidden="true"
             />
-            <h2 className="font-display mt-3 text-xl">Подходящих правок нет</h2>
+            <h2 className="font-display mt-3 text-xl">{t("Подходящих правок нет")}</h2>
             <p className="mt-2 text-sm text-[var(--ink-secondary)]">
-              Измените фильтры или добавьте заметку к выделенному тексту в рукописи.
+              {t("Измените фильтры или добавьте заметку к выделенному тексту в рукописи.")}
             </p>
           </div>
         ) : (
@@ -228,9 +231,9 @@ function AnnotationCard({ item, projectId }: { item: DocumentAnnotation; project
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ink-tertiary)]">
           <span className="font-semibold text-[var(--ink-secondary)]">{item.nodeTitle}</span>
           <span aria-hidden="true">·</span>
-          <span>{item.kind === "note" ? "Заметка" : "Словарь"}</span>
+          <span>{item.kind === "note" ? t("Заметка") : t("Словарь")}</span>
           {item.anchorStatus === "detached" || item.status === "needs_attention" ? (
-            <span className="font-semibold text-[var(--danger)]">Нужно проверить</span>
+            <span className="font-semibold text-[var(--danger)]">{t("Нужно проверить")}</span>
           ) : null}
         </div>
         <blockquote className="font-manuscript mt-2 border-l-2 border-[var(--border-strong)] pl-3 text-sm leading-6">
@@ -239,7 +242,10 @@ function AnnotationCard({ item, projectId }: { item: DocumentAnnotation; project
         <p className="mt-2 text-sm leading-6 text-[var(--ink-secondary)]">
           {item.kind === "note"
             ? item.note
-            : `Связано с термином «${item.dictionaryTerm?.canonical ?? "удалённый термин"}»`}
+            : t(
+                "Связано с термином «{0}»",
+                item.dictionaryTerm?.canonical ?? t("удалённый термин"),
+              )}
         </p>
       </div>
       <Button asChild variant="secondary" size="compact" className="sm:self-center">
@@ -248,7 +254,7 @@ function AnnotationCard({ item, projectId }: { item: DocumentAnnotation; project
           params={{ projectId, nodeId: item.nodeId }}
           search={{ annotationId: item.id }}
         >
-          Перейти
+          {t("Перейти")}
           <ArrowUpRight className="size-3.5" aria-hidden="true" />
         </Link>
       </Button>

@@ -16,10 +16,10 @@ import {
   Settings,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 import type { Project } from "~entities/project";
 import { useSession } from "~entities/session";
 import { EditProjectDialog } from "~features/edit-project";
+import { t } from "~shared/i18n";
 import { maximumNodeTitleLength, normalizeNodeTitle } from "~shared/lib";
 import { BrandMark, Button, type SaveState, SaveStatus } from "~shared/ui";
 
@@ -64,7 +64,7 @@ export function StudioHeader({
     setEditingNodeTitle(false);
     if (title) onRenameNode?.(title);
   };
-  const initials = (session.data?.user.displayName || "Автор")
+  const initials = (session.data?.user.displayName || t("Автор"))
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
@@ -74,7 +74,13 @@ export function StudioHeader({
   return (
     <>
       <header className="studio-chrome flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-2 sm:px-[18px]">
-        <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="К проектам">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          aria-label={t("К проектам")}
+        >
           <Link to="/projects">
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
@@ -91,7 +97,7 @@ export function StudioHeader({
               ref={nodeTitleInputRef}
               value={nodeTitleDraft}
               maxLength={maximumNodeTitleLength}
-              aria-label={`Новое название для «${nodeTitle}»`}
+              aria-label={t("Новое название для «{0}»", nodeTitle)}
               className="hidden h-8 min-w-24 max-w-60 rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-2 text-[13px] outline-none sm:block"
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setNodeTitleDraft(event.target.value)}
@@ -111,8 +117,8 @@ export function StudioHeader({
             <button
               type="button"
               className="hidden min-w-0 truncate rounded px-1 text-[13px] text-[var(--ink-secondary)] hover:bg-[var(--surface-subtle)] focus-visible:outline-2 sm:block"
-              aria-label={`Материал «${nodeTitle}». Дважды нажмите, чтобы переименовать`}
-              title="Дважды нажмите, чтобы переименовать"
+              aria-label={t("Материал «{0}». Дважды нажмите, чтобы переименовать", nodeTitle)}
+              title={t("Дважды нажмите, чтобы переименовать")}
               onDoubleClick={() => onRenameNode && setEditingNodeTitle(true)}
             >
               {nodeTitle}
@@ -128,7 +134,7 @@ export function StudioHeader({
             variant="ghost"
             size="icon"
             className="hidden sm:inline-flex"
-            aria-label="Поиск по проекту"
+            aria-label={t("Поиск по проекту")}
           >
             <Link to="/projects/$projectId/search" params={{ projectId: project.id }}>
               <Search className="size-4" aria-hidden="true" />
@@ -143,10 +149,10 @@ export function StudioHeader({
             <Link
               to="/projects/$projectId/assistant-context"
               params={{ projectId: project.id }}
-              aria-label="Контекст, память и руководство ассистента"
+              aria-label={t("Контекст, память и руководство ассистента")}
             >
               <Brain className="size-4" aria-hidden="true" />
-              <span className="hidden xl:inline">Контекст</span>
+              <span className="hidden xl:inline">{t("Контекст")}</span>
             </Link>
           </Button>
           <Button
@@ -156,10 +162,10 @@ export function StudioHeader({
             onClick={onDictate}
             disabled={!onDictate}
             className="rounded-[var(--radius-pill)] px-4"
-            aria-label={onDictate ? "Диктовать" : "Откройте документ, чтобы начать диктовку"}
+            aria-label={onDictate ? t("Диктовать") : t("Откройте документ, чтобы начать диктовку")}
           >
             <span className="size-2 rounded-full bg-current" aria-hidden="true" />
-            <span className="hidden sm:inline">Диктовка</span>
+            <span className="hidden sm:inline">{t("Диктовка")}</span>
           </Button>
           <Button
             type="button"
@@ -168,17 +174,19 @@ export function StudioHeader({
             onClick={onAssistant}
             disabled={!onAssistant}
             className="rounded-[var(--radius-pill)] px-4"
-            aria-label={onAssistant ? "Открыть ассистента" : "Откройте документ для ассистента"}
+            aria-label={
+              onAssistant ? t("Открыть ассистента") : t("Откройте документ для ассистента")
+            }
           >
             <MessageCircle className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Ассистент</span>
+            <span className="hidden sm:inline">{t("Ассистент")}</span>
           </Button>
           <Button
             asChild
             variant="ghost"
             size="icon"
             className="hidden sm:inline-flex"
-            aria-label="Экспорт"
+            aria-label={t("Экспорт")}
           >
             <Link to="/projects/$projectId/export" params={{ projectId: project.id }}>
               <Download className="size-4" aria-hidden="true" />
@@ -186,7 +194,7 @@ export function StudioHeader({
           </Button>
           <DropdownMenuPrimitive.Root>
             <DropdownMenuPrimitive.Trigger asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Ещё">
+              <Button type="button" variant="ghost" size="icon" aria-label={t("Ещё")}>
                 <MoreHorizontal className="size-4" aria-hidden="true" />
               </Button>
             </DropdownMenuPrimitive.Trigger>
@@ -203,7 +211,7 @@ export function StudioHeader({
                     className="flex min-h-11 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)] sm:hidden"
                   >
                     <Search className="size-4" aria-hidden="true" />
-                    Поиск по проекту
+                    {t("Поиск по проекту")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item asChild>
@@ -213,7 +221,7 @@ export function StudioHeader({
                     className="flex min-h-11 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)] sm:hidden"
                   >
                     <Download className="size-4" aria-hidden="true" />
-                    Экспорт
+                    {t("Экспорт")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item asChild>
@@ -222,7 +230,7 @@ export function StudioHeader({
                     className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                   >
                     <BookOpen className="size-4" aria-hidden="true" />
-                    Документация
+                    {t("Документация")}
                   </a>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item asChild>
@@ -232,7 +240,7 @@ export function StudioHeader({
                     className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                   >
                     <Brain className="size-4" aria-hidden="true" />
-                    Контекст ассистента
+                    {t("Контекст ассистента")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item
@@ -240,7 +248,7 @@ export function StudioHeader({
                   className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                 >
                   <PencilLine className="size-4" aria-hidden="true" />
-                  Настройки проекта
+                  {t("Настройки проекта")}
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item asChild>
                   <Link
@@ -248,7 +256,7 @@ export function StudioHeader({
                     className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                   >
                     <Server className="size-4" aria-hidden="true" />
-                    AI и провайдеры
+                    {t("AI и провайдеры")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Item asChild>
@@ -258,7 +266,7 @@ export function StudioHeader({
                     className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                   >
                     <Settings className="size-4" aria-hidden="true" />
-                    Настройки редактора
+                    {t("Настройки редактора")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
                 <DropdownMenuPrimitive.Separator className="my-1 h-px bg-[var(--border-subtle)]" />
@@ -267,7 +275,8 @@ export function StudioHeader({
                     to="/projects"
                     className="flex min-h-10 cursor-default items-center gap-2 rounded-[var(--radius-sm)] px-3 text-sm outline-none data-[highlighted]:bg-[var(--surface-subtle)]"
                   >
-                    <LogOut className="size-4" aria-hidden="true" />К проектам
+                    <LogOut className="size-4" aria-hidden="true" />
+                    {t("К проектам")}
                   </Link>
                 </DropdownMenuPrimitive.Item>
               </DropdownMenuPrimitive.Content>
@@ -275,7 +284,7 @@ export function StudioHeader({
           </DropdownMenuPrimitive.Root>
           <span
             className="hidden size-8 shrink-0 place-items-center rounded-full bg-[var(--surface-subtle)] text-[11px] font-semibold text-[var(--ink-secondary)] sm:grid"
-            title={`Профиль: ${session.data?.user.email ?? "Автор"}`}
+            title={t("Профиль: {0}", session.data?.user.email ?? t("Автор"))}
           >
             {initials}
           </span>
@@ -299,7 +308,7 @@ export function StudioHeader({
             onClick={onOpenDocuments}
           >
             <ListTree className="size-4" aria-hidden="true" />
-            Документы
+            {t("Документы")}
             <ChevronRight className="size-3.5" aria-hidden="true" />
           </Button>
           <span className="min-w-0 truncate text-xs text-[var(--ink-secondary)]">{nodeTitle}</span>

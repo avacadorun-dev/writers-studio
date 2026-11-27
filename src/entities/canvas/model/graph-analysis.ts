@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 import type { CanvasDocument, CanvasEdge, CanvasNode } from "./types";
 
 export type CanvasGraphProfile = "generic" | "quest" | "dialogue" | "state" | "economy" | "all";
@@ -40,12 +42,13 @@ export function analyzeCanvasGraph(
   const diagnostics: CanvasGraphDiagnostic[] = [];
   if (components.length > 1) {
     diagnostics.push(
-      issue("disconnected", "Доска содержит несвязанные компоненты", components.flat()),
+      issue("disconnected", t("Доска содержит несвязанные компоненты"), components.flat()),
     );
   }
-  for (const id of orphans) diagnostics.push(issue("orphan", "Элемент ни с чем не связан", [id]));
+  for (const id of orphans)
+    diagnostics.push(issue("orphan", t("Элемент ни с чем не связан"), [id]));
   for (const cycle of cycles)
-    diagnostics.push(issue("cycle", "Обнаружен направленный цикл", cycle));
+    diagnostics.push(issue("cycle", t("Обнаружен направленный цикл"), cycle));
 
   if (profile === "quest" || profile === "all") validateQuests(document, diagnostics);
   if (profile === "dialogue" || profile === "all") validateDialogue(document, diagnostics);
@@ -100,7 +103,7 @@ function validateQuests(document: CanvasDocument, diagnostics: CanvasGraphDiagno
   );
   const cycles = findCycles(questIds, adjacency(questIds, dependencyEdges, "outgoing"));
   for (const cycle of cycles) {
-    diagnostics.push(issue("quest-cycle", "Циклическая зависимость квестов", cycle));
+    diagnostics.push(issue("quest-cycle", t("Циклическая зависимость квестов"), cycle));
   }
   for (const quest of quests) {
     const prerequisites = quest["x-writers-studio"]?.card?.fields.prerequisites;
@@ -110,9 +113,11 @@ function validateQuests(document: CanvasDocument, diagnostics: CanvasGraphDiagno
     );
     if (missing.length) {
       diagnostics.push(
-        issue("quest-missing-prerequisite", `Не найдены prerequisites: ${missing.join(", ")}`, [
-          quest.id,
-        ]),
+        issue(
+          "quest-missing-prerequisite",
+          t("Не найдены prerequisites: {0}", missing.join(", ")),
+          [quest.id],
+        ),
       );
     }
   }
@@ -130,16 +135,16 @@ function validateDialogue(document: CanvasDocument, diagnostics: CanvasGraphDiag
   const incoming = adjacency(ids, edges, "incoming");
   const entries = [...ids].filter((id) => (incoming.get(id)?.length ?? 0) === 0);
   if (entries.length === 0)
-    diagnostics.push(issue("dialogue-no-entry", "У диалога нет точки входа", [...ids]));
+    diagnostics.push(issue("dialogue-no-entry", t("У диалога нет точки входа"), [...ids]));
   const reachable = reachableFrom(entries, outgoing);
   const unreachable = [...ids].filter((id) => !reachable.has(id));
   if (unreachable.length)
-    diagnostics.push(issue("dialogue-unreachable", "Есть недостижимые реплики", unreachable));
+    diagnostics.push(issue("dialogue-unreachable", t("Есть недостижимые реплики"), unreachable));
   for (const node of nodes) {
     const terminal = node["x-writers-studio"]?.card?.fields.terminal === true;
     if (!terminal && (outgoing.get(node.id)?.length ?? 0) === 0) {
       diagnostics.push(
-        issue("dialogue-dead-end", "Нетерминальная реплика не имеет продолжения", [node.id]),
+        issue("dialogue-dead-end", t("Нетерминальная реплика не имеет продолжения"), [node.id]),
       );
     }
   }
@@ -147,7 +152,9 @@ function validateDialogue(document: CanvasDocument, diagnostics: CanvasGraphDiag
     (edge) => !edge["x-writers-studio"]?.relation?.fields?.condition,
   );
   for (const cycle of findCycles(ids, adjacency(ids, unconditional, "outgoing"))) {
-    diagnostics.push(issue("dialogue-unconditional-cycle", "Бесконечный безусловный цикл", cycle));
+    diagnostics.push(
+      issue("dialogue-unconditional-cycle", t("Бесконечный безусловный цикл"), cycle),
+    );
   }
 }
 
@@ -169,11 +176,11 @@ function validateStates(document: CanvasDocument, diagnostics: CanvasGraphDiagno
     : [...ids].filter((id) => (incoming.get(id)?.length ?? 0) === 0);
   const unreachable = [...ids].filter((id) => !reachableFrom(entries, outgoing).has(id));
   if (unreachable.length)
-    diagnostics.push(issue("state-unreachable", "Есть недостижимые состояния", unreachable));
+    diagnostics.push(issue("state-unreachable", t("Есть недостижимые состояния"), unreachable));
   for (const node of nodes) {
     const terminal = node["x-writers-studio"]?.card?.fields.terminal === true;
     if (!terminal && (outgoing.get(node.id)?.length ?? 0) === 0) {
-      diagnostics.push(issue("state-no-exit", "Состояние не имеет выхода", [node.id]));
+      diagnostics.push(issue("state-no-exit", t("Состояние не имеет выхода"), [node.id]));
     }
   }
 }
@@ -188,9 +195,9 @@ function validateEconomy(document: CanvasDocument, diagnostics: CanvasGraphDiagn
       (edge) => edge.fromNode === resource.id && relationType(edge) === "consumes",
     );
     if (!produced)
-      diagnostics.push(issue("resource-no-producer", "У ресурса нет producer", [resource.id]));
+      diagnostics.push(issue("resource-no-producer", t("У ресурса нет producer"), [resource.id]));
     if (!consumed)
-      diagnostics.push(issue("resource-no-consumer", "У ресурса нет consumer", [resource.id]));
+      diagnostics.push(issue("resource-no-consumer", t("У ресурса нет consumer"), [resource.id]));
   }
 }
 

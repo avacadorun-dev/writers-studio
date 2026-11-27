@@ -16,9 +16,9 @@ import {
   Type,
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-
 import { type CreateProjectInput, createProject, type ProjectKind } from "~entities/project";
 import { APIError } from "~shared/api";
+import { t } from "~shared/i18n";
 import { Button, Field, Input, Select } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 import { WorkspaceHeader } from "~widgets/workspace-header";
@@ -26,13 +26,13 @@ import { WorkspaceHeader } from "~widgets/workspace-header";
 import "./create-project.css";
 
 const projectTypes: Array<{ value: ProjectKind; label: string; icon: typeof BookOpen }> = [
-  { value: "novel", label: "Роман", icon: BookOpen },
-  { value: "story", label: "Рассказ", icon: FileText },
-  { value: "screenplay", label: "Сценарий", icon: Clapperboard },
-  { value: "nonfiction", label: "Нон-фикшн", icon: BookMarked },
-  { value: "game_design", label: "Гейм-дизайн", icon: Gamepad2 },
-  { value: "free", label: "Свободный", icon: Shapes },
-  { value: "custom", label: "Своя структура", icon: Blocks },
+  { value: "novel", label: t("Роман"), icon: BookOpen },
+  { value: "story", label: t("Рассказ"), icon: FileText },
+  { value: "screenplay", label: t("Сценарий"), icon: Clapperboard },
+  { value: "nonfiction", label: t("Нон-фикшн"), icon: BookMarked },
+  { value: "game_design", label: t("Гейм-дизайн"), icon: Gamepad2 },
+  { value: "free", label: t("Свободный"), icon: Shapes },
+  { value: "custom", label: t("Своя структура"), icon: Blocks },
 ];
 
 export function CreateProjectPage() {
@@ -67,7 +67,7 @@ export function CreateProjectPage() {
     <RequireSession>
       <div className="project-setup-workspace">
         <WorkspaceHeader />
-        <main className="project-setup-scroll" aria-label="Создание проекта">
+        <main className="project-setup-scroll" aria-label={t("Создание проекта")}>
           <div className="project-setup-content">
             <section>
               <p className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-[var(--ink-tertiary)] uppercase">
@@ -76,18 +76,18 @@ export function CreateProjectPage() {
                   className="size-2 rounded-full bg-[var(--border-strong)]"
                   aria-hidden="true"
                 />
-                Основа проекта
+                {t("Основа проекта")}
               </p>
-              <h1 className="project-setup-title">О чём вы хотите писать?</h1>
+              <h1 className="project-setup-title">{t("О чём вы хотите писать?")}</h1>
               <p className="mt-3 text-[13px] leading-6 text-[var(--ink-secondary)]">
-                Достаточно рабочего названия. Всё остальное можно изменить позже.
+                {t("Достаточно рабочего названия. Всё остальное можно изменить позже.")}
               </p>
             </section>
 
             <form id="create-project-form" onSubmit={handleSubmit} className="mt-6">
               <div className="project-setup-panel grid gap-6 p-5 sm:p-7">
                 <Field
-                  label="Рабочее название"
+                  label={t("Рабочее название")}
                   htmlFor="project-title"
                   error={
                     mutation.error instanceof APIError && mutation.error.code === "invalid_project"
@@ -114,7 +114,7 @@ export function CreateProjectPage() {
                       minLength={1}
                       maxLength={120}
                       value={form.title}
-                      placeholder="Дом у тихой воды"
+                      placeholder={t("Дом у тихой воды")}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, title: event.target.value }))
                       }
@@ -122,7 +122,9 @@ export function CreateProjectPage() {
                   </div>
                 </Field>
                 <fieldset className="grid content-start gap-2 text-sm text-[var(--ink-secondary)]">
-                  <legend className="font-medium text-[var(--ink-primary)]">Тип проекта</legend>
+                  <legend className="font-medium text-[var(--ink-primary)]">
+                    {t("Тип проекта")}
+                  </legend>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                     {projectTypes.map((type) => (
                       <button
@@ -140,7 +142,7 @@ export function CreateProjectPage() {
                   </div>
                 </fieldset>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Язык диктовки" htmlFor="project-language">
+                  <Field label={t("Язык диктовки")} htmlFor="project-language">
                     <div className="relative">
                       <Languages
                         className="pointer-events-none absolute top-1/2 left-3 z-10 size-[18px] -translate-y-1/2 text-[var(--ink-tertiary)]"
@@ -157,12 +159,12 @@ export function CreateProjectPage() {
                           }))
                         }
                       >
-                        <option value="ru">Русский</option>
+                        <option value="ru">{t("Русский")}</option>
                         <option value="en">English</option>
                       </Select>
                     </div>
                   </Field>
-                  <Field label="Цель по словам · необязательно" htmlFor="project-word-goal">
+                  <Field label={t("Цель по словам · необязательно")} htmlFor="project-word-goal">
                     <div className="relative">
                       <Target
                         className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ink-tertiary)]"
@@ -175,7 +177,7 @@ export function CreateProjectPage() {
                         min={1}
                         max={10_000_000}
                         value={form.wordGoal ?? ""}
-                        placeholder="Например, 80 000"
+                        placeholder={t("Например, 80 000")}
                         onChange={(event) =>
                           setForm((current) => ({
                             ...current,
@@ -186,7 +188,7 @@ export function CreateProjectPage() {
                     </div>
                   </Field>
                 </div>
-                <Field label="Коротко о замысле · необязательно" htmlFor="project-synopsis">
+                <Field label={t("Коротко о замысле · необязательно")} htmlFor="project-synopsis">
                   <div className="relative">
                     <Lightbulb
                       className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ink-tertiary)]"
@@ -196,7 +198,7 @@ export function CreateProjectPage() {
                       id="project-synopsis"
                       className="pl-10"
                       value={form.synopsis}
-                      placeholder="История возвращения в родной дом"
+                      placeholder={t("История возвращения в родной дом")}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, synopsis: event.target.value }))
                       }
@@ -211,12 +213,13 @@ export function CreateProjectPage() {
           <div className="project-setup-footer-inner">
             <Button asChild variant="ghost">
               <Link to="/projects">
-                <ArrowLeft className="size-4" aria-hidden="true" />К проектам
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                {t("К проектам")}
               </Link>
             </Button>
             <Button type="submit" form="create-project-form" disabled={mutation.isPending}>
               <ArrowRight className="size-4" aria-hidden="true" />
-              {mutation.isPending ? "Создаём…" : "Создать и открыть"}
+              {mutation.isPending ? t("Создаём…") : t("Создать и открыть")}
             </Button>
           </div>
         </footer>

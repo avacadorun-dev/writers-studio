@@ -2,9 +2,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, FileAudio, LoaderCircle, RotateCcw, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
-
 import { getDictation, retryDictation } from "~entities/dictation";
 import { getProject } from "~entities/project";
+import { t } from "~shared/i18n";
 import { Banner, Button, Spinner } from "~shared/ui";
 import { ProjectUtilityShell } from "~widgets/project-utility-shell";
 import { RequireSession } from "~widgets/require-session";
@@ -37,7 +37,7 @@ export function FinalizingPage({ sessionId }: { sessionId: string }) {
   }, [navigate, session.data?.session.status, sessionId]);
 
   if (session.isPending) {
-    return <Spinner label="Проверяем запись…" />;
+    return <Spinner label={t("Проверяем запись…")} />;
   }
   const data = session.data?.session;
   if (!data || session.isError) {
@@ -45,11 +45,11 @@ export function FinalizingPage({ sessionId }: { sessionId: string }) {
       <main className="grid min-h-full place-items-center p-5">
         <Banner
           variant="danger"
-          title="Не удалось открыть запись"
-          body="Запись не удалена. Проверьте раздел восстановления."
+          title={t("Не удалось открыть запись")}
+          body={t("Запись не удалена. Проверьте раздел восстановления.")}
           action={
             <Button asChild variant="secondary" size="compact">
-              <Link to="/recovery">Восстановление</Link>
+              <Link to="/recovery">{t("Восстановление")}</Link>
             </Button>
           }
         />
@@ -62,15 +62,16 @@ export function FinalizingPage({ sessionId }: { sessionId: string }) {
       <div className="w-full max-w-[560px]">
         <div className="text-center">
           <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-            Сессия сохранена · {formatDuration(data.durationMs)}
+            {t("Сессия сохранена · ")}
+            {formatDuration(data.durationMs)}
           </p>
           <h1 className="font-display mt-3 text-[38px] leading-tight">
-            {failed ? "Аудио сохранено" : "Запись уже в проекте"}
+            {failed ? t("Аудио сохранено") : t("Запись уже в проекте")}
           </h1>
           <p className="mt-3 text-sm leading-6 text-[var(--ink-secondary)]">
             {failed
-              ? "Исходная запись не потеряна — обработку можно безопасно повторить."
-              : "Готовим точную расшифровку. Это не мешает продолжить работу с рукописью."}
+              ? t("Исходная запись не потеряна — обработку можно безопасно повторить.")
+              : t("Готовим точную расшифровку. Это не мешает продолжить работу с рукописью.")}
           </p>
         </div>
         <section className="mt-7 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-6 text-left sm:p-7">
@@ -83,44 +84,44 @@ export function FinalizingPage({ sessionId }: { sessionId: string }) {
               )}
             </span>
             <h2 className="font-display text-2xl">
-              {failed ? "Нужна повторная обработка" : "Готовим точную расшифровку"}
+              {failed ? t("Нужна повторная обработка") : t("Готовим точную расшифровку")}
             </h2>
           </div>
           <p className="mt-4 text-sm leading-6 text-[var(--ink-secondary)]">
             {failed
-              ? "Расшифровка не завершилась, но исходная запись осталась неизменной."
-              : "Обработка завершится в фоне. Исходное аудио и живой текст уже сохранены."}
+              ? t("Расшифровка не завершилась, но исходная запись осталась неизменной.")
+              : t("Обработка завершится в фоне. Исходное аудио и живой текст уже сохранены.")}
           </p>
           <ol className="mt-5 grid gap-3 text-sm">
-            <ProgressRow done label="Сохраняем запись" />
-            <ProgressRow done={!failed} label="Проверяем аудио" />
-            <ProgressRow done={!failed} active={!failed} label="Готовим точную расшифровку" />
-            <ProgressRow label="Готово" />
+            <ProgressRow done label={t("Сохраняем запись")} />
+            <ProgressRow done={!failed} label={t("Проверяем аудио")} />
+            <ProgressRow done={!failed} active={!failed} label={t("Готовим точную расшифровку")} />
+            <ProgressRow label={t("Готово")} />
           </ol>
           <div className="mt-7 flex flex-wrap justify-end gap-2">
             {data.draft ? (
               <Button asChild>
                 <Link to="/dictations/$sessionId/review" params={{ sessionId }}>
-                  Проверить живой черновик
+                  {t("Проверить живой черновик")}
                 </Link>
               </Button>
             ) : null}
             {failed ? (
               <Button type="button" disabled={retry.isPending} onClick={() => retry.mutate()}>
                 <RotateCcw className="size-4" aria-hidden="true" />
-                {retry.isPending ? "Запускаем…" : "Повторить обработку"}
+                {retry.isPending ? t("Запускаем…") : t("Повторить обработку")}
               </Button>
             ) : null}
             <Button asChild variant="ghost">
               <Link to="/projects/$projectId" params={{ projectId: data.projectId }}>
-                Вернуться в проект
+                {t("Вернуться в проект")}
               </Link>
             </Button>
           </div>
         </section>
         <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[var(--ink-tertiary)]">
           <ShieldCheck className="size-4" aria-hidden="true" />
-          Сообщим, когда расшифровка будет готова
+          {t("Сообщим, когда расшифровка будет готова")}
         </div>
       </div>
     </main>

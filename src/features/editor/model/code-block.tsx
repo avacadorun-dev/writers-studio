@@ -48,6 +48,7 @@ import scheme from "refractor/scheme";
 import solidity from "refractor/solidity";
 import toml from "refractor/toml";
 import tsx from "refractor/tsx";
+import { t } from "~shared/i18n";
 
 import { Button } from "~shared/ui";
 import {
@@ -404,10 +405,10 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
     <NodeViewWrapper className="ws-code-block" data-language={language || undefined}>
       <div className="ws-code-block-toolbar" contentEditable={false}>
         <label>
-          <span className="sr-only">Язык блока кода</span>
+          <span className="sr-only">{t("Язык блока кода")}</span>
           <select
             value={language}
-            aria-label="Язык блока кода"
+            aria-label={t("Язык блока кода")}
             onChange={(event) => updateAttributes({ language: event.target.value || null })}
           >
             {options.map((option) => (
@@ -422,7 +423,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
           variant="ghost"
           size="compact"
           className="min-h-8 gap-1.5 px-2 text-xs"
-          aria-label={copied ? "Код скопирован" : "Скопировать код"}
+          aria-label={copied ? t("Код скопирован") : t("Скопировать код")}
           onClick={() => void copyCode()}
         >
           {copied ? (
@@ -430,7 +431,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
           ) : (
             <Copy className="size-3.5" aria-hidden="true" />
           )}
-          {copied ? "Скопировано" : "Копировать"}
+          {copied ? t("Скопировано") : t("Копировать")}
         </Button>
       </div>
       <pre spellCheck={false}>

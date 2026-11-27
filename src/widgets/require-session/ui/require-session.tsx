@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-
 import { useSession } from "~entities/session";
+import { t } from "~shared/i18n";
 import { Spinner } from "~shared/ui";
 
 export function RequireSession({ children }: { children: React.ReactNode }) {
@@ -17,7 +17,7 @@ export function RequireSession({ children }: { children: React.ReactNode }) {
   if (session.isPending || session.isError) {
     return (
       <main className="min-h-full">
-        <Spinner label={session.isError ? "Переходим ко входу…" : "Открываем студию…"} />
+        <Spinner label={session.isError ? t("Переходим ко входу…") : t("Открываем студию…")} />
       </main>
     );
   }

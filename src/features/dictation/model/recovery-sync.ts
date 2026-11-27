@@ -1,4 +1,5 @@
 import { createDictation, stopDictation, uploadAudioChunk } from "~entities/dictation";
+import { t } from "~shared/i18n";
 import {
   getLocalRecording,
   listAudioChunks,
@@ -9,11 +10,11 @@ import {
 export async function synchronizeLocalRecording(localId: string): Promise<string> {
   let recording = await getLocalRecording(localId);
   if (!recording) {
-    throw new Error("Локальная запись не найдена");
+    throw new Error(t("Локальная запись не найдена"));
   }
   const chunks = await listAudioChunks(localId);
   if (chunks.length === 0) {
-    throw new Error("В записи нет аудиофрагментов");
+    throw new Error(t("В записи нет аудиофрагментов"));
   }
   let sessionId = recording.serverSessionId;
   if (!sessionId) {

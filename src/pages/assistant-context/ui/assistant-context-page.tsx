@@ -15,7 +15,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-
 import {
   deactivateProjectMemory,
   deleteAssistantRunHistory,
@@ -31,6 +30,7 @@ import {
   updateProjectMemory,
 } from "~entities/assistant";
 import { type DocumentNode, getProject } from "~entities/project";
+import { interfaceLanguage, t } from "~shared/i18n";
 import {
   type AssistantGuideDraft,
   clearAssistantGuideDraft,
@@ -66,30 +66,9 @@ import {
 
 export type AssistantContextView = "overview" | "guide" | "memory";
 
-const assistantGuideTemplate = `# Голос и тон
-
-- 
-
-# Лицо, время и фокализация
-
-- 
-
-# Ритм, длина фраз и диалоги
-
-- 
-
-# Канон и приоритет источников
-
-- Используй канонические написания из словаря проекта.
-
-# Нежелательные слова, клише и приёмы
-
-- 
-
-# Положительные и отрицательные примеры
-
-- Хорошо: 
-- Не использовать: `;
+const assistantGuideTemplate = t(
+  "# Голос и тон\n\n- \n\n# Лицо, время и фокализация\n\n- \n\n# Ритм, длина фраз и диалоги\n\n- \n\n# Канон и приоритет источников\n\n- Используй канонические написания из словаря проекта.\n\n# Нежелательные слова, клише и приёмы\n\n- \n\n# Положительные и отрицательные примеры\n\n- Хорошо: \n- Не использовать: ",
+);
 
 export function AssistantContextPage({
   projectId,
@@ -172,10 +151,11 @@ export function AssistantContextPage({
   const applyGuideTemplate = async () => {
     if (guideContent.trim() && guideContent !== (guide.data?.guide?.content ?? "")) {
       const confirmed = await requestConfirmation({
-        title: "Заменить несохранённый черновик шаблоном?",
-        description:
+        title: t("Заменить несохранённый черновик шаблоном?"),
+        description: t(
           "Текущий локальный черновик будет заменён. На сервере ничего не изменится, пока вы не сохраните revision.",
-        confirmLabel: "Вставить шаблон",
+        ),
+        confirmLabel: t("Вставить шаблон"),
         tone: "default",
         icon: BookOpenCheck,
       });
@@ -190,10 +170,10 @@ export function AssistantContextPage({
       setGuideDraftRecovered(false);
       setStaleGuideDraft(undefined);
       await queryClient.invalidateQueries({ queryKey: ["assistant-guide", projectId] });
-      showToast({ title: "Руководство сохранено" });
+      showToast({ title: t("Руководство сохранено") });
     },
     onError: (error) =>
-      showToast({ title: "Руководство не сохранено", description: error.message }),
+      showToast({ title: t("Руководство не сохранено"), description: error.message }),
   });
   const restoreGuide = useMutation({
     mutationFn: (revision: number) => restoreAssistantGuide(projectId, revision),
@@ -220,10 +200,10 @@ export function AssistantContextPage({
       resetMemoryEditor();
       await queryClient.invalidateQueries({ queryKey: ["project-memory", projectId] });
       showToast({
-        title: wasEditing ? "Запись памяти обновлена" : "Факт добавлен в память проекта",
+        title: wasEditing ? t("Запись памяти обновлена") : t("Факт добавлен в память проекта"),
       });
     },
-    onError: (error) => showToast({ title: "Память не сохранена", description: error.message }),
+    onError: (error) => showToast({ title: t("Память не сохранена"), description: error.message }),
   });
   const deactivate = useMutation({
     mutationFn: (memoryId: string) => deactivateProjectMemory(projectId, memoryId),
@@ -236,7 +216,7 @@ export function AssistantContextPage({
       ]);
     },
     onError: (error) =>
-      showToast({ title: "Запись не деактивирована", description: error.message }),
+      showToast({ title: t("Запись не деактивирована"), description: error.message }),
   });
   const reactivate = useMutation({
     mutationFn: (record: ProjectMemoryRecord) =>
@@ -249,7 +229,8 @@ export function AssistantContextPage({
         }),
       ]);
     },
-    onError: (error) => showToast({ title: "Запись не активирована", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Запись не активирована"), description: error.message }),
   });
   const restoreMemory = useMutation({
     mutationFn: ({ memoryId, revision }: { memoryId: string; revision: number }) =>
@@ -261,28 +242,30 @@ export function AssistantContextPage({
           queryKey: ["project-memory-history", projectId, variables.memoryId],
         }),
       ]);
-      showToast({ title: `Версия r${variables.revision} восстановлена новой revision` });
+      showToast({ title: t("Версия r{0} восстановлена новой revision", variables.revision) });
     },
     onError: (error) =>
-      showToast({ title: "Версия памяти не восстановлена", description: error.message }),
+      showToast({ title: t("Версия памяти не восстановлена"), description: error.message }),
   });
   const deleteHistory = useMutation({
     mutationFn: (runId: string) => deleteAssistantRunHistory(runId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["assistant-runs", projectId] });
       showToast({
-        title: "История сессии удалена",
-        description: "Уже применённые изменения проекта сохранены.",
+        title: t("История сессии удалена"),
+        description: t("Уже применённые изменения проекта сохранены."),
       });
     },
-    onError: (error) => showToast({ title: "История не удалена", description: error.message }),
+    onError: (error) => showToast({ title: t("История не удалена"), description: error.message }),
   });
 
   if (project.isPending || guide.isPending || memory.isPending || runs.isPending) {
-    return <Spinner label="Открываем контекст ассистента…" />;
+    return <Spinner label={t("Открываем контекст ассистента…")} />;
   }
   if (project.isError || !project.data) {
-    return <Banner variant="danger" title="Проект недоступен" body="Обновите страницу." />;
+    return (
+      <Banner variant="danger" title={t("Проект недоступен")} body={t("Обновите страницу.")} />
+    );
   }
   const memoryRecords = (memory.data?.records ?? []).map(normalizeProjectMemoryRecord);
   const filteredMemoryRecords = filterProjectMemory(
@@ -297,7 +280,7 @@ export function AssistantContextPage({
     <RequireSession>
       <div className="min-h-full bg-[var(--surface-app)]">
         <header className="flex h-14 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-4">
-          <Button asChild variant="ghost" size="icon" aria-label="Назад в проект">
+          <Button asChild variant="ghost" size="icon" aria-label={t("Назад в проект")}>
             <Link to="/projects/$projectId" params={{ projectId }}>
               <ArrowLeft className="size-4" aria-hidden="true" />
             </Link>
@@ -305,10 +288,10 @@ export function AssistantContextPage({
           <Brain className="size-5 text-[var(--accent)]" aria-hidden="true" />
           <p className="truncate text-sm font-semibold">
             {view === "guide"
-              ? "Руководство ассистента"
+              ? t("Руководство ассистента")
               : view === "memory"
-                ? "Память проекта"
-                : "Контекст ассистента"}
+                ? t("Память проекта")
+                : t("Контекст ассистента")}
             <span className="hidden text-[var(--ink-tertiary)] sm:inline">
               {" "}
               · {project.data.project.title}
@@ -317,13 +300,13 @@ export function AssistantContextPage({
           <Button asChild variant="secondary" size="compact" className="ml-auto">
             <Link to="/settings/assistant-providers">
               <Settings2 className="size-4" aria-hidden="true" />
-              Провайдеры
+              {t("Провайдеры")}
             </Link>
           </Button>
         </header>
         <main className="mx-auto grid w-full max-w-[1180px] gap-6 px-4 py-8 lg:grid-cols-2 lg:px-8">
           <nav
-            aria-label="Контекст ассистента"
+            aria-label={t("Контекст ассистента")}
             className="flex gap-2 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-1 lg:col-span-2"
           >
             <AssistantContextLink
@@ -331,7 +314,7 @@ export function AssistantContextPage({
               to="/projects/$projectId/assistant-context"
               projectId={projectId}
             >
-              Обзор и история
+              {t("Обзор и история")}
             </AssistantContextLink>
             <AssistantContextLink
               active={view === "guide"}
@@ -345,7 +328,7 @@ export function AssistantContextPage({
               to="/projects/$projectId/memory"
               projectId={projectId}
             >
-              Память проекта
+              {t("Память проекта")}
             </AssistantContextLink>
           </nav>
 
@@ -353,19 +336,26 @@ export function AssistantContextPage({
             <>
               <ContextDestinationCard
                 icon={BookOpenCheck}
-                eyebrow={`Руководство · r${guide.data?.guide?.revision ?? 0}`}
+                eyebrow={t("Руководство · r{0}", guide.data?.guide?.revision ?? 0)}
                 title="ASSISTANT.md"
-                body="Отдельный проектный файл со стилем, голосом, запретами и правилами работы ассистента."
-                action="Открыть руководство"
+                body={t(
+                  "Отдельный проектный файл со стилем, голосом, запретами и правилами работы ассистента.",
+                )}
+                action={t("Открыть руководство")}
                 to="/projects/$projectId/assistant-guide"
                 projectId={projectId}
               />
               <ContextDestinationCard
                 icon={Brain}
-                eyebrow={`${memoryRecords.filter((record) => record.active).length} активных записей`}
-                title="Память проекта"
-                body="Канон, решения, правила мира и ограничения — отдельно от словаря и документов."
-                action="Открыть память"
+                eyebrow={t(
+                  "{0} активных записей",
+                  memoryRecords.filter((record) => record.active).length,
+                )}
+                title={t("Память проекта")}
+                body={t(
+                  "Канон, решения, правила мира и ограничения — отдельно от словаря и документов.",
+                )}
+                action={t("Открыть память")}
                 to="/projects/$projectId/memory"
                 projectId={projectId}
               />
@@ -379,14 +369,15 @@ export function AssistantContextPage({
                 <div>
                   <h1 className="font-display text-3xl">ASSISTANT.md</h1>
                   <p className="mt-2 text-sm leading-6 text-[var(--ink-secondary)]">
-                    Стиль, тон, запреты и договорённости автора. Активная revision фиксируется при
-                    подтверждении каждого поручения: сохранение здесь повлияет на следующий turn, но
-                    не изменит уже выполняющийся.
+                    {t(
+                      "Стиль, тон, запреты и договорённости автора. Активная revision фиксируется при подтверждении каждого поручения: сохранение здесь повлияет на следующий turn, но не изменит уже выполняющийся.",
+                    )}
                   </p>
                 </div>
               </div>
               <label htmlFor="assistant-guide" className="mt-5 block text-sm font-medium">
-                Руководство проекта · r{guide.data?.guide?.revision ?? 0}
+                {t("Руководство проекта · r")}
+                {guide.data?.guide?.revision ?? 0}
               </label>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
@@ -396,11 +387,11 @@ export function AssistantContextPage({
                   onClick={() => void applyGuideTemplate()}
                 >
                   <BookOpenCheck className="size-3.5" aria-hidden="true" />
-                  Вставить структурированный шаблон
+                  {t("Вставить структурированный шаблон")}
                 </Button>
                 {guideContent !== (guide.data?.guide?.content ?? "") ? (
                   <Button type="button" variant="ghost" size="compact" onClick={discardGuideDraft}>
-                    Отменить локальный черновик
+                    {t("Отменить локальный черновик")}
                   </Button>
                 ) : null}
               </div>
@@ -408,16 +399,21 @@ export function AssistantContextPage({
                 <Banner
                   className="mt-3"
                   variant="info"
-                  title="Несохранённый черновик защищён локально"
-                  body="Он восстановится после перезагрузки этого браузера. Ассистент увидит его только после «Сохранить revision»."
+                  title={t("Несохранённый черновик защищён локально")}
+                  body={t(
+                    "Он восстановится после перезагрузки этого браузера. Ассистент увидит его только после «Сохранить revision».",
+                  )}
                 />
               ) : null}
               {staleGuideDraft ? (
                 <Banner
                   className="mt-3"
                   variant="warning"
-                  title={`Есть черновик для r${staleGuideDraft.baseRevision}`}
-                  body={`На сервере уже активна r${guide.data?.guide?.revision ?? 0}. Откройте старый черновик только если хотите вручную перенести его поверх новой revision.`}
+                  title={t("Есть черновик для r{0}", staleGuideDraft.baseRevision)}
+                  body={t(
+                    "На сервере уже активна r{0}. Откройте старый черновик только если хотите вручную перенести его поверх новой revision.",
+                    guide.data?.guide?.revision ?? 0,
+                  )}
                   action={
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -426,7 +422,7 @@ export function AssistantContextPage({
                         size="compact"
                         onClick={() => updateGuideDraft(staleGuideDraft.content)}
                       >
-                        Открыть черновик
+                        {t("Открыть черновик")}
                       </Button>
                       <Button
                         type="button"
@@ -434,7 +430,7 @@ export function AssistantContextPage({
                         size="compact"
                         onClick={discardGuideDraft}
                       >
-                        Отбросить
+                        {t("Отбросить")}
                       </Button>
                     </div>
                   }
@@ -446,12 +442,14 @@ export function AssistantContextPage({
                 onChange={(event) => updateGuideDraft(event.target.value)}
                 maxLength={24_000}
                 rows={18}
-                placeholder={`# Голос и стиль\n\n- Пиши сдержанно, без лишних объяснений.\n- Используй канонические имена из словаря.\n- Не меняй финальную реплику без прямого поручения.`}
+                placeholder={t(
+                  "# Голос и стиль\n\n- Пиши сдержанно, без лишних объяснений.\n- Используй канонические имена из словаря.\n- Не меняй финальную реплику без прямого поручения.",
+                )}
                 className="font-mono mt-2 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-[13px] leading-6 outline-none focus:border-[var(--accent)]"
               />
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[11px] text-[var(--ink-tertiary)]">
-                  {guideContent.length.toLocaleString("ru")} / 24 000
+                  {guideContent.length.toLocaleString(interfaceLanguage)} / 24 000
                 </span>
                 <Button
                   onClick={() => saveGuide.mutate()}
@@ -460,14 +458,14 @@ export function AssistantContextPage({
                   }
                 >
                   <Save className="size-4" aria-hidden="true" />
-                  Сохранить revision
+                  {t("Сохранить revision")}
                 </Button>
               </div>
               {(guide.data?.guide?.history?.length ?? 0) > 0 ? (
                 <details className="mt-6 border-t border-[var(--border-subtle)] pt-4">
                   <summary className="flex cursor-pointer items-center gap-2 text-sm">
                     <History className="size-4" aria-hidden="true" />
-                    История руководства
+                    {t("История руководства")}
                   </summary>
                   <div className="mt-3 space-y-2">
                     {guide.data?.guide?.history?.map((revision) => (
@@ -485,7 +483,7 @@ export function AssistantContextPage({
                           onClick={() => restoreGuide.mutate(revision.revision)}
                         >
                           <RotateCcw className="size-3.5" aria-hidden="true" />
-                          Вернуть
+                          {t("Вернуть")}
                         </Button>
                       </div>
                     ))}
@@ -503,10 +501,11 @@ export function AssistantContextPage({
                   aria-hidden="true"
                 />
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-display text-3xl">Память проекта</h2>
+                  <h2 className="font-display text-3xl">{t("Память проекта")}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--ink-secondary)]">
-                    Канон, решения, правила мира и ограничения. Записи, предложенные ассистентом,
-                    всегда проходят отдельную группу review.
+                    {t(
+                      "Канон, решения, правила мира и ограничения. Записи, предложенные ассистентом, всегда проходят отдельную группу review.",
+                    )}
                   </p>
                 </div>
               </div>
@@ -520,8 +519,8 @@ export function AssistantContextPage({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">
                     {editingMemory
-                      ? `Изменить запись · текущая r${editingMemory.revision}`
-                      : "Добавить факт или решение"}
+                      ? t("Изменить запись · текущая r{0}", editingMemory.revision)
+                      : t("Добавить факт или решение")}
                   </h3>
                   {editingMemory ? (
                     <Button
@@ -530,12 +529,12 @@ export function AssistantContextPage({
                       size="compact"
                       onClick={resetMemoryEditor}
                     >
-                      Отмена
+                      {t("Отмена")}
                     </Button>
                   ) : null}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
-                  <Field label="Тип">
+                  <Field label={t("Тип")}>
                     <Select
                       value={memoryDraft.kind}
                       onChange={(event) =>
@@ -545,27 +544,27 @@ export function AssistantContextPage({
                         }))
                       }
                     >
-                      <option value="fact">Факт</option>
-                      <option value="character">Персонаж</option>
-                      <option value="world_rule">Правило мира</option>
-                      <option value="plot">Сюжет</option>
-                      <option value="style">Стиль</option>
-                      <option value="constraint">Ограничение</option>
-                      <option value="decision">Решение</option>
-                      <option value="other">Другое</option>
+                      <option value="fact">{t("Факт")}</option>
+                      <option value="character">{t("Персонаж")}</option>
+                      <option value="world_rule">{t("Правило мира")}</option>
+                      <option value="plot">{t("Сюжет")}</option>
+                      <option value="style">{t("Стиль")}</option>
+                      <option value="constraint">{t("Ограничение")}</option>
+                      <option value="decision">{t("Решение")}</option>
+                      <option value="other">{t("Другое")}</option>
                     </Select>
                   </Field>
-                  <Field label="Что нужно помнить">
+                  <Field label={t("Что нужно помнить")}>
                     <Input
                       value={memoryDraft.statement}
                       onChange={(event) =>
                         setMemoryDraft((current) => ({ ...current, statement: event.target.value }))
                       }
                       maxLength={4_000}
-                      placeholder="Элина никогда не называет отца по имени."
+                      placeholder={t("Элина никогда не называет отца по имени.")}
                     />
                   </Field>
-                  <Field label="Область действия">
+                  <Field label={t("Область действия")}>
                     <Select
                       value={memoryDraft.scope}
                       onChange={(event) =>
@@ -576,12 +575,12 @@ export function AssistantContextPage({
                         }))
                       }
                     >
-                      <option value="project">Весь проект</option>
-                      <option value="node">Конкретный файл</option>
+                      <option value="project">{t("Весь проект")}</option>
+                      <option value="node">{t("Конкретный файл")}</option>
                     </Select>
                   </Field>
                   {memoryDraft.scope === "node" ? (
-                    <Field label="Файл области">
+                    <Field label={t("Файл области")}>
                       <Select
                         required
                         value={memoryDraft.scopeNodeId}
@@ -592,7 +591,7 @@ export function AssistantContextPage({
                           }))
                         }
                       >
-                        <option value="">Выберите файл</option>
+                        <option value="">{t("Выберите файл")}</option>
                         {projectNodes.map((node) => (
                           <option key={node.id} value={node.id}>
                             {node.title}
@@ -601,7 +600,7 @@ export function AssistantContextPage({
                       </Select>
                     </Field>
                   ) : (
-                    <Field label="Теги" hint="Через запятую; по ним работает поиск.">
+                    <Field label={t("Теги")} hint={t("Через запятую; по ним работает поиск.")}>
                       <Input
                         value={memoryDraft.tagsText}
                         onChange={(event) =>
@@ -611,14 +610,16 @@ export function AssistantContextPage({
                           }))
                         }
                         maxLength={1_000}
-                        placeholder="Элина, канон, вода"
+                        placeholder={t("Элина, канон, вода")}
                       />
                     </Field>
                   )}
                   {memoryDraft.scope === "node" ? (
                     <Field
-                      label="Теги"
-                      hint="Через запятую; область ограничивает применение, теги помогают найти запись."
+                      label={t("Теги")}
+                      hint={t(
+                        "Через запятую; область ограничивает применение, теги помогают найти запись.",
+                      )}
                       className="sm:col-span-2"
                     >
                       <Input
@@ -630,15 +631,17 @@ export function AssistantContextPage({
                           }))
                         }
                         maxLength={1_000}
-                        placeholder="Элина, канон, вода"
+                        placeholder={t("Элина, канон, вода")}
                       />
                     </Field>
                   ) : null}
                 </div>
                 <fieldset className="mt-4 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] p-3">
-                  <legend className="px-1 text-xs font-medium">Файлы-источники</legend>
+                  <legend className="px-1 text-xs font-medium">{t("Файлы-источники")}</legend>
                   <p className="mb-3 text-[11px] leading-5 text-[var(--ink-tertiary)]">
-                    Источник объясняет, откуда взялся факт. Он не меняет область действия записи.
+                    {t(
+                      "Источник объясняет, откуда взялся факт. Он не меняет область действия записи.",
+                    )}
                   </p>
                   <div className="grid max-h-36 gap-2 overflow-y-auto sm:grid-cols-2">
                     {projectNodes.map((node) => {
@@ -685,10 +688,12 @@ export function AssistantContextPage({
                       }))
                     }
                   />
-                  Всегда включать в ограниченный prompt-контекст
+                  {t("Всегда включать в ограниченный prompt-контекст")}
                 </label>
                 <p className="mt-2 text-[11px] leading-5 text-[var(--ink-tertiary)]">
-                  Используйте редко: такая запись расходует prompt-контекст в каждом поручении.
+                  {t(
+                    "Используйте редко: такая запись расходует prompt-контекст в каждом поручении.",
+                  )}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
@@ -705,7 +710,7 @@ export function AssistantContextPage({
                     ) : (
                       <Plus className="size-4" aria-hidden="true" />
                     )}
-                    {editingMemory ? "Сохранить новую revision" : "Добавить в память"}
+                    {editingMemory ? t("Сохранить новую revision") : t("Добавить в память")}
                   </Button>
                 </div>
               </form>
@@ -719,8 +724,8 @@ export function AssistantContextPage({
                     className="pl-10"
                     value={memoryQuery}
                     onChange={(event) => setMemoryQuery(event.target.value)}
-                    placeholder="Факт, тег или источник"
-                    aria-label="Поиск по памяти проекта"
+                    placeholder={t("Факт, тег или источник")}
+                    aria-label={t("Поиск по памяти проекта")}
                   />
                 </div>
                 <Select
@@ -728,31 +733,34 @@ export function AssistantContextPage({
                   onChange={(event) =>
                     setMemoryStatusFilter(event.target.value as MemoryStatusFilter)
                   }
-                  aria-label="Фильтр по состоянию памяти"
+                  aria-label={t("Фильтр по состоянию памяти")}
                 >
-                  <option value="all">Все состояния</option>
-                  <option value="active">Активные</option>
-                  <option value="inactive">Не используются</option>
-                  <option value="always">Всегда в контексте</option>
+                  <option value="all">{t("Все состояния")}</option>
+                  <option value="active">{t("Активные")}</option>
+                  <option value="inactive">{t("Не используются")}</option>
+                  <option value="always">{t("Всегда в контексте")}</option>
                 </Select>
                 <Select
                   value={memoryKindFilter}
                   onChange={(event) => setMemoryKindFilter(event.target.value as MemoryKindFilter)}
-                  aria-label="Фильтр по типу памяти"
+                  aria-label={t("Фильтр по типу памяти")}
                 >
-                  <option value="all">Все типы</option>
-                  <option value="fact">Факты</option>
-                  <option value="character">Персонажи</option>
-                  <option value="world_rule">Правила мира</option>
-                  <option value="plot">Сюжет</option>
-                  <option value="style">Стиль</option>
-                  <option value="constraint">Ограничения</option>
-                  <option value="decision">Решения</option>
-                  <option value="other">Другое</option>
+                  <option value="all">{t("Все типы")}</option>
+                  <option value="fact">{t("Факты")}</option>
+                  <option value="character">{t("Персонажи")}</option>
+                  <option value="world_rule">{t("Правила мира")}</option>
+                  <option value="plot">{t("Сюжет")}</option>
+                  <option value="style">{t("Стиль")}</option>
+                  <option value="constraint">{t("Ограничения")}</option>
+                  <option value="decision">{t("Решения")}</option>
+                  <option value="other">{t("Другое")}</option>
                 </Select>
               </div>
               <p className="mt-3 text-[11px] text-[var(--ink-tertiary)]" aria-live="polite">
-                Показано {filteredMemoryRecords.length} из {memoryRecords.length}
+                {t("Показано ")}
+                {filteredMemoryRecords.length}
+                {t(" из ")}
+                {memoryRecords.length}
               </p>
               <div className="mt-5 space-y-3">
                 {filteredMemoryRecords.length ? (
@@ -765,39 +773,46 @@ export function AssistantContextPage({
                         {memoryKindLabel(record.kind)} · r{record.revision}
                         {!record.active ? (
                           <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-1 text-[var(--ink-secondary)]">
-                            не используется
+                            {t("не используется")}
                           </span>
                         ) : null}
                         {record.alwaysRelevant ? (
                           <span
                             className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[var(--accent-ink)]"
-                            title="Эта запись входит в ограниченный prompt-контекст каждого поручения"
+                            title={t(
+                              "Эта запись входит в ограниченный prompt-контекст каждого поручения",
+                            )}
                           >
-                            всегда
+                            {t("всегда")}
                           </span>
                         ) : null}
                       </div>
                       <p className="mt-2 text-sm leading-6">{record.statement}</p>
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[var(--ink-tertiary)]">
                         <span>
-                          Область:{" "}
+                          {t("Область:")}{" "}
                           {record.scope === "project"
-                            ? "весь проект"
+                            ? t("весь проект")
                             : record.scopeNodeId && (
                                 <MemoryNodeLink
                                   projectId={projectId}
                                   nodeId={record.scopeNodeId}
                                   nodes={projectNodes}
-                                  fallback="файл недоступен"
+                                  fallback={t("файл недоступен")}
                                 />
                               )}
                         </span>
-                        <span>Источник: {memorySourceLabel(record.source)}</span>
-                        <span>{new Date(record.updatedAt).toLocaleString("ru")}</span>
+                        <span>
+                          {t("Источник: ")}
+                          {memorySourceLabel(record.source)}
+                        </span>
+                        <span>{new Date(record.updatedAt).toLocaleString(interfaceLanguage)}</span>
                       </div>
                       {record.tags.length ? (
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] text-[var(--ink-tertiary)]">Теги:</span>
+                          <span className="text-[10px] text-[var(--ink-tertiary)]">
+                            {t("Теги:")}
+                          </span>
                           {record.tags.map((tag) => (
                             <span
                               key={tag}
@@ -810,7 +825,7 @@ export function AssistantContextPage({
                       ) : null}
                       {record.sourceReferences.length ? (
                         <div className="mt-3 text-[11px] leading-5 text-[var(--ink-secondary)]">
-                          <p>Файлы-источники:</p>
+                          <p>{t("Файлы-источники:")}</p>
                           <ul className="mt-1 space-y-1">
                             {record.sourceReferences.map((reference) => (
                               <li
@@ -843,7 +858,7 @@ export function AssistantContextPage({
                           }}
                         >
                           <Pencil className="size-3.5" aria-hidden="true" />
-                          Изменить
+                          {t("Изменить")}
                         </Button>
                         {record.active ? (
                           <Button
@@ -852,7 +867,7 @@ export function AssistantContextPage({
                             disabled={deactivate.isPending}
                             onClick={() => deactivate.mutate(record.id)}
                           >
-                            Не использовать
+                            {t("Не использовать")}
                           </Button>
                         ) : (
                           <Button
@@ -861,7 +876,7 @@ export function AssistantContextPage({
                             disabled={reactivate.isPending}
                             onClick={() => reactivate.mutate(record)}
                           >
-                            Использовать снова
+                            {t("Использовать снова")}
                           </Button>
                         )}
                         <Button
@@ -876,7 +891,7 @@ export function AssistantContextPage({
                           }
                         >
                           <History className="size-3.5" aria-hidden="true" />
-                          История
+                          {t("История")}
                         </Button>
                       </div>
                       {expandedMemoryId === record.id ? (
@@ -894,8 +909,8 @@ export function AssistantContextPage({
                 ) : memoryRecords.length ? (
                   <Banner
                     variant="info"
-                    title="Ничего не найдено"
-                    body="Измените запрос или сбросьте фильтры памяти."
+                    title={t("Ничего не найдено")}
+                    body={t("Измените запрос или сбросьте фильтры памяти.")}
                     action={
                       <Button
                         type="button"
@@ -907,15 +922,17 @@ export function AssistantContextPage({
                           setMemoryKindFilter("all");
                         }}
                       >
-                        Сбросить фильтры
+                        {t("Сбросить фильтры")}
                       </Button>
                     }
                   />
                 ) : (
                   <Banner
                     variant="info"
-                    title="Память пока пуста"
-                    body="Добавьте первый факт вручную или скажите ассистенту: «занеси это в память»."
+                    title={t("Память пока пуста")}
+                    body={t(
+                      "Добавьте первый факт вручную или скажите ассистенту: «занеси это в память».",
+                    )}
                   />
                 )}
               </div>
@@ -926,10 +943,11 @@ export function AssistantContextPage({
               <div className="flex items-start gap-3">
                 <History className="mt-1 size-5 text-[var(--accent)]" aria-hidden="true" />
                 <div>
-                  <h2 className="font-display text-3xl">История ассистента</h2>
+                  <h2 className="font-display text-3xl">{t("История ассистента")}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--ink-secondary)]">
-                    Сессии, поручения и техническая история хранятся отдельно от проекта. Удаление
-                    записи не откатывает уже применённые правки, словарь или память.
+                    {t(
+                      "Сессии, поручения и техническая история хранятся отдельно от проекта. Удаление записи не откатывает уже применённые правки, словарь или память.",
+                    )}
                   </p>
                 </div>
               </div>
@@ -944,18 +962,18 @@ export function AssistantContextPage({
                         <p className="text-[10px] font-semibold tracking-[0.12em] text-[var(--accent)] uppercase">
                           {assistantRunStatusLabel(run.status)} ·{" "}
                           {run.inputMode === "voice"
-                            ? "голосом"
+                            ? t("голосом")
                             : run.inputMode === "mcp"
-                              ? `внешний агент · ${run.agent?.clientName ?? "MCP"}`
-                              : "чат"}
+                              ? t("внешний агент · {0}", run.agent?.clientName ?? "MCP")
+                              : t("чат")}
                         </p>
                         <p className="mt-1 truncate text-sm font-semibold">
-                          {run.latestTurn?.instruction || "Сессия без подтверждённого поручения"}
+                          {run.latestTurn?.instruction || t("Сессия без подтверждённого поручения")}
                         </p>
                         <p className="mt-1 text-[11px] text-[var(--ink-tertiary)]">
-                          {new Date(run.updatedAt).toLocaleString("ru")} ·{" "}
+                          {new Date(run.updatedAt).toLocaleString(interfaceLanguage)} ·{" "}
                           {run.origin === "remote_mcp"
-                            ? `Внешний агент · ${run.agent?.clientName ?? run.provider.name}`
+                            ? t("Внешний агент · {0}", run.agent?.clientName ?? run.provider.name)
                             : `${run.provider.name} · ${run.provider.model}`}
                         </p>
                       </div>
@@ -965,7 +983,7 @@ export function AssistantContextPage({
                             to="/projects/$projectId/assistant/$runId"
                             params={{ projectId, runId: run.id }}
                           >
-                            Открыть
+                            {t("Открыть")}
                           </Link>
                         </Button>
                         <Button
@@ -974,10 +992,11 @@ export function AssistantContextPage({
                           disabled={run.status === "working" || deleteHistory.isPending}
                           onClick={async () => {
                             const confirmed = await requestConfirmation({
-                              title: "Удалить историю этой сессии?",
-                              description:
+                              title: t("Удалить историю этой сессии?"),
+                              description: t(
                                 "Поручения, ответы и неприменённые предложения исчезнут. Уже применённые изменения проекта останутся.",
-                              confirmLabel: "Удалить историю",
+                              ),
+                              confirmLabel: t("Удалить историю"),
                               tone: "danger",
                               icon: Trash2,
                             });
@@ -985,7 +1004,7 @@ export function AssistantContextPage({
                           }}
                         >
                           <Trash2 className="size-3.5" aria-hidden="true" />
-                          Удалить историю
+                          {t("Удалить историю")}
                         </Button>
                       </div>
                     </article>
@@ -993,8 +1012,8 @@ export function AssistantContextPage({
                 ) : (
                   <Banner
                     variant="info"
-                    title="Истории пока нет"
-                    body="Новая сессия появится здесь после запуска ассистента."
+                    title={t("Истории пока нет")}
+                    body={t("Новая сессия появится здесь после запуска ассистента.")}
                   />
                 )}
               </div>
@@ -1093,16 +1112,16 @@ function MemoryHistoryPanel({
   return (
     <section
       id={`memory-history-${record.id}`}
-      aria-label={`История записи «${record.statement}»`}
+      aria-label={t("История записи «{0}»", record.statement)}
       className="mt-4 border-t border-[var(--border-subtle)] pt-4"
     >
-      <h4 className="text-xs font-semibold">История без перезаписи прошлых версий</h4>
-      {history.isPending ? <Spinner label="Открываем историю записи…" /> : null}
+      <h4 className="text-xs font-semibold">{t("История без перезаписи прошлых версий")}</h4>
+      {history.isPending ? <Spinner label={t("Открываем историю записи…")} /> : null}
       {history.isError ? (
         <Banner
           className="mt-3"
           variant="danger"
-          title="История недоступна"
+          title={t("История недоступна")}
           body={history.error.message}
         />
       ) : null}
@@ -1115,7 +1134,7 @@ function MemoryHistoryPanel({
             <div className="flex flex-wrap items-center gap-2 text-[10px] text-[var(--ink-tertiary)]">
               <span className="font-semibold text-[var(--ink-primary)]">r{revision.revision}</span>
               <span>{memorySourceLabel(revision.source)}</span>
-              <span>{new Date(revision.createdAt).toLocaleString("ru")}</span>
+              <span>{new Date(revision.createdAt).toLocaleString(interfaceLanguage)}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -1125,7 +1144,8 @@ function MemoryHistoryPanel({
                 onClick={() => onRestore(revision.revision)}
               >
                 <RotateCcw className="size-3.5" aria-hidden="true" />
-                Восстановить r{revision.revision}
+                {t("Восстановить r")}
+                {revision.revision}
               </Button>
             </div>
             <p className="mt-1 text-xs leading-5">{revision.snapshot.statement}</p>
@@ -1162,12 +1182,12 @@ function MemoryNodeLink({
 
 function assistantRunStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    active: "Можно продолжить",
-    working: "Выполняется",
-    awaiting_review: "Нужно проверить",
-    completed: "Завершено",
-    cancelled: "Остановлено",
-    failed: "Требует внимания",
+    active: t("Можно продолжить"),
+    working: t("Выполняется"),
+    awaiting_review: t("Нужно проверить"),
+    completed: t("Завершено"),
+    cancelled: t("Остановлено"),
+    failed: t("Требует внимания"),
   };
-  return labels[status] ?? "Сессия";
+  return labels[status] ?? t("Сессия");
 }

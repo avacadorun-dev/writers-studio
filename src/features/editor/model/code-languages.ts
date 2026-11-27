@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 export interface CodeLanguageOption {
   value: string;
   label: string;
@@ -6,7 +8,7 @@ export interface CodeLanguageOption {
 // Keep stored values aligned with conventional Markdown fence names. The
 // highlighter maps aliases separately so export never rewrites the fence info.
 export const codeLanguageOptions: readonly CodeLanguageOption[] = [
-  { value: "", label: "Обычный текст" },
+  { value: "", label: t("Обычный текст") },
   { value: "go", label: "Go / Golang" },
   { value: "javascript", label: "JavaScript" },
   { value: "typescript", label: "TypeScript" },

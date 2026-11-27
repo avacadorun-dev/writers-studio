@@ -22,6 +22,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppProviders } from "~app/providers";
+import { interfaceLanguage, t } from "~shared/i18n";
 
 import { routeTree } from "./app/routeTree.gen";
 
@@ -42,6 +43,21 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("Application root is missing");
 }
+
+document.documentElement.lang = interfaceLanguage;
+document.title = t("Студия автора");
+document
+  .querySelector('meta[name="description"]')
+  ?.setAttribute(
+    "content",
+    t("Студия автора — голос, черновик и рукопись в одном безопасном пространстве."),
+  );
+document.documentElement.style.setProperty("--callout-info-label", JSON.stringify(t("Информация")));
+document.documentElement.style.setProperty("--callout-idea-label", JSON.stringify(t("Идея")));
+document.documentElement.style.setProperty(
+  "--callout-warning-label",
+  JSON.stringify(t("Предупреждение")),
+);
 
 createRoot(root).render(
   <StrictMode>

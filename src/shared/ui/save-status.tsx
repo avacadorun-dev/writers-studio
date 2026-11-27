@@ -1,20 +1,21 @@
 import { Check, CircleAlert, CloudOff, LoaderCircle, RefreshCw } from "lucide-react";
+import { t } from "~shared/i18n";
 
 import { cn } from "~shared/lib/cn";
 
 export type SaveState = "saved" | "saving" | "local" | "pending" | "conflict";
 
 const stateConfig = {
-  saved: { label: "Сохранено", Icon: Check, className: "text-[var(--success)]" },
-  saving: { label: "Сохранение…", Icon: LoaderCircle, className: "text-[var(--info)]" },
-  local: { label: "На этом устройстве", Icon: CloudOff, className: "text-[var(--warning)]" },
+  saved: { label: t("Сохранено"), Icon: Check, className: "text-[var(--success)]" },
+  saving: { label: t("Сохранение…"), Icon: LoaderCircle, className: "text-[var(--info)]" },
+  local: { label: t("На этом устройстве"), Icon: CloudOff, className: "text-[var(--warning)]" },
   pending: {
-    label: "Нужна синхронизация",
+    label: t("Нужна синхронизация"),
     Icon: RefreshCw,
     className: "text-[var(--warning)]",
   },
   conflict: {
-    label: "Сохранены оба варианта",
+    label: t("Сохранены оба варианта"),
     Icon: CircleAlert,
     className: "text-[var(--danger)]",
   },

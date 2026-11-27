@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-
 import { getAssistantRun } from "~entities/assistant";
 import { getProject } from "~entities/project";
 import { StudioPage } from "~pages/studio";
+import { t } from "~shared/i18n";
 import { Banner, Spinner } from "~shared/ui";
 
 export const Route = createFileRoute("/projects/$projectId/assistant/$runId/")({
@@ -20,13 +20,13 @@ function AssistantSessionRoute() {
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId),
   });
-  if (run.isPending || project.isPending) return <Spinner label="Открываем workspace…" />;
+  if (run.isPending || project.isPending) return <Spinner label={t("Открываем workspace…")} />;
   if (run.isError || project.isError || !run.data || !project.data) {
     return (
       <Banner
         variant="danger"
-        title="Сессия недоступна"
-        body="Вернитесь в проект и откройте другую сессию."
+        title={t("Сессия недоступна")}
+        body={t("Вернитесь в проект и откройте другую сессию.")}
       />
     );
   }
@@ -43,8 +43,8 @@ function AssistantSessionRoute() {
     return (
       <Banner
         variant="warning"
-        title="В проекте нет открываемого документа"
-        body="Создайте документ и снова откройте сессию ассистента."
+        title={t("В проекте нет открываемого документа")}
+        body={t("Создайте документ и снова откройте сессию ассистента.")}
       />
     );
   }

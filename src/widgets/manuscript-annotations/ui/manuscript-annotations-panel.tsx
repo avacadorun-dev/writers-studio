@@ -12,12 +12,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
 import {
   type DocumentAnnotation,
   deleteDocumentAnnotation,
   updateDocumentAnnotation,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import { Button, useActionDialog, useToast } from "~shared/ui";
 
@@ -65,16 +65,16 @@ export function ManuscriptAnnotationsPanel({
       updateDocumentAnnotation(selected?.id ?? "", input),
     onSuccess: async () => {
       await refresh();
-      showToast({ title: "Заметка обновлена" });
+      showToast({ title: t("Заметка обновлена") });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось обновить заметку", description: error.message }),
+      showToast({ title: t("Не удалось обновить заметку"), description: error.message }),
   });
   const remove = useMutation({
     mutationFn: (annotationId: string) => deleteDocumentAnnotation(annotationId),
     onSuccess: async () => {
       await refresh();
-      showToast({ title: "Пометка удалена" });
+      showToast({ title: t("Пометка удалена") });
     },
   });
 
@@ -89,14 +89,14 @@ export function ManuscriptAnnotationsPanel({
       >
         <MessageSquareText className="size-4 shrink-0 text-[var(--accent)]" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">Заметки и ссылки</h2>
-          <p className="truncate text-[10px] text-[var(--ink-tertiary)]">Поля рукописи</p>
+          <h2 className="truncate text-sm font-semibold">{t("Заметки и ссылки")}</h2>
+          <p className="truncate text-[10px] text-[var(--ink-tertiary)]">{t("Поля рукописи")}</p>
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Закрыть поля"
+          aria-label={t("Закрыть поля")}
           onClick={onClose}
         >
           <X className="size-4" aria-hidden="true" />
@@ -106,7 +106,7 @@ export function ManuscriptAnnotationsPanel({
       <div className="border-b border-[var(--border-subtle)] p-3">
         <Button asChild variant="secondary" className="w-full justify-between">
           <Link to="/projects/$projectId/annotations" params={{ projectId }}>
-            Все правки проекта
+            {t("Все правки проекта")}
             <ExternalLink className="size-4" aria-hidden="true" />
           </Link>
         </Button>
@@ -116,7 +116,7 @@ export function ManuscriptAnnotationsPanel({
         <div className="min-h-0 overflow-y-auto border-r border-[var(--border-subtle)] p-2 lg:border-r-0 lg:border-b">
           {active.length === 0 ? (
             <p className="p-3 text-xs leading-5 text-[var(--ink-secondary)]">
-              Выделите текст, чтобы добавить заметку или связать его со словарём.
+              {t("Выделите текст, чтобы добавить заметку или связать его со словарём.")}
             </p>
           ) : (
             active.map((item) => (
@@ -131,7 +131,8 @@ export function ManuscriptAnnotationsPanel({
           {resolved.length > 0 ? (
             <details className="mt-2">
               <summary className="cursor-pointer px-2 py-2 text-[11px] text-[var(--ink-secondary)]">
-                Исправлено · {resolved.length}
+                {t("Исправлено · ")}
+                {resolved.length}
               </summary>
               {resolved.map((item) => (
                 <AnnotationListItem
@@ -168,7 +169,8 @@ export function ManuscriptAnnotationsPanel({
                     «{selected.anchor.exactText}»
                   </p>
                   <p className="mt-1 text-[11px] text-[var(--ink-tertiary)]">
-                    Редакция {selected.baseRevision}
+                    {t("Редакция ")}
+                    {selected.baseRevision}
                   </p>
                 </div>
               </div>
@@ -176,13 +178,15 @@ export function ManuscriptAnnotationsPanel({
               {selected.anchorStatus === "detached" || selected.status === "needs_attention" ? (
                 <div className="mt-4 flex gap-2 rounded-[var(--radius-md)] bg-[var(--danger-soft)] p-3 text-xs leading-5 text-[var(--danger)]">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  Фрагмент или термин изменился. Пометка сохранена, но её нужно перепривязать.
+                  {t(
+                    "Фрагмент или термин изменился. Пометка сохранена, но её нужно перепривязать.",
+                  )}
                 </div>
               ) : null}
 
               {selected.kind === "note" ? (
                 <label className="mt-4 block text-xs font-semibold">
-                  Заметка
+                  {t("Заметка")}
                   <textarea
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
@@ -194,17 +198,17 @@ export function ManuscriptAnnotationsPanel({
               ) : (
                 <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
                   <p className="text-[10px] font-semibold tracking-wide text-[var(--ink-tertiary)] uppercase">
-                    Термин словаря
+                    {t("Термин словаря")}
                   </p>
                   <p className="mt-1 font-semibold">
-                    {selected.dictionaryTerm?.canonical ?? "Удалённый термин"}
+                    {selected.dictionaryTerm?.canonical ?? t("Удалённый термин")}
                   </p>
                   <p className="mt-1 text-xs text-[var(--ink-secondary)]">
                     {selected.dictionaryTerm?.id
                       ? selected.dictionaryTerm.active
-                        ? "Активен в словаре"
-                        : "Отключён в словаре"
-                      : "Снимок термина сохранён вместе с проектом"}
+                        ? t("Активен в словаре")
+                        : t("Отключён в словаре")
+                      : t("Снимок термина сохранён вместе с проектом")}
                   </p>
                 </div>
               )}
@@ -218,7 +222,7 @@ export function ManuscriptAnnotationsPanel({
                     onClick={() => update.mutate({ note: draft.trim() })}
                   >
                     <Save className="size-3.5" aria-hidden="true" />
-                    Сохранить
+                    {t("Сохранить")}
                   </Button>
                 ) : null}
                 <Button
@@ -235,7 +239,7 @@ export function ManuscriptAnnotationsPanel({
                   ) : (
                     <Check className="size-3.5" aria-hidden="true" />
                   )}
-                  {selected.status === "resolved" ? "Вернуть" : "Исправлено"}
+                  {selected.status === "resolved" ? t("Вернуть") : t("Исправлено")}
                 </Button>
                 <Button
                   type="button"
@@ -243,9 +247,9 @@ export function ManuscriptAnnotationsPanel({
                   size="compact"
                   onClick={() => {
                     void requestConfirmation({
-                      title: "Удалить пометку?",
-                      description: "Текст рукописи и словарь не изменятся.",
-                      confirmLabel: "Удалить",
+                      title: t("Удалить пометку?"),
+                      description: t("Текст рукописи и словарь не изменятся."),
+                      confirmLabel: t("Удалить"),
                       tone: "danger",
                     }).then((confirmed) => {
                       if (confirmed) remove.mutate(selected.id);
@@ -253,7 +257,7 @@ export function ManuscriptAnnotationsPanel({
                   }}
                 >
                   <Trash2 className="size-3.5" aria-hidden="true" />
-                  Удалить
+                  {t("Удалить")}
                 </Button>
               </div>
             </>
@@ -293,7 +297,9 @@ function AnnotationListItem({
         <span className="truncate">{item.anchor.exactText}</span>
       </span>
       <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-[var(--ink-secondary)]">
-        {item.kind === "note" ? item.note : (item.dictionaryTerm?.canonical ?? "Удалённый термин")}
+        {item.kind === "note"
+          ? item.note
+          : (item.dictionaryTerm?.canonical ?? t("Удалённый термин"))}
       </span>
     </button>
   );

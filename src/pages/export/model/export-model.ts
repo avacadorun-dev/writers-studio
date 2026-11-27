@@ -4,6 +4,7 @@ import type {
   ExportProfile,
   ProjectStructure,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 
 export interface ExportQueueItem {
   id: string;
@@ -25,9 +26,9 @@ export function buildPublicationPreviewPages(
   documents: Array<{ id: string; title: string }>,
 ): PublicationPreviewPage[] {
   const pages: PublicationPreviewPage[] = [];
-  if (hasCover) pages.push({ id: "cover", kind: "cover", label: "Обложка" });
-  if (profile.titlePage) pages.push({ id: "title", kind: "title", label: "Титульная страница" });
-  if (profile.tableOfContents) pages.push({ id: "toc", kind: "toc", label: "Оглавление" });
+  if (hasCover) pages.push({ id: "cover", kind: "cover", label: t("Обложка") });
+  if (profile.titlePage) pages.push({ id: "title", kind: "title", label: t("Титульная страница") });
+  if (profile.tableOfContents) pages.push({ id: "toc", kind: "toc", label: t("Оглавление") });
   for (const [index, document] of documents.entries()) {
     pages.push({
       id: `document:${document.id}`,

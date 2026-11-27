@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Bot, Copy, Pencil, Tags, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-
 import { listAssistantRuns } from "~entities/assistant";
 import {
   type CanvasDocument,
@@ -21,6 +20,7 @@ import { getProjectOutline } from "~entities/project";
 import { useCanvasAutosave } from "~features/canvas-autosave";
 import { CanvasSchemaEditor } from "~features/canvas-schema-editor";
 import { AssistantSessionPage } from "~pages/assistant-session";
+import { t } from "~shared/i18n";
 import { getCanvasSnapshot } from "~shared/lib";
 import { Banner, Button, Spinner, useActionDialog, useToast } from "~shared/ui";
 import {
@@ -59,7 +59,7 @@ export function CanvasPage({
   });
 
   if (project.isPending || canvas.isPending || typeSchema.isPending)
-    return <Spinner label="Открываем доску…" />;
+    return <Spinner label={t("Открываем доску…")} />;
   if (
     project.isError ||
     canvas.isError ||
@@ -72,8 +72,8 @@ export function CanvasPage({
       <main className="mx-auto max-w-xl p-6">
         <Banner
           variant="danger"
-          title="Не удалось открыть доску"
-          body="Проверьте соединение и обновите страницу."
+          title={t("Не удалось открыть доску")}
+          body={t("Проверьте соединение и обновите страницу.")}
         />
       </main>
     );
@@ -83,8 +83,8 @@ export function CanvasPage({
       <main className="mx-auto max-w-xl p-6">
         <Banner
           variant="warning"
-          title="Доска недоступна"
-          body="Вернитесь в проект и выберите другую доску."
+          title={t("Доска недоступна")}
+          body={t("Вернитесь в проект и выберите другую доску.")}
         />
       </main>
     );
@@ -194,18 +194,19 @@ function LoadedCanvasPage({
         setInitialContent(content);
         autosave.queue(content);
         showToast({
-          title: "Восстановлена локальная версия доски",
+          title: t("Восстановлена локальная версия доски"),
           description: navigator.onLine
-            ? "Она будет синхронизирована автоматически."
-            : "Она сохранена на этом устройстве и синхронизируется после подключения.",
+            ? t("Она будет синхронизирована автоматически.")
+            : t("Она сохранена на этом устройстве и синхронизируется после подключения."),
         });
       })
       .catch(() => {
         if (cancelled) return;
         showToast({
-          title: "Доска открыта без локального восстановления",
-          description:
+          title: t("Доска открыта без локального восстановления"),
+          description: t(
             "Локальное хранилище не ответило. Серверная версия доступна, и можно продолжить работу.",
+          ),
         });
       })
       .finally(() => {
@@ -226,23 +227,23 @@ function LoadedCanvasPage({
         invalidateCanvases(),
         queryClient.invalidateQueries({ queryKey: ["canvas", canvasId] }),
       ]);
-      showToast({ title: "Доска переименована" });
+      showToast({ title: t("Доска переименована") });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось переименовать", description: error.message }),
+      showToast({ title: t("Не удалось переименовать"), description: error.message }),
   });
   const duplicate = useMutation({
     mutationFn: () => duplicateCanvas(canvasId),
     onSuccess: async ({ canvas }) => {
       await invalidateCanvases();
-      showToast({ title: "Создана копия доски" });
+      showToast({ title: t("Создана копия доски") });
       void navigate({
         to: "/projects/$projectId/canvases/$canvasId",
         params: { projectId, canvasId: canvas.id },
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось создать копию", description: error.message }),
+      showToast({ title: t("Не удалось создать копию"), description: error.message }),
   });
   const trash = useMutation({
     mutationFn: () => trashCanvas(canvasId),
@@ -259,7 +260,7 @@ function LoadedCanvasPage({
       }
     },
     onError: (error) =>
-      showToast({ title: "Не удалось удалить доску", description: error.message }),
+      showToast({ title: t("Не удалось удалить доску"), description: error.message }),
   });
   const saveTypeSchema = useMutation({
     mutationFn: (schema: ReturnType<typeof resolveCanvasTypeSchema>) =>
@@ -267,10 +268,10 @@ function LoadedCanvasPage({
     onSuccess: ({ schema }) => {
       queryClient.setQueryData(["canvas-schema", projectId], { schema });
       setSchemaEditorOpen(false);
-      showToast({ title: "Каталог Canvas сохранён" });
+      showToast({ title: t("Каталог Canvas сохранён") });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось сохранить каталог", description: error.message }),
+      showToast({ title: t("Не удалось сохранить каталог"), description: error.message }),
   });
 
   const documentTypeKeys = useMemo(
@@ -305,19 +306,19 @@ function LoadedCanvasPage({
 
   const promoteNode = async (nodeId: string, suggestedTitle: string) => {
     const titleValue = await requestInput({
-      title: "Превратить идею в документ",
-      label: "Название документа",
+      title: t("Превратить идею в документ"),
+      label: t("Название документа"),
       defaultValue: suggestedTitle,
-      confirmLabel: "Дальше",
+      confirmLabel: t("Дальше"),
     });
     const nextTitle = titleValue?.trim();
     if (!nextTitle) return undefined;
     const contentTypes = project.project.structure.nodeTypes.filter((item) => item.contentBearing);
     const kind = await requestSelect({
-      title: "Тип документа",
-      label: "Куда превратить карточку",
+      title: t("Тип документа"),
+      label: t("Куда превратить карточку"),
       options: contentTypes.map((item) => ({ value: item.key, label: item.label })),
-      confirmLabel: "Дальше",
+      confirmLabel: t("Дальше"),
     });
     if (!kind) return undefined;
     const selectedType = contentTypes.find((item) => item.key === kind);
@@ -330,11 +331,12 @@ function LoadedCanvasPage({
         return parentType?.allowedChildren.includes(kind);
       })
       .map((node) => ({ value: node.id, label: node.title }));
-    if (selectedType?.canBeRoot) parentOptions.unshift({ value: "root", label: "В корне проекта" });
+    if (selectedType?.canBeRoot)
+      parentOptions.unshift({ value: "root", label: t("В корне проекта") });
     if (parentOptions.length === 0) {
       showToast({
-        title: "Некуда поместить документ",
-        description: "Добавьте подходящий раздел в структуру проекта.",
+        title: t("Некуда поместить документ"),
+        description: t("Добавьте подходящий раздел в структуру проекта."),
       });
       return undefined;
     }
@@ -342,10 +344,10 @@ function LoadedCanvasPage({
       parentOptions.length === 1
         ? parentOptions[0]?.value
         : await requestSelect({
-            title: "Расположение документа",
-            label: "Раздел проекта",
+            title: t("Расположение документа"),
+            label: t("Раздел проекта"),
             options: parentOptions,
-            confirmLabel: "Создать документ",
+            confirmLabel: t("Создать документ"),
           });
     if (!parent) return undefined;
     try {
@@ -362,11 +364,11 @@ function LoadedCanvasPage({
         queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["canvas", canvasId] }),
       ]);
-      showToast({ title: "Идея стала документом", description: `Создан «${nextTitle}»` });
+      showToast({ title: t("Идея стала документом"), description: t("Создан «{0}»", nextTitle) });
       return result;
     } catch (error) {
       showToast({
-        title: "Не удалось создать документ",
+        title: t("Не удалось создать документ"),
         description: error instanceof Error ? error.message : undefined,
       });
       return undefined;
@@ -388,15 +390,15 @@ function LoadedCanvasPage({
           <Banner
             className="m-3 mb-0 shrink-0"
             variant="warning"
-            title="Сохранены оба варианта"
-            body="Параллельные изменения вынесены в отдельную конфликтующую доску."
+            title={t("Сохранены оба варианта")}
+            body={t("Параллельные изменения вынесены в отдельную конфликтующую доску.")}
             action={
               <Button asChild variant="secondary" size="compact">
                 <Link
                   to="/projects/$projectId/canvases/$canvasId"
                   params={{ projectId, canvasId: autosave.conflictCanvasId }}
                 >
-                  Открыть вариант
+                  {t("Открыть вариант")}
                 </Link>
               </Button>
             }
@@ -422,14 +424,14 @@ function LoadedCanvasPage({
           <main className="relative flex min-h-0 min-w-0 flex-1">
             <div className="relative min-h-0 min-w-0 flex-1">
               <fieldset className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg lg:top-3">
-                <legend className="sr-only">Действия с доской</legend>
+                <legend className="sr-only">{t("Действия с доской")}</legend>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  aria-label="Открыть Ассистента для этой доски"
-                  title="Ассистент Canvas"
+                  aria-label={t("Открыть Ассистента для этой доски")}
+                  title={t("Ассистент Canvas")}
                   onClick={openAssistantPanel}
                 >
                   <Bot className="size-3.5" aria-hidden="true" />
@@ -439,8 +441,8 @@ function LoadedCanvasPage({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  aria-label="Настроить типы карточек и связей"
-                  title="Каталог Canvas"
+                  aria-label={t("Настроить типы карточек и связей")}
+                  title={t("Каталог Canvas")}
                   onClick={() => setSchemaEditorOpen(true)}
                 >
                   <Tags className="size-3.5" aria-hidden="true" />
@@ -450,15 +452,15 @@ function LoadedCanvasPage({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  aria-label="Переименовать доску"
-                  title="Переименовать"
+                  aria-label={t("Переименовать доску")}
+                  title={t("Переименовать")}
                   onClick={() =>
                     void requestInput({
-                      title: "Переименовать доску",
-                      label: "Название",
+                      title: t("Переименовать доску"),
+                      label: t("Название"),
                       defaultValue: title,
                       icon: Pencil,
-                      confirmLabel: "Сохранить",
+                      confirmLabel: t("Сохранить"),
                     }).then((value) => {
                       if (value?.trim() && value.trim() !== title) rename.mutate(value.trim());
                     })
@@ -471,8 +473,8 @@ function LoadedCanvasPage({
                   variant="ghost"
                   size="icon"
                   className="size-8"
-                  aria-label="Создать копию доски"
-                  title="Создать копию"
+                  aria-label={t("Создать копию доски")}
+                  title={t("Создать копию")}
                   onClick={() => duplicate.mutate()}
                 >
                   <Copy className="size-3.5" aria-hidden="true" />
@@ -482,15 +484,15 @@ function LoadedCanvasPage({
                   variant="ghost"
                   size="icon"
                   className="size-8 text-[var(--danger)]"
-                  aria-label="Переместить доску в корзину"
-                  title="В корзину"
+                  aria-label={t("Переместить доску в корзину")}
+                  title={t("В корзину")}
                   onClick={() =>
                     void requestConfirmation({
-                      title: `Удалить «${title}»?`,
-                      description: "Доску можно будет восстановить из корзины проекта.",
+                      title: t("Удалить «{0}»?", title),
+                      description: t("Доску можно будет восстановить из корзины проекта."),
                       icon: Trash2,
                       tone: "danger",
-                      confirmLabel: "В корзину",
+                      confirmLabel: t("В корзину"),
                     }).then((confirmed) => confirmed && trash.mutate())
                   }
                 >
@@ -525,7 +527,7 @@ function LoadedCanvasPage({
                   }}
                 />
               ) : (
-                <Spinner label="Проверяем локальные изменения…" />
+                <Spinner label={t("Проверяем локальные изменения…")} />
               )}
               <CanvasSchemaEditor
                 open={schemaEditorOpen}

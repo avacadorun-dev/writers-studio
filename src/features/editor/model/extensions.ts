@@ -7,6 +7,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
+import { t } from "~shared/i18n";
 
 import { createClientId } from "~shared/lib";
 import { DocumentAnnotationsExtension } from "./annotations";
@@ -288,7 +289,7 @@ const SceneBreak = TiptapNode.create({
         "data-scene-break": "",
         class: "scene-break",
         role: "separator",
-        "aria-label": "Разделитель сцены",
+        "aria-label": t("Разделитель сцены"),
       }),
     ];
   },
@@ -318,7 +319,7 @@ export const editorExtensions = [
     },
   }),
   Placeholder.configure({
-    placeholder: "Начните писать или вставьте новый блок",
+    placeholder: t("Начните писать или вставьте новый блок"),
   }),
   PasteSanitizer,
   ActiveSourceHighlight,

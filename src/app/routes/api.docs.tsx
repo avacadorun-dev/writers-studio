@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { t } from "~shared/i18n";
 
 const swaggerAssetBase = "/swagger-assets/5.32.12";
 
@@ -56,7 +57,7 @@ function OpenAPIDocsPage() {
         });
       })
       .catch(() => {
-        if (active) setError("Не удалось загрузить Swagger UI");
+        if (active) setError(t("Не удалось загрузить Swagger UI"));
       });
     return () => {
       active = false;
@@ -68,7 +69,7 @@ function OpenAPIDocsPage() {
       {error ? (
         <p className="p-8 font-sans text-[var(--danger)]">{error}</p>
       ) : (
-        <div id="swagger-ui" />
+        <div id="swagger-ui" lang="en" />
       )}
     </main>
   );

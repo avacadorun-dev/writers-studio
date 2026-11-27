@@ -1,12 +1,12 @@
 import { Plus, Tags, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-
 import type {
   CanvasFieldType,
   CanvasRelationType,
   CanvasTypeDefinition,
   CanvasTypeSchema,
 } from "~entities/canvas";
+import { t } from "~shared/i18n";
 import { Button, Checkbox, Field, Input, ModalDialog, Select } from "~shared/ui";
 
 interface CanvasSchemaEditorProps {
@@ -18,17 +18,17 @@ interface CanvasSchemaEditorProps {
 }
 
 const fieldTypes: Array<{ value: CanvasFieldType; label: string }> = [
-  { value: "short-text", label: "Короткий текст" },
+  { value: "short-text", label: t("Короткий текст") },
   { value: "markdown", label: "Markdown" },
-  { value: "number", label: "Число" },
-  { value: "checkbox", label: "Флаг" },
-  { value: "single-select", label: "Один вариант" },
-  { value: "multi-select", label: "Несколько вариантов" },
-  { value: "date", label: "Дата" },
-  { value: "duration", label: "Длительность" },
-  { value: "document", label: "Документ" },
-  { value: "media", label: "Медиа" },
-  { value: "canvas", label: "Доска" },
+  { value: "number", label: t("Число") },
+  { value: "checkbox", label: t("Флаг") },
+  { value: "single-select", label: t("Один вариант") },
+  { value: "multi-select", label: t("Несколько вариантов") },
+  { value: "date", label: t("Дата") },
+  { value: "duration", label: t("Длительность") },
+  { value: "document", label: t("Документ") },
+  { value: "media", label: t("Медиа") },
+  { value: "canvas", label: t("Доска") },
 ];
 
 const colors = ["1", "2", "3", "4", "5", "6"] as const;
@@ -72,7 +72,7 @@ export function CanvasSchemaEditor({
         ...current.cardTypes,
         {
           id,
-          name: "Новый тип",
+          name: t("Новый тип"),
           category: "custom",
           color: "5",
           icon: "StickyNote",
@@ -88,7 +88,7 @@ export function CanvasSchemaEditor({
     const id = nextTypeId("field", new Set(selectedCard.fields.map((item) => item.id)));
     updateCard((card) => ({
       ...card,
-      fields: [...card.fields, { id, name: "Новое поле", type: "short-text" }],
+      fields: [...card.fields, { id, name: t("Новое поле"), type: "short-text" }],
     }));
   };
 
@@ -113,25 +113,27 @@ export function CanvasSchemaEditor({
     <ModalDialog
       open={open}
       onOpenChange={(next) => !pending && onOpenChange(next)}
-      title="Каталог Canvas"
-      description="Типы и связи общие для всех досок проекта и сохраняются отдельными ревизиями."
+      title={t("Каталог Canvas")}
+      description={t(
+        "Типы и связи общие для всех досок проекта и сохраняются отдельными ревизиями.",
+      )}
       icon={Tags}
       className="sm:w-[min(920px,calc(100vw-40px))]"
     >
       <form onSubmit={handleSubmit} className="grid gap-5 lg:grid-cols-[230px_1fr]">
         <aside className="space-y-2 border-b border-[var(--border-subtle)] pb-4 lg:border-b-0 lg:border-r lg:pr-4">
           <div className="flex items-center justify-between gap-2">
-            <strong className="text-sm">Типы карточек</strong>
+            <strong className="text-sm">{t("Типы карточек")}</strong>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="size-8"
-              aria-label="Добавить тип карточки"
+              aria-label={t("Добавить тип карточки")}
               onClick={addCard}
             >
               <Plus className="size-4" aria-hidden="true" />
-              <span className="sr-only">Добавить тип карточки</span>
+              <span className="sr-only">{t("Добавить тип карточки")}</span>
             </Button>
           </div>
           <div className="max-h-72 space-y-1 overflow-auto">
@@ -157,7 +159,7 @@ export function CanvasSchemaEditor({
           {selectedCard ? (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Название">
+                <Field label={t("Название")}>
                   <Input
                     value={selectedCard.name}
                     maxLength={120}
@@ -167,12 +169,12 @@ export function CanvasSchemaEditor({
                   />
                 </Field>
                 <Field
-                  label="Стабильный ID"
-                  hint="Используется в данных и не меняется автоматически."
+                  label={t("Стабильный ID")}
+                  hint={t("Используется в данных и не меняется автоматически.")}
                 >
                   <Input value={selectedCard.id} readOnly />
                 </Field>
-                <Field label="Цвет">
+                <Field label={t("Цвет")}>
                   <Select
                     value={selectedCard.color}
                     onChange={(event) =>
@@ -184,12 +186,13 @@ export function CanvasSchemaEditor({
                   >
                     {colors.map((color) => (
                       <option key={color} value={color}>
-                        Цвет {color}
+                        {t("Цвет ")}
+                        {color}
                       </option>
                     ))}
                   </Select>
                 </Field>
-                <Field label="Иконка Lucide">
+                <Field label={t("Иконка Lucide")}>
                   <Input
                     value={selectedCard.icon}
                     maxLength={80}
@@ -202,9 +205,10 @@ export function CanvasSchemaEditor({
 
               <div>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <strong className="text-sm">Поля</strong>
+                  <strong className="text-sm">{t("Поля")}</strong>
                   <Button type="button" variant="secondary" size="compact" onClick={addField}>
-                    <Plus className="size-3.5" aria-hidden="true" /> Добавить поле
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    {t(" Добавить поле")}
                   </Button>
                 </div>
                 <div className="space-y-2">
@@ -215,7 +219,7 @@ export function CanvasSchemaEditor({
                     >
                       <Input
                         className="h-9"
-                        aria-label={`Название поля ${index + 1}`}
+                        aria-label={t("Название поля {0}", index + 1)}
                         value={field.name}
                         onChange={(event) =>
                           updateCard((card) => ({
@@ -228,7 +232,7 @@ export function CanvasSchemaEditor({
                       />
                       <Select
                         className="h-9"
-                        aria-label={`Тип поля ${index + 1}`}
+                        aria-label={t("Тип поля {0}", index + 1)}
                         value={field.type}
                         onChange={(event) =>
                           updateCard((card) => ({
@@ -249,7 +253,7 @@ export function CanvasSchemaEditor({
                       </Select>
                       <div className="flex items-center gap-2 text-xs">
                         <Checkbox
-                          aria-label={`Поле ${field.name} обязательно`}
+                          aria-label={t("Поле {0} обязательно", field.name)}
                           checked={field.required ?? false}
                           onCheckedChange={(checked) =>
                             updateCard((card) => ({
@@ -262,14 +266,14 @@ export function CanvasSchemaEditor({
                             }))
                           }
                         />
-                        Обязательно
+                        {t("Обязательно")}
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="size-8 text-[var(--danger)]"
-                        aria-label={`Удалить поле ${field.name}`}
+                        aria-label={t("Удалить поле {0}", field.name)}
                         onClick={() =>
                           updateCard((card) => ({
                             ...card,
@@ -288,7 +292,7 @@ export function CanvasSchemaEditor({
 
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <strong className="text-sm">Типы связей</strong>
+              <strong className="text-sm">{t("Типы связей")}</strong>
               <Button
                 type="button"
                 variant="secondary"
@@ -302,12 +306,13 @@ export function CanvasSchemaEditor({
                     ...current,
                     relationTypes: [
                       ...current.relationTypes,
-                      { id, name: "Новая связь", color: "5", directed: true },
+                      { id, name: t("Новая связь"), color: "5", directed: true },
                     ],
                   }));
                 }}
               >
-                <Plus className="size-3.5" aria-hidden="true" /> Добавить связь
+                <Plus className="size-3.5" aria-hidden="true" />
+                {t(" Добавить связь")}
               </Button>
             </div>
             <div className="max-h-56 space-y-2 overflow-auto">
@@ -319,7 +324,7 @@ export function CanvasSchemaEditor({
                   <Input
                     className="h-9"
                     value={relation.name}
-                    aria-label={`Название связи ${relation.id}`}
+                    aria-label={t("Название связи {0}", relation.id)}
                     onChange={(event) =>
                       updateRelation(relation.id, (item) => ({ ...item, name: event.target.value }))
                     }
@@ -327,7 +332,7 @@ export function CanvasSchemaEditor({
                   <Select
                     className="h-9"
                     value={relation.color}
-                    aria-label={`Цвет связи ${relation.id}`}
+                    aria-label={t("Цвет связи {0}", relation.id)}
                     onChange={(event) =>
                       updateRelation(relation.id, (item) => ({
                         ...item,
@@ -337,13 +342,14 @@ export function CanvasSchemaEditor({
                   >
                     {colors.map((color) => (
                       <option key={color} value={color}>
-                        Цвет {color}
+                        {t("Цвет ")}
+                        {color}
                       </option>
                     ))}
                   </Select>
                   <div className="flex items-center gap-2 text-xs">
                     <Checkbox
-                      aria-label={`Связь ${relation.name} направленная`}
+                      aria-label={t("Связь {0} направленная", relation.name)}
                       checked={relation.directed}
                       onCheckedChange={(checked) =>
                         updateRelation(relation.id, (item) => ({
@@ -352,15 +358,15 @@ export function CanvasSchemaEditor({
                         }))
                       }
                     />
-                    Стрелка
+                    {t("Стрелка")}
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="size-8 text-[var(--danger)]"
-                    aria-label={`Удалить связь ${relation.name}`}
-                    title={`Используется: ${relationNames.get(relation.id) ?? relation.id}`}
+                    aria-label={t("Удалить связь {0}", relation.name)}
+                    title={t("Используется: {0}", relationNames.get(relation.id) ?? relation.id)}
                     onClick={() =>
                       setDraft((current) => ({
                         ...current,
@@ -390,10 +396,10 @@ export function CanvasSchemaEditor({
               disabled={pending}
               onClick={() => onOpenChange(false)}
             >
-              Отмена
+              {t("Отмена")}
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Сохраняем…" : "Сохранить каталог"}
+              {pending ? t("Сохраняем…") : t("Сохранить каталог")}
             </Button>
           </div>
         </section>

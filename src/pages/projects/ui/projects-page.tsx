@@ -16,7 +16,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRef, useState } from "react";
-
 import {
   importMarkdownTree,
   importProjectFile,
@@ -25,6 +24,7 @@ import {
   type ProjectImportResult,
   type ProjectStatus,
 } from "~entities/project";
+import { localizeMessage, t } from "~shared/i18n";
 import { listLocalRecordings } from "~shared/lib";
 import { Banner, Button, Field, Input, ModalDialog, Select, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
@@ -36,10 +36,10 @@ import "./projects.css";
 type ProjectFilter = "recent" | "active" | "archived" | "trash";
 
 const filters = [
-  { value: "recent", label: "Недавние", icon: Clock3 },
-  { value: "active", label: "Все", icon: LayoutGrid },
-  { value: "archived", label: "Архив", icon: Archive },
-  { value: "trash", label: "Корзина", icon: Trash2 },
+  { value: "recent", label: t("Недавние"), icon: Clock3 },
+  { value: "active", label: t("Все"), icon: LayoutGrid },
+  { value: "archived", label: t("Архив"), icon: Archive },
+  { value: "trash", label: t("Корзина"), icon: Trash2 },
 ] satisfies Array<{ value: ProjectFilter; label: string; icon: typeof Clock3 }>;
 
 function ProjectFilters({
@@ -54,7 +54,7 @@ function ProjectFilters({
   return (
     <fieldset
       className={`library-filters library-filters-${presentation}`}
-      aria-label="Фильтр проектов"
+      aria-label={t("Фильтр проектов")}
     >
       {filters.map(({ value, label, icon: Icon }) => (
         <button
@@ -196,7 +196,10 @@ export function ProjectsPage() {
     mutationFn: importProjectFile,
     onSuccess: async ({ project, notice }) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      showToast({ title: `Импортирован проект «${project.title}»`, description: notice });
+      showToast({
+        title: t("Импортирован проект «{0}»", project.title),
+        description: localizeMessage(notice),
+      });
       if (project.firstNodeId) {
         await navigate({
           to: "/projects/$projectId/studio/$nodeId",
@@ -229,8 +232,13 @@ export function ProjectsPage() {
       setMarkdownProgress(undefined);
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
       showToast({
-        title: `Импортирован проект «${project.title}»`,
-        description: `${report.documents} документов, ${report.directories} папок, ${report.images} изображений`,
+        title: t("Импортирован проект «{0}»", project.title),
+        description: t(
+          "{0} документов, {1} папок, {2} изображений",
+          report.documents,
+          report.directories,
+          report.images,
+        ),
       });
     },
   });
@@ -273,46 +281,46 @@ export function ProjectsPage() {
       <div className="projects-workspace library-workspace">
         <WorkspaceHeader />
         <div className="library-shell">
-          <aside className="library-sidebar" aria-label="Библиотека проектов">
+          <aside className="library-sidebar" aria-label={t("Библиотека проектов")}>
             <div className="library-sidebar-title">
               <BookOpen className="size-4" aria-hidden="true" />
-              Библиотека
+              {t("Библиотека")}
             </div>
             <ProjectFilters status={status} onChange={setStatus} presentation="sidebar" />
             <div className="library-sidebar-divider" />
-            <nav className="library-utilities" aria-label="Инструменты студии">
+            <nav className="library-utilities" aria-label={t("Инструменты студии")}>
               <Link to="/recovery">
                 <LifeBuoy className="size-[17px]" aria-hidden="true" />
-                Восстановление
+                {t("Восстановление")}
               </Link>
               <Link to="/settings">
                 <Settings className="size-[17px]" aria-hidden="true" />
-                Настройки
+                {t("Настройки")}
               </Link>
             </nav>
             <a href="/docs" className="library-sidebar-help">
               <BookOpen className="size-4" aria-hidden="true" />
-              Руководство по студии
+              {t("Руководство по студии")}
             </a>
           </aside>
-          <section className="library-pane" aria-label="Библиотека">
+          <section className="library-pane" aria-label={t("Библиотека")}>
             <div className="library-toolbar">
               <div className="library-heading">
-                <h1>Ваши проекты</h1>
+                <h1>{t("Ваши проекты")}</h1>
                 <p>
                   {status === "recent"
-                    ? "Недавно открытые и обновлённые"
+                    ? t("Недавно открытые и обновлённые")
                     : status === "archived"
-                      ? "Завершённые и отложенные"
+                      ? t("Завершённые и отложенные")
                       : status === "trash"
-                        ? "Удалённые проекты"
-                        : "Все тексты в одном месте"}
+                        ? t("Удалённые проекты")
+                        : t("Все тексты в одном месте")}
                 </p>
               </div>
               <Button asChild className="library-new-button">
                 <Link to="/projects/new">
                   <Plus className="size-[18px]" aria-hidden="true" />
-                  Новый проект
+                  {t("Новый проект")}
                 </Link>
               </Button>
             </div>
@@ -321,8 +329,8 @@ export function ProjectsPage() {
                 <Search className="size-[17px]" aria-hidden="true" />
                 <input
                   type="search"
-                  aria-label="Поиск проектов"
-                  placeholder="Найти проект…"
+                  aria-label={t("Поиск проектов")}
+                  placeholder={t("Найти проект…")}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                 />
@@ -333,7 +341,7 @@ export function ProjectsPage() {
                   type="file"
                   accept=".wstudio,application/vnd.writers-studio.project+zip"
                   className="sr-only"
-                  aria-label="Выбрать файл проекта Writers Studio"
+                  aria-label={t("Выбрать файл проекта Writers Studio")}
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0];
                     event.currentTarget.value = "";
@@ -344,7 +352,7 @@ export function ProjectsPage() {
                   type="button"
                   variant="ghost"
                   size="compact"
-                  aria-label="Проект Writers Studio"
+                  aria-label={t("Проект Writers Studio")}
                   disabled={importProject.isPending}
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -353,7 +361,9 @@ export function ProjectsPage() {
                   ) : (
                     <FileUp className="size-4" aria-hidden="true" />
                   )}
-                  <span>{importProject.isPending ? "Импортируем…" : "Проект Writers Studio"}</span>
+                  <span>
+                    {importProject.isPending ? t("Импортируем…") : t("Проект Writers Studio")}
+                  </span>
                 </Button>
                 <Button
                   type="button"
@@ -369,12 +379,12 @@ export function ProjectsPage() {
             </div>
             <ProjectFilters status={status} onChange={setStatus} presentation="tabs" />
             {/* biome-ignore lint/a11y/noNoninteractiveTabindex: The scrollable project region must be reachable for keyboard scrolling. */}
-            <main className="library-scroll" aria-label="Проекты" tabIndex={0}>
+            <main className="library-scroll" aria-label={t("Проекты")} tabIndex={0}>
               {importProject.isError ? (
                 <Banner
                   className="mt-6"
                   variant="danger"
-                  title="Проект не импортирован"
+                  title={t("Проект не импортирован")}
                   body={importProject.error.message}
                 />
               ) : null}
@@ -382,8 +392,15 @@ export function ProjectsPage() {
                 <Banner
                   className="mt-6"
                   variant={importReport.warningsCount > 0 ? "warning" : "success"}
-                  title="Markdown-хранилище импортировано"
-                  body={`${importReport.documents} документов · ${importReport.directories} папок · ${importReport.images} изображений · ${importReport.resolvedLinks} ссылок. Предупреждений: ${importReport.warningsCount}.`}
+                  title={t("Markdown-хранилище импортировано")}
+                  body={t(
+                    "{0} документов · {1} папок · {2} изображений · {3} ссылок. Предупреждений: {4}.",
+                    importReport.documents,
+                    importReport.directories,
+                    importReport.images,
+                    importReport.resolvedLinks,
+                    importReport.warningsCount,
+                  )}
                   action={
                     importedMarkdownProject ? (
                       <Button
@@ -399,7 +416,7 @@ export function ProjectsPage() {
                           })
                         }
                       >
-                        Открыть проект
+                        {t("Открыть проект")}
                       </Button>
                     ) : undefined
                   }
@@ -408,13 +425,14 @@ export function ProjectsPage() {
               {importReport?.warnings.length ? (
                 <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4 text-sm">
                   <summary className="cursor-pointer font-medium">
-                    Показать предупреждения ({importReport.warningsCount})
+                    {t("Показать предупреждения (")}
+                    {importReport.warningsCount})
                   </summary>
                   <ul className="mt-3 grid gap-2 text-xs text-[var(--ink-secondary)]">
                     {importReport.warnings.map((warning) => (
                       <li key={`${warning.path}-${warning.code}-${warning.message}`}>
                         <span className="font-medium text-[var(--ink-primary)]">
-                          {warning.path || "Хранилище"}:
+                          {warning.path || t("Хранилище")}:
                         </span>{" "}
                         {warning.message}
                       </li>
@@ -422,7 +440,9 @@ export function ProjectsPage() {
                   </ul>
                   {importReport.warningsCount > importReport.warnings.length ? (
                     <p className="mt-3 text-xs text-[var(--ink-tertiary)]">
-                      Показаны первые {importReport.warnings.length} записей.
+                      {t("Показаны первые ")}
+                      {importReport.warnings.length}
+                      {t(" записей.")}
                     </p>
                   ) : null}
                 </details>
@@ -432,13 +452,15 @@ export function ProjectsPage() {
                 <Banner
                   className="mt-6"
                   variant="info"
-                  title="Незавершённые записи всегда можно восстановить"
-                  body="Центр восстановления проверяет локальные аудиофрагменты при каждом запуске."
+                  title={t("Незавершённые записи всегда можно восстановить")}
+                  body={t(
+                    "Центр восстановления проверяет локальные аудиофрагменты при каждом запуске.",
+                  )}
                   action={
                     <Button asChild variant="ghost" size="compact">
                       <Link to="/recovery">
                         <LifeBuoy className="size-4" aria-hidden="true" />
-                        Восстановить
+                        {t("Восстановить")}
                       </Link>
                     </Button>
                   }
@@ -446,16 +468,18 @@ export function ProjectsPage() {
               ) : null}
 
               {projects.isPending ? (
-                <Spinner label="Открываем проекты…" />
+                <Spinner label={t("Открываем проекты…")} />
               ) : projects.isError ? (
                 <div className="mt-10 rounded-[var(--radius-lg)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-6">
-                  <h2 className="font-medium text-[var(--danger)]">Не удалось загрузить проекты</h2>
+                  <h2 className="font-medium text-[var(--danger)]">
+                    {t("Не удалось загрузить проекты")}
+                  </h2>
                   <Button
                     className="mt-4"
                     variant="secondary"
                     onClick={() => void projects.refetch()}
                   >
-                    Повторить
+                    {t("Повторить")}
                   </Button>
                 </div>
               ) : visibleProjects?.length === 0 &&
@@ -463,29 +487,29 @@ export function ProjectsPage() {
                 <section className="mt-10 grid min-h-72 place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-panel)] p-8 text-center">
                   <div>
                     <h2 className="font-display text-3xl">
-                      {normalizedSearch ? "Проекты не найдены" : "Здесь пока пусто"}
+                      {normalizedSearch ? t("Проекты не найдены") : t("Здесь пока пусто")}
                     </h2>
                     <p className="mt-3 text-sm text-[var(--ink-secondary)]">
                       {normalizedSearch
-                        ? "Попробуйте другое название или описание."
-                        : "Проекты появятся здесь после соответствующего действия."}
+                        ? t("Попробуйте другое название или описание.")
+                        : t("Проекты появятся здесь после соответствующего действия.")}
                     </p>
                     {status === "active" ? (
                       <Button asChild className="mt-5">
-                        <Link to="/projects/new">Создать проект</Link>
+                        <Link to="/projects/new">{t("Создать проект")}</Link>
                       </Button>
                     ) : null}
                   </div>
                 </section>
               ) : (
-                <section className="library-grid" aria-label="Список проектов">
+                <section className="library-grid" aria-label={t("Список проектов")}>
                   <Link to="/projects/new" className="project-create-card library-create-card">
                     <span className="library-create-icon">
                       <Plus className="size-6" aria-hidden="true" />
                     </span>
-                    <span className="library-create-title">Новый проект</span>
+                    <span className="library-create-title">{t("Новый проект")}</span>
                     <span className="library-create-description">
-                      Выберите название и структуру
+                      {t("Выберите название и структуру")}
                     </span>
                     <span className="library-create-arrow" aria-hidden="true">
                       ↗
@@ -502,7 +526,7 @@ export function ProjectsPage() {
         <input
           ref={zipInputRef}
           className="hidden"
-          aria-label="Выбрать ZIP-архив Markdown"
+          aria-label={t("Выбрать ZIP-архив Markdown")}
           type="file"
           accept=".zip,application/zip"
           onChange={(event) => {
@@ -515,7 +539,7 @@ export function ProjectsPage() {
         <input
           ref={directoryInputRef}
           className="hidden"
-          aria-label="Выбрать папку Markdown"
+          aria-label={t("Выбрать папку Markdown")}
           type="file"
           multiple
           {...({ webkitdirectory: "" } as Record<string, string>)}
@@ -530,13 +554,15 @@ export function ProjectsPage() {
         <ModalDialog
           open={markdownDialogOpen}
           onOpenChange={setMarkdownDialogOpen}
-          title="Импорт Markdown / Obsidian"
-          description="Создадим проект free и сохраним папки, Markdown, внутренние ссылки, frontmatter и локальные изображения."
+          title={t("Импорт Markdown / Obsidian")}
+          description={t(
+            "Создадим проект free и сохраним папки, Markdown, внутренние ссылки, frontmatter и локальные изображения.",
+          )}
           icon={FileArchive}
           footer={
             <>
               <Button type="button" variant="ghost" onClick={() => setMarkdownDialogOpen(false)}>
-                Отмена
+                {t("Отмена")}
               </Button>
               <Button
                 type="button"
@@ -553,21 +579,26 @@ export function ProjectsPage() {
                 )}
                 {importMarkdown.isPending
                   ? markdownProgress?.phase === "processing"
-                    ? "Обрабатываем хранилище…"
-                    : `Загружаем${markdownProgress?.percent === undefined ? "…" : ` ${markdownProgress.percent}%…`}`
-                  : "Создать проект"}
+                    ? t("Обрабатываем хранилище…")
+                    : t(
+                        "Загружаем{0}",
+                        markdownProgress?.percent === undefined
+                          ? "…"
+                          : ` ${markdownProgress.percent}%…`,
+                      )
+                  : t("Создать проект")}
               </Button>
             </>
           }
         >
           <div className="grid gap-4">
-            <Field label="Источник">
+            <Field label={t("Источник")}>
               <Select
                 value={markdownSource}
                 onChange={(event) => setMarkdownSource(event.target.value as "zip" | "directory")}
               >
-                <option value="zip">ZIP-архив</option>
-                <option value="directory">Локальная папка</option>
+                <option value="zip">{t("ZIP-архив")}</option>
+                <option value="directory">{t("Локальная папка")}</option>
               </Select>
             </Field>
             {markdownSource === "zip" ? (
@@ -577,44 +608,44 @@ export function ProjectsPage() {
                 onClick={() => zipInputRef.current?.click()}
               >
                 <FileArchive className="size-4" />
-                {markdownArchive?.name ?? "Выбрать ZIP"}
+                {markdownArchive?.name ?? t("Выбрать ZIP")}
               </Button>
             ) : (
               <>
                 <Button type="button" variant="secondary" onClick={() => void chooseDirectory()}>
                   <FolderOpen className="size-4" />
-                  {markdownDirectory?.rootName ?? "Выбрать папку vault"}
+                  {markdownDirectory?.rootName ?? t("Выбрать папку vault")}
                 </Button>
                 {directoryFallbackNotice ? (
                   <Banner
                     variant="warning"
-                    title="Режим совместимости браузера"
-                    body="Браузер передаёт файлы, но не сообщает о полностью пустых папках."
+                    title={t("Режим совместимости браузера")}
+                    body={t("Браузер передаёт файлы, но не сообщает о полностью пустых папках.")}
                   />
                 ) : null}
               </>
             )}
-            <Field label="Название проекта">
+            <Field label={t("Название проекта")}>
               <Input
                 value={markdownTitle}
                 maxLength={120}
-                placeholder="Будет взято из корневой папки"
+                placeholder={t("Будет взято из корневой папки")}
                 onChange={(event) => setMarkdownTitle(event.target.value)}
               />
             </Field>
-            <Field label="Язык">
+            <Field label={t("Язык")}>
               <Select
                 value={markdownLanguage}
                 onChange={(event) => setMarkdownLanguage(event.target.value as "ru" | "en")}
               >
-                <option value="ru">Русский</option>
+                <option value="ru">{t("Русский")}</option>
                 <option value="en">English</option>
               </Select>
             </Field>
             {importMarkdown.isError ? (
               <Banner
                 variant="danger"
-                title="Markdown-хранилище не импортировано"
+                title={t("Markdown-хранилище не импортировано")}
                 body={importMarkdown.error.message}
               />
             ) : null}

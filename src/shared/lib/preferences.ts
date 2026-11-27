@@ -1,14 +1,16 @@
+import { t } from "~shared/i18n";
+
 export type EditorFontFamily = "sofia" | "inter" | "source-serif";
 export type EditorTheme = "light" | "dark" | "system";
 export const editorStyleOptions = [
-  { id: "quiet", label: "Тихая редакция" },
-  { id: "cedar-and-copper", label: "Кедр и медь" },
-  { id: "dried-rose-and-wine", label: "Сухая роза и вино" },
-  { id: "olive-ink", label: "Олива и чернила" },
-  { id: "fog-graphite", label: "Туман и графит" },
-  { id: "linen-clay", label: "Лён и глина" },
-  { id: "dusty-lavender", label: "Пыльная лаванда" },
-  { id: "porcelain-ink", label: "Фарфор и чернила" },
+  { id: "quiet", label: t("Тихая редакция") },
+  { id: "cedar-and-copper", label: t("Кедр и медь") },
+  { id: "dried-rose-and-wine", label: t("Сухая роза и вино") },
+  { id: "olive-ink", label: t("Олива и чернила") },
+  { id: "fog-graphite", label: t("Туман и графит") },
+  { id: "linen-clay", label: t("Лён и глина") },
+  { id: "dusty-lavender", label: t("Пыльная лаванда") },
+  { id: "porcelain-ink", label: t("Фарфор и чернила") },
 ] as const;
 export type EditorStyle = (typeof editorStyleOptions)[number]["id"];
 export type EditorFontSize = 17 | 19 | 21;

@@ -33,6 +33,7 @@ import {
 } from "~entities/project";
 import { AssistantReviewPage } from "~pages/assistant-review";
 import { AssistantSessionPage } from "~pages/assistant-session";
+import { interfaceLanguage, t } from "~shared/i18n";
 import { cn } from "~shared/lib";
 import {
   Banner,
@@ -116,50 +117,50 @@ function AnnotationComposerDialog({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title={isNote ? "Заметка на полях" : "Связать со словарём"}
+      title={isNote ? t("Заметка на полях") : t("Связать со словарём")}
       description={
         pending
-          ? `Фрагмент «${pending.anchor.exactText}» останется обычным текстом рукописи.`
+          ? t("Фрагмент «{0}» останется обычным текстом рукописи.", pending.anchor.exactText)
           : undefined
       }
       icon={isNote ? MessageSquarePlus : BookMarked}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Отмена
+            {t("Отмена")}
           </Button>
           <Button
             type="button"
             disabled={saving || (isNote ? !note.trim() : !selectedTermId)}
             onClick={onSave}
           >
-            {saving ? "Сохраняем…" : isNote ? "Добавить заметку" : "Связать"}
+            {saving ? t("Сохраняем…") : isNote ? t("Добавить заметку") : t("Связать")}
           </Button>
         </>
       }
     >
       {isNote ? (
         <label className="block text-sm font-semibold">
-          Что нужно исправить или проверить
+          {t("Что нужно исправить или проверить")}
           <textarea
             value={note}
             onChange={(event) => onNote(event.target.value)}
             rows={5}
             maxLength={10000}
-            placeholder="Например: уточнить мотивацию героя и сократить повтор"
+            placeholder={t("Например: уточнить мотивацию героя и сократить повтор")}
             className="mt-2 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-paper)] px-3 py-2 font-normal leading-6 outline-none focus:border-[var(--focus)]"
           />
         </label>
       ) : (
         <div>
           <label htmlFor="annotation-dictionary-search" className="block text-sm font-semibold">
-            Найти термин
+            {t("Найти термин")}
             <Input
               id="annotation-dictionary-search"
               className="mt-2"
               value={dictionaryQuery}
               onChange={(event) => onDictionaryQuery(event.target.value)}
-              placeholder="Имя, место или термин"
+              placeholder={t("Имя, место или термин")}
             />
           </label>
           <div className="mt-3 max-h-64 space-y-1 overflow-y-auto" role="listbox">
@@ -189,7 +190,9 @@ function AnnotationComposerDialog({
               ))
             ) : (
               <p className="rounded-[var(--radius-md)] bg-[var(--surface-subtle)] p-3 text-sm text-[var(--ink-secondary)]">
-                Подходящих активных терминов нет. Добавьте термин на странице словаря и повторите.
+                {t(
+                  "Подходящих активных терминов нет. Добавьте термин на странице словаря и повторите.",
+                )}
               </p>
             )}
           </div>
@@ -200,7 +203,9 @@ function AnnotationComposerDialog({
 }
 
 function termKindLabel(kind: DictionaryTerm["kind"]): string {
-  return { character: "Персонаж", place: "Место", term: "Термин", other: "Другое" }[kind];
+  return { character: t("Персонаж"), place: t("Место"), term: t("Термин"), other: t("Другое") }[
+    kind
+  ];
 }
 
 export function StudioPage({
@@ -301,7 +306,7 @@ export function StudioPage({
         queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["node", nodeId] }),
       ]);
-      showToast({ title: "Название сохранено" });
+      showToast({ title: t("Название сохранено") });
     },
     onError: (error, _title, context) => {
       if (context?.previousProject) {
@@ -310,7 +315,7 @@ export function StudioPage({
       if (context?.previousNode) {
         queryClient.setQueryData(["node", nodeId], context.previousNode);
       }
-      showToast({ title: "Не удалось переименовать", description: error.message });
+      showToast({ title: t("Не удалось переименовать"), description: error.message });
     },
   });
   useEffect(() => {
@@ -391,7 +396,7 @@ export function StudioPage({
   }, [activeAssistantReviewId, activeAssistantRunId, highlight, navigate, nodeId, projectId]);
   const createAnnotation = useMutation({
     mutationFn: async () => {
-      if (!pendingAnnotation) throw new Error("Нет выделенного фрагмента");
+      if (!pendingAnnotation) throw new Error(t("Нет выделенного фрагмента"));
       return createDocumentAnnotation(nodeId, {
         kind: pendingAnnotation.kind,
         anchor: pendingAnnotation.anchor,
@@ -411,11 +416,12 @@ export function StudioPage({
       ]);
       selectAnnotation(annotation.id);
       showToast({
-        title: annotation.kind === "note" ? "Заметка добавлена" : "Ссылка на словарь добавлена",
+        title:
+          annotation.kind === "note" ? t("Заметка добавлена") : t("Ссылка на словарь добавлена"),
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось добавить пометку", description: error.message }),
+      showToast({ title: t("Не удалось добавить пометку"), description: error.message }),
   });
   const handleDocumentSaved = useCallback(() => {
     void Promise.all([
@@ -442,32 +448,35 @@ export function StudioPage({
     });
   }, [highlight, navigate, nodeId, projectId]);
   const saveVersion = useMutation({
-    mutationFn: (name: string) => createVersion(nodeId, { name, note: "Горячая клавиша" }),
-    onSuccess: () => showToast({ title: "Именованная версия создана" }),
+    mutationFn: (name: string) => createVersion(nodeId, { name, note: t("Горячая клавиша") }),
+    onSuccess: () => showToast({ title: t("Именованная версия создана") }),
     onError: (error) =>
-      showToast({ title: "Не удалось сохранить версию", description: error.message }),
+      showToast({ title: t("Не удалось сохранить версию"), description: error.message }),
   });
   const requestVersion = useCallback(() => {
     if (saveState !== "saved") {
       showToast({
-        title: "Дождитесь сохранения текста",
-        description: "Версия должна точно соответствовать текущей редакции на сервере.",
+        title: t("Дождитесь сохранения текста"),
+        description: t("Версия должна точно соответствовать текущей редакции на сервере."),
       });
       return;
     }
-    const defaultName = `Версия ${new Intl.DateTimeFormat("ru", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date())}`;
+    const defaultName = t(
+      "Версия {0}",
+      new Intl.DateTimeFormat(interfaceLanguage, {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date()),
+    );
     void requestInput({
-      title: "Сохранить именованную версию",
-      description: "Текущая редакция останется в истории и получит узнаваемое название.",
-      label: "Название версии",
+      title: t("Сохранить именованную версию"),
+      description: t("Текущая редакция останется в истории и получит узнаваемое название."),
+      label: t("Название версии"),
       defaultValue: defaultName,
       icon: Save,
-      confirmLabel: "Сохранить версию",
+      confirmLabel: t("Сохранить версию"),
     }).then((name) => {
       if (name?.trim()) {
         saveVersion.mutate(name.trim());
@@ -502,15 +511,15 @@ export function StudioPage({
   }, [navigate, projectId, requestVersion]);
 
   if (project.isPending || activeDocument.isPending) {
-    return <Spinner label="Открываем проект…" />;
+    return <Spinner label={t("Открываем проект…")} />;
   }
   if (project.isError || activeDocument.isError || !project.data || !activeDocument.data) {
     return (
       <main className="mx-auto max-w-xl p-6">
         <Banner
           variant="danger"
-          title="Не удалось открыть проект"
-          body="Проверьте соединение и обновите страницу."
+          title={t("Не удалось открыть проект")}
+          body={t("Проверьте соединение и обновите страницу.")}
         />
       </main>
     );
@@ -530,15 +539,15 @@ export function StudioPage({
       <main className="mx-auto max-w-xl p-6">
         <Banner
           variant="warning"
-          title="Документ не найден"
-          body="Вернитесь в проект и выберите другой раздел."
+          title={t("Документ не найден")}
+          body={t("Вернитесь в проект и выберите другой раздел.")}
         />
       </main>
     );
   }
   const nodeTypeLabel =
     project.data.project.structure.nodeTypes.find((type) => type.key === node.kind)?.label ??
-    "Документ";
+    t("Документ");
   const activeAssistantPreview = activeAssistantRunId
     ? assistantPreviews[activeAssistantRunId]
     : undefined;
@@ -808,13 +817,13 @@ export function StudioPage({
             onClose={() => setPaletteOpen(false)}
             commands={[
               {
-                label: "Найти в документе",
+                label: t("Найти в документе"),
                 shortcut: "⌘/Ctrl F",
                 icon: SearchCode,
                 action: () => window.dispatchEvent(new CustomEvent("writers-studio-find")),
               },
               {
-                label: "Поиск по проекту",
+                label: t("Поиск по проекту"),
                 shortcut: "⌘/Ctrl ⇧ F",
                 icon: Search,
                 action: () =>
@@ -824,25 +833,25 @@ export function StudioPage({
                   }),
               },
               {
-                label: "Сохранить именованную версию",
+                label: t("Сохранить именованную версию"),
                 shortcut: "⌘/Ctrl ⇧ S",
                 icon: Save,
                 action: requestVersion,
               },
               {
-                label: "Режим фокуса",
+                label: t("Режим фокуса"),
                 shortcut: "⌘/Ctrl ⇧ Enter",
                 icon: Focus,
                 action: () => window.dispatchEvent(new CustomEvent("writers-studio-focus")),
               },
-              { label: "Начать диктовку", icon: Mic, action: openPreflight },
+              { label: t("Начать диктовку"), icon: Mic, action: openPreflight },
               {
-                label: "Открыть версии",
+                label: t("Открыть версии"),
                 icon: History,
                 action: () => void navigate({ to: "/nodes/$nodeId/versions", params: { nodeId } }),
               },
               {
-                label: "Открыть словарь",
+                label: t("Открыть словарь"),
                 icon: SpellCheck2,
                 action: () =>
                   void navigate({
@@ -851,7 +860,7 @@ export function StudioPage({
                   }),
               },
               {
-                label: "Экспортировать",
+                label: t("Экспортировать"),
                 icon: Download,
                 action: () =>
                   void navigate({
@@ -898,15 +907,15 @@ function CommandPalette({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Палитра команд"
-      description="Быстрый переход к основным действиям редактора."
+      title={t("Палитра команд")}
+      description={t("Быстрый переход к основным действиям редактора.")}
       icon={Search}
       className="sm:top-[12vh] sm:w-[min(576px,calc(100vw-40px))] sm:translate-y-0"
     >
       <Input
         autoFocus
-        aria-label="Найти команду"
-        placeholder="Найти команду…"
+        aria-label={t("Найти команду")}
+        placeholder={t("Найти команду…")}
         value={query}
         className="h-12 px-4"
         onChange={(event) => onQuery(event.target.value)}
@@ -933,7 +942,9 @@ function CommandPalette({
           </Button>
         ))}
         {filtered.length === 0 ? (
-          <p className="p-5 text-center text-sm text-[var(--ink-tertiary)]">Команд не найдено</p>
+          <p className="p-5 text-center text-sm text-[var(--ink-tertiary)]">
+            {t("Команд не найдено")}
+          </p>
         ) : null}
       </div>
     </ModalDialog>

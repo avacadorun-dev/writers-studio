@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { GitCompareArrows, History, Plus, RotateCcw } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-
 import { createVersion, getNode, getProject, getVersions, restoreVersion } from "~entities/project";
+import { interfaceLanguage, t } from "~shared/i18n";
 import {
   Banner,
   Button,
@@ -50,7 +50,7 @@ export function VersionsPage({
       setName("");
       setNote("");
       void queryClient.invalidateQueries({ queryKey: ["versions", nodeId] });
-      showToast({ title: "Именованная версия создана" });
+      showToast({ title: t("Именованная версия создана") });
     },
   });
   const restore = useMutation({
@@ -61,8 +61,8 @@ export function VersionsPage({
         queryClient.invalidateQueries({ queryKey: ["node", nodeId] }),
       ]);
       showToast({
-        title: "Версия восстановлена как новая правка",
-        description: "Предыдущая история не удалена.",
+        title: t("Версия восстановлена как новая правка"),
+        description: t("Предыдущая история не удалена."),
       });
     },
   });
@@ -83,13 +83,13 @@ export function VersionsPage({
   }, [history.data?.revisions, leftRevision, rightRevision]);
 
   if (node.isPending || history.isPending || workspace.isPending) {
-    return <Spinner label="Открываем историю…" />;
+    return <Spinner label={t("Открываем историю…")} />;
   }
   const document = node.data?.node;
   if (!document || !workspace.data) {
     return (
       <main className="grid min-h-full place-items-center p-6">
-        <Banner variant="danger" title="История недоступна" body="Документ не найден." />
+        <Banner variant="danger" title={t("История недоступна")} body={t("Документ не найден.")} />
       </main>
     );
   }
@@ -110,11 +110,11 @@ export function VersionsPage({
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
               {document.title}
             </p>
-            <h1 className="font-display mt-2 text-[34px] leading-tight">История версий</h1>
+            <h1 className="font-display mt-2 text-[34px] leading-tight">{t("История версий")}</h1>
           </div>
           <Button type="button" onClick={() => setCreating(true)}>
             <Plus className="size-4" aria-hidden="true" />
-            Сохранить версию
+            {t("Сохранить версию")}
           </Button>
         </div>
 
@@ -126,7 +126,7 @@ export function VersionsPage({
               create.mutate();
             }}
           >
-            <Field label="Название версии">
+            <Field label={t("Название версии")}>
               <Input
                 required
                 maxLength={160}
@@ -134,15 +134,15 @@ export function VersionsPage({
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            <Field label="Заметка · необязательно">
+            <Field label={t("Заметка · необязательно")}>
               <Input value={note} onChange={(event) => setNote(event.target.value)} />
             </Field>
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
-                Отмена
+                {t("Отмена")}
               </Button>
               <Button type="submit" disabled={!name.trim() || create.isPending}>
-                Сохранить снимок
+                {t("Сохранить снимок")}
               </Button>
             </div>
           </form>
@@ -154,15 +154,19 @@ export function VersionsPage({
             variant={preparedRestoreIsStale || !preparedVersion ? "warning" : "info"}
             title={
               preparedRestoreIsStale
-                ? "Документ изменился после поручения"
+                ? t("Документ изменился после поручения")
                 : preparedVersion
-                  ? `Ассистент выбрал «${preparedVersion.name}»`
-                  : "Подготовленная версия больше недоступна"
+                  ? t("Ассистент выбрал «{0}»", preparedVersion.name)
+                  : t("Подготовленная версия больше недоступна")
             }
             body={
               preparedRestoreIsStale
-                ? "Сначала сравните актуальный текст с выбранной версией. Старое подтверждение не применяется автоматически."
-                : "Текущий текст не изменён. Выбранная версия выделена ниже; восстановление требует отдельного подтверждения."
+                ? t(
+                    "Сначала сравните актуальный текст с выбранной версией. Старое подтверждение не применяется автоматически.",
+                  )
+                : t(
+                    "Текущий текст не изменён. Выбранная версия выделена ниже; восстановление требует отдельного подтверждения.",
+                  )
             }
           />
         ) : null}
@@ -170,7 +174,7 @@ export function VersionsPage({
         <div className="mt-5 grid gap-4 lg:grid-cols-[390px_minmax(0,1fr)]">
           <aside className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold">Сохранённые версии</h2>
+              <h2 className="text-sm font-semibold">{t("Сохранённые версии")}</h2>
               <span className="text-xs text-[var(--ink-tertiary)]">
                 {history.data?.versions.length ?? 0}
               </span>
@@ -191,8 +195,9 @@ export function VersionsPage({
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-semibold">{version.name}</h3>
                       <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
-                        Редакция {version.revision} ·{" "}
-                        {new Intl.DateTimeFormat("ru", {
+                        {t("Редакция ")}
+                        {version.revision} ·{" "}
+                        {new Intl.DateTimeFormat(interfaceLanguage, {
                           dateStyle: "medium",
                           timeStyle: "short",
                         }).format(new Date(version.createdAt))}
@@ -214,24 +219,25 @@ export function VersionsPage({
                     onClick={() => {
                       if (version.id === preparedVersionId && preparedRestoreIsStale) {
                         showToast({
-                          title: "Нужно заново проверить восстановление",
-                          description: "Текущая редакция изменилась после поручения ассистенту.",
+                          title: t("Нужно заново проверить восстановление"),
+                          description: t("Текущая редакция изменилась после поручения ассистенту."),
                         });
                         return;
                       }
                       void requestConfirmation({
-                        title: `Восстановить «${version.name}»?`,
-                        description:
+                        title: t("Восстановить «{0}»?", version.name),
+                        description: t(
                           "Текущая редакция останется в истории. Восстановленная версия станет новой текущей редакцией.",
+                        ),
                         icon: RotateCcw,
-                        confirmLabel: "Восстановить",
+                        confirmLabel: t("Восстановить"),
                       }).then((confirmed) => {
                         if (confirmed) restore.mutate(version.id);
                       });
                     }}
                   >
                     <RotateCcw className="size-4" aria-hidden="true" />
-                    Восстановить
+                    {t("Восстановить")}
                   </Button>
                 </article>
               ))}
@@ -241,7 +247,7 @@ export function VersionsPage({
                     className="mx-auto size-6 text-[var(--ink-tertiary)]"
                     aria-hidden="true"
                   />
-                  <p className="mt-2 text-sm font-medium">Пока нет именованных версий</p>
+                  <p className="mt-2 text-sm font-medium">{t("Пока нет именованных версий")}</p>
                 </div>
               ) : null}
             </div>
@@ -250,7 +256,7 @@ export function VersionsPage({
                 to="/projects/$projectId/studio/$nodeId"
                 params={{ projectId: document.projectId, nodeId: document.id }}
               >
-                Открыть документ
+                {t("Открыть документ")}
               </Link>
             </Button>
           </aside>
@@ -261,48 +267,50 @@ export function VersionsPage({
                 <GitCompareArrows className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-sm font-semibold">Сравнить редакции</h2>
+                <h2 className="text-sm font-semibold">{t("Сравнить редакции")}</h2>
                 <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
-                  Сравнение работает только для чтения и не изменяет документ.
+                  {t("Сравнение работает только для чтения и не изменяет документ.")}
                 </p>
               </div>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Field label="Более ранняя редакция">
+              <Field label={t("Более ранняя редакция")}>
                 <Select
                   value={leftRevision}
                   onChange={(event) => setLeftRevision(event.target.value)}
                 >
-                  <option value="">Выберите редакцию</option>
+                  <option value="">{t("Выберите редакцию")}</option>
                   {history.data?.revisions.map((revision) => (
                     <option key={revision.id} value={revision.revision}>
-                      Редакция {revision.revision} · {revision.source}
+                      {t("Редакция ")}
+                      {revision.revision} · {revision.source}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label="Более поздняя редакция">
+              <Field label={t("Более поздняя редакция")}>
                 <Select
                   value={rightRevision}
                   onChange={(event) => setRightRevision(event.target.value)}
                 >
-                  <option value="">Выберите редакцию</option>
+                  <option value="">{t("Выберите редакцию")}</option>
                   {history.data?.revisions.map((revision) => (
                     <option key={revision.id} value={revision.revision}>
-                      Редакция {revision.revision} · {revision.source}
+                      {t("Редакция ")}
+                      {revision.revision} · {revision.source}
                     </option>
                   ))}
                 </Select>
               </Field>
             </div>
             <section
-              aria-label="Сравнение редакций"
+              aria-label={t("Сравнение редакций")}
               className="font-manuscript mt-5 min-h-[520px] rounded-[var(--radius-md)] bg-[var(--surface-subtle)] p-6 text-lg leading-8"
             >
               {leftRevision && rightRevision ? (
                 comparison.length === 0 ? (
                   <p className="font-ui text-sm text-[var(--ink-tertiary)]">
-                    Текст редакций совпадает.
+                    {t("Текст редакций совпадает.")}
                   </p>
                 ) : (
                   comparison.map((token) => (
@@ -322,7 +330,7 @@ export function VersionsPage({
                 )
               ) : (
                 <p className="font-ui text-sm text-[var(--ink-tertiary)]">
-                  Для сравнения нужны как минимум две редакции.
+                  {t("Для сравнения нужны как минимум две редакции.")}
                 </p>
               )}
             </section>

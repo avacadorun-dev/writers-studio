@@ -24,7 +24,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 import {
   groupLiveTranscriptSegments,
   isNavigationCommand,
@@ -33,6 +32,7 @@ import {
   useRecorder,
   type VoiceEditTarget,
 } from "~features/dictation";
+import { t } from "~shared/i18n";
 import { Banner, BrandMark, Button, useActionDialog, useToast } from "~shared/ui";
 
 export function RecordingPage({ projectId, localId }: { projectId: string; localId: string }) {
@@ -58,7 +58,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
 
   const executeQuickCommand = (kind: QuickDictationCommandKind) => {
     if (!controller.executeCommand(kind)) {
-      showToast({ title: "Пока нечего отменять" });
+      showToast({ title: t("Пока нечего отменять") });
     }
   };
 
@@ -84,9 +84,9 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
     }
     const announcement =
       latest.command?.executed && latest.command.kind !== "undo_command"
-        ? `Выполнена команда: ${commandLabel(latest.command.kind)}`
+        ? t("Выполнена команда: {0}", commandLabel(latest.command.kind))
         : latest.command?.kind === "undo_command" && latest.command.executed
-          ? "Предыдущая команда отменена"
+          ? t("Предыдущая команда отменена")
           : latest.text;
     const timer = window.setTimeout(() => setAnnouncedText(announcement), 500);
     return () => window.clearTimeout(timer);
@@ -126,8 +126,8 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
     if (!target) {
       controller.setCommandExecution(navigationSegment.id, false);
       showToast({
-        title: "Не нашли это место",
-        description: "Назовите номер абзаца или несколько точных слов из текста.",
+        title: t("Не нашли это место"),
+        description: t("Назовите номер абзаца или несколько точных слов из текста."),
       });
       return;
     }
@@ -180,7 +180,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
     if (voiceEditText.trim() !== voiceEditTarget.text.trim()) {
       controller.replaceSegments(voiceEditTarget.segmentIds, voiceEditText);
       showToast({
-        title: voiceEditText.trim() ? "Исправление сохранено" : "Фрагмент удалён",
+        title: voiceEditText.trim() ? t("Исправление сохранено") : t("Фрагмент удалён"),
       });
     }
     setVoiceEditTarget(null);
@@ -200,40 +200,41 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
   return (
     <main className="flex h-full min-h-0 flex-col bg-[var(--surface-app)]">
       <header className="flex h-14 items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-2 sm:px-[18px]">
-        <Button asChild variant="ghost" size="icon" aria-label="Вернуться в проект">
+        <Button asChild variant="ghost" size="icon" aria-label={t("Вернуться в проект")}>
           <Link to="/projects/$projectId" params={{ projectId }}>
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
         </Button>
         <BrandMark className="hidden size-7 shrink-0 sm:block" aria-hidden="true" />
         <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-sm font-medium">{snapshot.projectTitle ?? "Запись"}</p>
+          <p className="truncate text-sm font-medium">{snapshot.projectTitle ?? t("Запись")}</p>
           <span className="text-[var(--ink-tertiary)]" aria-hidden="true">
             ›
           </span>
           <p className="hidden truncate text-xs text-[var(--ink-tertiary)] sm:block">
-            {snapshot.destinationTitle ?? "Голосовая сессия"}
+            {snapshot.destinationTitle ?? t("Голосовая сессия")}
           </p>
           <span className="hidden rounded-[var(--radius-pill)] bg-[var(--info-soft)] px-3 py-1 text-[11px] text-[var(--info)] md:inline-flex">
-            На этом устройстве
+            {t("На этом устройстве")}
           </span>
         </div>
         <div className="ml-auto flex min-h-9 items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--record-surface)] px-4 text-sm font-semibold text-[var(--ink-on-solid)]">
           <span className="size-2 rounded-full bg-current" aria-hidden="true" />
           <span className="sr-only">
-            Общая длительность сессии {formatDuration(snapshot.totalDurationMs)}
+            {t("Общая длительность сессии ")}
+            {formatDuration(snapshot.totalDurationMs)}
           </span>
           <span aria-hidden="true">
-            {paused ? "Пауза" : "Запись"} · {formatDuration(snapshot.totalDurationMs)}
+            {paused ? t("Пауза") : t("Запись")} · {formatDuration(snapshot.totalDurationMs)}
           </span>
         </div>
       </header>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {paused
-          ? "Запись приостановлена"
+          ? t("Запись приостановлена")
           : degraded
-            ? "Локальная запись продолжается, живая расшифровка недоступна"
-            : "Идёт запись и живая расшифровка"}
+            ? t("Локальная запись продолжается, живая расшифровка недоступна")
+            : t("Идёт запись и живая расшифровка")}
       </p>
 
       {degraded ? (
@@ -241,19 +242,23 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
           className="m-3 mb-0"
           variant="warning"
           title={
-            snapshot.connection === "offline" ? "Нет соединения" : "Живая расшифровка недоступна"
+            snapshot.connection === "offline"
+              ? t("Нет соединения")
+              : t("Живая расшифровка недоступна")
           }
-          body="Запись продолжается и сохраняется на этом устройстве. Завершите её обычной кнопкой."
+          body={t(
+            "Запись продолжается и сохраняется на этом устройстве. Завершите её обычной кнопкой.",
+          )}
         />
       ) : null}
 
       <section
         className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-2 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4"
-        aria-label="Живая расшифровка"
+        aria-label={t("Живая расшифровка")}
       >
         <div className="flex min-h-8 items-center gap-3 text-xs">
           <span className="truncate font-medium">
-            {snapshot.destinationTitle ?? "Продолжение рукописи"}
+            {snapshot.destinationTitle ?? t("Продолжение рукописи")}
           </span>
           <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[var(--ink-tertiary)]">
             <span
@@ -266,7 +271,11 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               }`}
               aria-hidden="true"
             />
-            {paused ? "На паузе" : degraded ? "Только локальная запись" : "Онлайн · сохраняется"}
+            {paused
+              ? t("На паузе")
+              : degraded
+                ? t("Только локальная запись")
+                : t("Онлайн · сохраняется")}
           </span>
         </div>
         <div
@@ -281,9 +290,11 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
             <div className="grid h-full place-items-center text-center">
               <div>
                 <Mic className="mx-auto size-9 text-[var(--record)]" aria-hidden="true" />
-                <h1 className="font-display mt-4 text-3xl">Говорите — мы слушаем</h1>
+                <h1 className="font-display mt-4 text-3xl">{t("Говорите — мы слушаем")}</h1>
                 <p className="mt-2 text-sm text-[var(--ink-tertiary)]">
-                  Стабильные фрагменты появятся здесь. Аудио сохраняется независимо от текста.
+                  {t(
+                    "Стабильные фрагменты появятся здесь. Аудио сохраняется независимо от текста.",
+                  )}
                 </p>
               </div>
             </div>
@@ -303,10 +314,10 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                         <Flag className="size-4 shrink-0 text-[var(--accent)]" aria-hidden="true" />
                         <span className="font-medium text-[var(--accent)]">
                           {run.segment.command.kind === "marker"
-                            ? `Метка · ${formatDuration(run.segment.startMs)}`
+                            ? t("Метка · {0}", formatDuration(run.segment.startMs))
                             : run.segment.command.kind === "undo_command"
-                              ? "Предыдущая команда отменена"
-                              : `Выполнено: ${commandLabel(run.segment.command.kind)}`}
+                              ? t("Предыдущая команда отменена")
+                              : t("Выполнено: {0}", commandLabel(run.segment.command.kind))}
                         </span>
                         {run.segment.command.kind !== "marker" ? (
                           <span className="ml-auto font-mono text-[11px] text-[var(--ink-tertiary)]">
@@ -324,7 +335,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                             onClick={() => controller.setCommandExecution(run.segment.id, false)}
                           >
                             <RotateCcw className="size-3.5" aria-hidden="true" />
-                            Отменить
+                            {t("Отменить")}
                           </Button>
                         ) : null}
                       </div>
@@ -332,14 +343,14 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                       <div>
                         <p className="font-manuscript text-xl">{run.segment.text}</p>
                         <div className="mt-2 flex items-center gap-2 text-xs text-[var(--warning)]">
-                          Команда не выполнена
+                          {t("Команда не выполнена")}
                           <Button
                             type="button"
                             variant="ghost"
                             size="compact"
                             onClick={() => controller.setCommandExecution(run.segment.id, true)}
                           >
-                            Выполнить
+                            {t("Выполнить")}
                           </Button>
                         </div>
                       </div>
@@ -353,14 +364,17 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                   >
                     <div className="mb-2 flex items-center gap-2 text-sm">
                       <Pencil className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                      <span className="font-semibold">Правка: {voiceEditTarget.label}</span>
+                      <span className="font-semibold">
+                        {t("Правка: ")}
+                        {voiceEditTarget.label}
+                      </span>
                       <span className="ml-auto text-xs text-[var(--ink-tertiary)]">
-                        запись на паузе
+                        {t("запись на паузе")}
                       </span>
                     </div>
                     <textarea
                       ref={voiceEditRef}
-                      aria-label={`Правка абзаца ${voiceEditTarget.paragraphNumber}`}
+                      aria-label={t("Правка абзаца {0}", voiceEditTarget.paragraphNumber)}
                       value={voiceEditText}
                       onChange={(event) => setVoiceEditText(event.target.value)}
                       className="font-manuscript min-h-40 w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-paper)] px-4 py-3 text-xl leading-[1.75] text-[var(--ink-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] sm:text-2xl"
@@ -373,7 +387,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                         onClick={() => setVoiceEditTarget(null)}
                       >
                         <X className="size-3.5" aria-hidden="true" />
-                        Отменить
+                        {t("Отменить")}
                       </Button>
                       <Button
                         type="button"
@@ -382,15 +396,15 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                         onClick={() => void completeVoiceEdit(false)}
                       >
                         <Check className="size-3.5" aria-hidden="true" />
-                        Сохранить
+                        {t("Сохранить")}
                       </Button>
                       <Button
                         type="button"
                         size="compact"
                         onClick={() => void completeVoiceEdit(true)}
                       >
-                        <CornerDownRight className="size-3.5" aria-hidden="true" />К концу и
-                        продолжить
+                        <CornerDownRight className="size-3.5" aria-hidden="true" />
+                        {t("К концу и продолжить")}
                       </Button>
                     </div>
                   </div>
@@ -407,7 +421,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                         className="ml-1 border-l-2 border-dotted border-[var(--accent)] pl-2 text-[var(--ink-tertiary)]"
                         data-transcript-state="partial"
                       >
-                        <span className="sr-only">Предварительный текст: </span>
+                        <span className="sr-only">{t("Предварительный текст: ")}</span>
                         {snapshot.partial}
                         <span className="ml-1 inline-block h-6 w-px bg-[var(--accent)] align-middle" />
                       </span>
@@ -420,12 +434,12 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                   className="mb-5 border-l-2 border-dotted border-[var(--accent)] pl-3 text-[var(--ink-tertiary)]"
                   data-transcript-state="partial"
                 >
-                  <span className="sr-only">Предварительный текст: </span>
+                  <span className="sr-only">{t("Предварительный текст: ")}</span>
                   <span
                     className="font-ui mr-2 inline-flex rounded-full border border-[var(--border-strong)] px-2 py-0.5 align-middle text-[10px] font-semibold tracking-wide uppercase"
                     aria-hidden="true"
                   >
-                    Черновик
+                    {t("Черновик")}
                   </span>
                   {snapshot.partial}
                   <span className="ml-1 inline-block h-6 w-px bg-[var(--accent)] align-middle" />
@@ -441,7 +455,8 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               className="sticky bottom-2 left-1/2 -translate-x-1/2 shadow-[0_8px_20px_var(--shadow-color)]"
               onClick={() => setFollowLive(true)}
             >
-              <ArrowDown className="size-4" aria-hidden="true" />К текущему тексту
+              <ArrowDown className="size-4" aria-hidden="true" />
+              {t("К текущему тексту")}
             </Button>
           ) : null}
         </div>
@@ -463,9 +478,11 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               onClick={() => setCommandsExpanded((current) => !current)}
             >
               <Command className="size-4 text-[var(--accent)]" aria-hidden="true" />
-              Команды
+              {t("Команды")}
               <span className="font-normal text-[var(--ink-tertiary)]">
-                голосом с префиксом «{snapshot.commandPrefix}» или кнопкой
+                {t("голосом с префиксом «")}
+                {snapshot.commandPrefix}
+                {t("» или кнопкой")}
               </span>
               {commandsExpanded ? (
                 <ChevronUp className="ml-auto size-4" aria-hidden="true" />
@@ -476,7 +493,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
             {commandsExpanded ? (
               <div className="mt-1 grid gap-2">
                 <fieldset className="flex min-w-0 gap-2 overflow-x-auto border-0 p-0 pb-1">
-                  <legend className="sr-only">Кнопки команд диктовки</legend>
+                  <legend className="sr-only">{t("Кнопки команд диктовки")}</legend>
                   <Button
                     type="button"
                     variant="secondary"
@@ -485,7 +502,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                     onClick={() => executeQuickCommand("new_paragraph")}
                   >
                     <Pilcrow className="size-3.5" aria-hidden="true" />
-                    Новый абзац
+                    {t("Новый абзац")}
                   </Button>
                   <Button
                     type="button"
@@ -495,7 +512,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                     onClick={() => executeQuickCommand("dialogue_start")}
                   >
                     <MessageSquareQuote className="size-3.5" aria-hidden="true" />
-                    Начать диалог
+                    {t("Начать диалог")}
                   </Button>
                   <Button
                     type="button"
@@ -505,7 +522,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                     onClick={() => executeQuickCommand("scene_break")}
                   >
                     <SeparatorHorizontal className="size-3.5" aria-hidden="true" />
-                    Разделитель сцены
+                    {t("Разделитель сцены")}
                   </Button>
                   <Button
                     type="button"
@@ -515,7 +532,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                     onClick={() => controller.addMarker()}
                   >
                     <Flag className="size-3.5" aria-hidden="true" />
-                    Метка
+                    {t("Метка")}
                   </Button>
                   <Button
                     type="button"
@@ -526,20 +543,29 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                     onClick={() => executeQuickCommand("undo_command")}
                   >
                     <Undo2 className="size-3.5" aria-hidden="true" />
-                    Отменить команду
+                    {t("Отменить команду")}
                   </Button>
                 </fieldset>
                 <p className="text-[11px] leading-4 text-[var(--ink-tertiary)]">
-                  {snapshot.commandsEnabled ? (
-                    <>
-                      Голосом: «{snapshot.commandPrefix}, новый абзац» · «{snapshot.commandPrefix},
-                      разделитель сцены». Навигация: «{snapshot.commandPrefix}, вернись к первому
-                      абзацу» · «{snapshot.commandPrefix}, вернись к словам…» · «
-                      {snapshot.commandPrefix}, вернись в конец».
-                    </>
-                  ) : (
-                    "Голосовое распознавание команд отключено для этой записи; кнопки остаются доступны."
-                  )}
+                  {snapshot.commandsEnabled
+                    ? t(
+                        "Голосом: {0}",
+                        (snapshot.language === "en"
+                          ? ["new paragraph", "scene break", "start dialogue", "undo command"]
+                          : [
+                              "новый абзац",
+                              "разделитель сцены",
+                              "вернись к первому абзацу",
+                              "вернись к словам…",
+                              "вернись в конец",
+                            ]
+                        )
+                          .map((phrase) => `“${snapshot.commandPrefix}, ${phrase}”`)
+                          .join(" · "),
+                      )
+                    : t(
+                        "Голосовое распознавание команд отключено для этой записи; кнопки остаются доступны.",
+                      )}
                 </p>
               </div>
             ) : null}
@@ -553,26 +579,26 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                 onClick={() => {
                   const latest = snapshot.stableSegments.findLast((segment) => !segment.command);
                   if (!latest) {
-                    showToast({ title: "Текст ещё не появился" });
+                    showToast({ title: t("Текст ещё не появился") });
                     return;
                   }
                   void requestInput({
-                    title: "Исправить последний фрагмент",
-                    description: "Изменение сохранится в живом черновике этой записи.",
-                    label: "Текст фрагмента",
+                    title: t("Исправить последний фрагмент"),
+                    description: t("Изменение сохранится в живом черновике этой записи."),
+                    label: t("Текст фрагмента"),
                     defaultValue: latest.text,
                     icon: Pencil,
-                    confirmLabel: "Сохранить",
+                    confirmLabel: t("Сохранить"),
                   }).then((text) => {
                     if (text?.trim()) {
                       controller.editSegment(latest.id, text.trim());
-                      showToast({ title: "Исправление сохранено в живой расшифровке" });
+                      showToast({ title: t("Исправление сохранено в живой расшифровке") });
                     }
                   });
                 }}
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
-                Исправить текст
+                {t("Исправить текст")}
               </Button>
               <Button
                 type="button"
@@ -580,12 +606,12 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
                 size="compact"
                 onClick={() =>
                   void controller.playRecent(10).catch(() => {
-                    showToast({ title: "Последние секунды аудио ещё не готовы" });
+                    showToast({ title: t("Последние секунды аудио ещё не готовы") });
                   })
                 }
               >
                 <Headphones className="size-3.5" aria-hidden="true" />
-                Прослушать последние 10 секунд
+                {t("Прослушать последние 10 секунд")}
               </Button>
             </div>
           ) : null}
@@ -596,7 +622,8 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               ) : (
                 <Wifi className="size-4 text-[var(--success)]" aria-hidden="true" />
               )}
-              {snapshot.uploadedChunks}/{snapshot.totalChunks} фрагментов на сервере
+              {snapshot.uploadedChunks}/{snapshot.totalChunks}
+              {t(" фрагментов на сервере")}
             </div>
             <Button
               type="button"
@@ -609,7 +636,7 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               ) : (
                 <Pause className="size-4" aria-hidden="true" />
               )}
-              {paused ? "Продолжить" : "Пауза"}
+              {paused ? t("Продолжить") : t("Пауза")}
             </Button>
             <Button
               type="button"
@@ -618,20 +645,20 @@ export function RecordingPage({ projectId, localId }: { projectId: string; local
               onClick={() => void finish()}
             >
               <CircleStop className="size-4" aria-hidden="true" />
-              {finishing ? "Сохраняем…" : "Завершить"}
+              {finishing ? t("Сохраняем…") : t("Завершить")}
             </Button>
           </div>
           <p className="mt-2 text-center text-[11px] text-[var(--ink-tertiary)]">
             {paused
               ? voiceEditTarget
-                ? "Исправьте выделенный текст и вернитесь к концу"
-                : "Запись приостановлена"
-              : `${formatDuration(snapshot.recordedDurationMs)} записанного аудио`}
+                ? t("Исправьте выделенный текст и вернитесь к концу")
+                : t("Запись приостановлена")
+              : t("{0} записанного аудио", formatDuration(snapshot.recordedDurationMs))}
           </p>
         </div>
       </footer>
       <Link to="/projects/$projectId" params={{ projectId }} className="sr-only focus:not-sr-only">
-        Вернуться без завершения
+        {t("Вернуться без завершения")}
       </Link>
     </main>
   );
@@ -657,14 +684,14 @@ function commandLabel(
     | "navigate_end",
 ): string {
   return {
-    new_paragraph: "новый абзац",
-    dialogue_start: "начало диалога",
-    scene_break: "разделитель сцены",
-    marker: "метка",
-    undo_command: "отменить команду",
-    navigate_paragraph: "переход к абзацу",
-    navigate_sentence: "переход к предложению",
-    navigate_text: "переход к словам",
-    navigate_end: "переход в конец",
+    new_paragraph: t("новый абзац"),
+    dialogue_start: t("начало диалога"),
+    scene_break: t("разделитель сцены"),
+    marker: t("метка"),
+    undo_command: t("отменить команду"),
+    navigate_paragraph: t("переход к абзацу"),
+    navigate_sentence: t("переход к предложению"),
+    navigate_text: t("переход к словам"),
+    navigate_end: t("переход в конец"),
   }[kind];
 }

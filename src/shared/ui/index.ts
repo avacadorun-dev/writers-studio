@@ -21,6 +21,7 @@ export {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 export { Field, Input, Select } from "./field";
+export { InterfaceLanguagePicker } from "./interface-language-picker";
 export type { SaveState } from "./save-status";
 export { SaveStatus } from "./save-status";
 export { Spinner } from "./spinner";

@@ -1,20 +1,21 @@
 import { Check } from "lucide-react";
+import { t } from "~shared/i18n";
 
 import { cn, type EditorStyle, editorStyleOptions } from "~shared/lib";
 
 const previewTokens = [
-  { id: "background", label: "Фон" },
-  { id: "panel", label: "Панель" },
-  { id: "document", label: "Документ" },
-  { id: "surface", label: "Поверхность" },
-  { id: "border", label: "Граница" },
-  { id: "text-primary", label: "Основной текст" },
-  { id: "text-secondary", label: "Вторичный текст" },
-  { id: "accent", label: "Акцент" },
-  { id: "accent-secondary", label: "Дополнительный акцент" },
-  { id: "selected", label: "Выбранное" },
-  { id: "hover", label: "Наведение" },
-  { id: "error", label: "Ошибка" },
+  { id: "background", label: t("Фон") },
+  { id: "panel", label: t("Панель") },
+  { id: "document", label: t("Документ") },
+  { id: "surface", label: t("Поверхность") },
+  { id: "border", label: t("Граница") },
+  { id: "text-primary", label: t("Основной текст") },
+  { id: "text-secondary", label: t("Вторичный текст") },
+  { id: "accent", label: t("Акцент") },
+  { id: "accent-secondary", label: t("Дополнительный акцент") },
+  { id: "selected", label: t("Выбранное") },
+  { id: "hover", label: t("Наведение") },
+  { id: "error", label: t("Ошибка") },
 ] as const;
 
 export function EditorThemePicker({
@@ -28,7 +29,7 @@ export function EditorThemePicker({
     <div
       className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
       role="radiogroup"
-      aria-label="Цветовая тема"
+      aria-label={t("Цветовая тема")}
     >
       {editorStyleOptions.map((option) => {
         const selected = option.id === value;
@@ -56,7 +57,7 @@ export function EditorThemePicker({
               className="theme-palette-preview block overflow-hidden rounded-[var(--radius-md)] border border-[var(--theme-preview-border)] bg-[var(--theme-preview-background)]"
               data-style-preview={option.id}
               role="img"
-              aria-label={`Предпросмотр темы «${option.label}»`}
+              aria-label={t("Предпросмотр темы «{0}»", option.label)}
             >
               <span className="flex h-[100px]" aria-hidden="true">
                 <span className="flex w-10 shrink-0 flex-col gap-2 border-r border-[var(--theme-preview-border)] bg-[var(--theme-preview-panel)] p-2.5">

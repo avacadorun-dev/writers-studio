@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { t } from "~shared/i18n";
 
 import { Button } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
@@ -22,7 +23,7 @@ export function PageShell({
       <div className="min-h-full">
         <header className="workspace-chrome border-b border-[var(--border-subtle)]">
           <div className="mx-auto flex min-h-20 max-w-[1120px] items-center gap-3 px-4 lg:px-8">
-            <Button asChild variant="ghost" size="icon" aria-label="Назад">
+            <Button asChild variant="ghost" size="icon" aria-label={t("Назад")}>
               <Link to={backTo}>
                 <ArrowLeft className="size-4" aria-hidden="true" />
               </Link>

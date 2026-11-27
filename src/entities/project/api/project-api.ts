@@ -1,5 +1,6 @@
 import { APIError, type APIErrorPayload, apiRequest } from "~shared/api";
 import { API_BASE_URL } from "~shared/config";
+import { t } from "~shared/i18n";
 
 import type {
   AnnotationAnchor,
@@ -96,7 +97,7 @@ export function importMarkdownTree(
     request.addEventListener("error", () =>
       reject(
         new APIError(0, {
-          error: { code: "network_error", message: "Не удалось загрузить Markdown-хранилище" },
+          error: { code: "network_error", message: t("Не удалось загрузить Markdown-хранилище") },
         }),
       ),
     );

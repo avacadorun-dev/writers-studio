@@ -2,6 +2,9 @@
 
 :root {
   color-scheme: light;
+  --callout-info-label: "Information";
+  --callout-idea-label: "Idea";
+  --callout-warning-label: "Warning";
   --surface-app: #f5f3ee;
   --surface-panel: #faf9f6;
   --surface-paper: #fffefb;
@@ -2207,11 +2210,11 @@
   }
 
   .editor-content .tiptap aside[data-callout-kind="info"]::before {
-    content: "Информация";
+    content: var(--callout-info-label);
   }
 
   .editor-content .tiptap aside[data-callout-kind="idea"]::before {
-    content: "Идея";
+    content: var(--callout-idea-label);
   }
 
   .editor-content .tiptap aside[data-callout-kind="warning"] {
@@ -2221,7 +2224,7 @@
 
   .editor-content .tiptap aside[data-callout-kind="warning"]::before {
     color: var(--warning);
-    content: "Предупреждение";
+    content: var(--callout-warning-label);
   }
 
   .editor-content .tiptap aside[data-callout-kind="todo"] {

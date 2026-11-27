@@ -25,6 +25,7 @@ import {
   setProjectStatus,
 } from "~entities/project";
 import { EditProjectDialog } from "~features/edit-project";
+import { interfaceLanguage, localizeMessage, t } from "~shared/i18n";
 import {
   Button,
   DropdownMenu,
@@ -36,13 +37,13 @@ import {
 } from "~shared/ui";
 
 const kindLabels: Record<Project["kind"], string> = {
-  novel: "Роман",
-  story: "Рассказ",
-  screenplay: "Сценарий",
-  nonfiction: "Нон-фикшн",
-  game_design: "Гейм-дизайн",
-  free: "Свободный проект",
-  custom: "Своя структура",
+  novel: t("Роман"),
+  story: t("Рассказ"),
+  screenplay: t("Сценарий"),
+  nonfiction: t("Нон-фикшн"),
+  game_design: t("Гейм-дизайн"),
+  free: t("Свободный проект"),
+  custom: t("Своя структура"),
 };
 
 const kindIcons = {
@@ -68,22 +69,23 @@ export function ProjectCard({ project }: { project: Project }) {
       showToast({
         title:
           updated.status === "active"
-            ? "Проект восстановлен"
+            ? t("Проект восстановлен")
             : updated.status === "archived"
-              ? "Проект перемещён в архив"
-              : "Проект перемещён в корзину",
+              ? t("Проект перемещён в архив")
+              : t("Проект перемещён в корзину"),
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось изменить проект", description: error.message }),
+      showToast({ title: t("Не удалось изменить проект"), description: error.message }),
   });
   const purge = useMutation({
     mutationFn: (confirmation: string) => purgeProject(project.id, confirmation),
     onSuccess: async ({ notice }) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      showToast({ title: "Проект удалён", description: notice });
+      showToast({ title: t("Проект удалён"), description: localizeMessage(notice) });
     },
-    onError: (error) => showToast({ title: "Удаление не завершено", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Удаление не завершено"), description: error.message }),
   });
 
   return (
@@ -100,46 +102,52 @@ export function ProjectCard({ project }: { project: Project }) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label={`Действия: ${project.title}`}
+                aria-label={t("Действия: {0}", project.title)}
               >
                 <MoreHorizontal className="size-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label={`Действия с проектом «${project.title}»`}>
+            <DropdownMenuContent
+              align="end"
+              aria-label={t("Действия с проектом «{0}»", project.title)}
+            >
               {project.status !== "trash" ? (
                 <DropdownMenuItem onSelect={() => setEditing(true)}>
                   <PencilLine className="size-4" aria-hidden="true" />
-                  Редактировать
+                  {t("Редактировать")}
                 </DropdownMenuItem>
               ) : null}
               {project.status !== "active" ? (
                 <DropdownMenuItem onSelect={() => status.mutate("active")}>
                   <RotateCcw className="size-4" aria-hidden="true" />
-                  Восстановить
+                  {t("Восстановить")}
                 </DropdownMenuItem>
               ) : null}
               {project.status === "active" ? (
                 <DropdownMenuItem onSelect={() => status.mutate("archived")}>
-                  <Archive className="size-4" aria-hidden="true" />В архив
+                  <Archive className="size-4" aria-hidden="true" />
+                  {t("В архив")}
                 </DropdownMenuItem>
               ) : null}
               {project.status !== "trash" ? (
                 <DropdownMenuItem destructive onSelect={() => status.mutate("trash")}>
-                  <Trash2 className="size-4" aria-hidden="true" />В корзину
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  {t("В корзину")}
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem
                   destructive
                   onSelect={() => {
                     void requestInput({
-                      title: "Удалить проект безвозвратно?",
-                      description:
+                      title: t("Удалить проект безвозвратно?"),
+                      description: t(
                         "Будут удалены рукопись, версии и связанные записи. Резервные копии внешних систем могут храниться по их правилам.",
-                      label: "Название проекта",
+                      ),
+                      label: t("Название проекта"),
                       requiredValue: project.title,
                       icon: Trash2,
                       tone: "danger",
-                      confirmLabel: "Удалить безвозвратно",
+                      confirmLabel: t("Удалить безвозвратно"),
                     }).then((confirmation) => {
                       if (confirmation !== undefined) {
                         purge.mutate(confirmation);
@@ -148,7 +156,7 @@ export function ProjectCard({ project }: { project: Project }) {
                   }}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
-                  Удалить навсегда
+                  {t("Удалить навсегда")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -161,16 +169,16 @@ export function ProjectCard({ project }: { project: Project }) {
         className="project-card-open focus-visible:outline-none"
       >
         <h2>{project.title}</h2>
-        <p>{project.synopsis || "Новая рукопись ждёт первого абзаца."}</p>
+        <p>{project.synopsis || t("Новая рукопись ждёт первого абзаца.")}</p>
       </Link>
       <div className="project-card-footer">
         <time
           className="project-card-date"
           dateTime={project.updatedAt}
-          title="Последнее изменение"
+          title={t("Последнее изменение")}
         >
           <Clock3 className="size-3" aria-hidden="true" />
-          {new Intl.DateTimeFormat("ru", { day: "numeric", month: "long" }).format(
+          {new Intl.DateTimeFormat(interfaceLanguage, { day: "numeric", month: "long" }).format(
             new Date(project.updatedAt),
           )}
         </time>
@@ -180,7 +188,7 @@ export function ProjectCard({ project }: { project: Project }) {
             variant="ghost"
             size="icon"
             className="project-card-dictate sm:hidden"
-            aria-label={`Диктовать в проект ${project.title}`}
+            aria-label={t("Диктовать в проект {0}", project.title)}
           >
             <Link
               to="/projects/$projectId"

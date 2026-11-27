@@ -2,6 +2,7 @@ import { mergeAttributes, Node, type NodeViewProps } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
 import { AlertTriangle, ImageIcon, Info, Lightbulb, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { t } from "~shared/i18n";
 
 import { Button } from "~shared/ui";
 
@@ -124,22 +125,22 @@ function ImageBlockView({ node, selected, updateAttributes, deleteNode }: NodeVi
       ) : (
         <div className="ws-image-placeholder">
           <ImageIcon className="size-5" aria-hidden="true" />
-          Изображение недоступно
+          {t("Изображение недоступно")}
         </div>
       )}
       <input
         type="text"
         value={caption}
         className="ws-image-caption"
-        placeholder="Подпись к изображению"
-        aria-label="Подпись к изображению"
+        placeholder={t("Подпись к изображению")}
+        aria-label={t("Подпись к изображению")}
         onChange={(event) => setCaption(event.target.value)}
         onBlur={() => updateAttributes({ caption: caption.trim() })}
       />
       {selected ? (
         <div className="ws-rich-block-controls" contentEditable={false}>
           <label className="ws-rich-block-field">
-            <span>Alt-текст</span>
+            <span>{t("Alt-текст")}</span>
             <input
               type="text"
               value={alt}
@@ -152,7 +153,7 @@ function ImageBlockView({ node, selected, updateAttributes, deleteNode }: NodeVi
             variant="ghost"
             size="icon"
             className="size-8 min-h-8"
-            aria-label="Удалить изображение из документа"
+            aria-label={t("Удалить изображение из документа")}
             onClick={deleteNode}
           >
             <Trash2 className="size-4" aria-hidden="true" />
@@ -171,7 +172,7 @@ export const MermaidBlock = Node.create({
   selectable: true,
   addAttributes() {
     return {
-      code: { default: "graph TD\n  A[Начало] --> B[Результат]" },
+      code: { default: t("graph TD\n  A[Начало] --> B[Результат]") },
       caption: { default: "" },
     };
   },
@@ -232,13 +233,13 @@ function MermaidBlockView({ node, selected, updateAttributes, deleteNode }: Node
           } catch {
             if (!active || !previewRef.current) return;
             previewRef.current.replaceChildren();
-            setError("Не удалось построить схему. Проверьте синтаксис Mermaid.");
+            setError(t("Не удалось построить схему. Проверьте синтаксис Mermaid."));
           }
         })
         .catch(() => {
           if (!active || !previewRef.current) return;
           previewRef.current.replaceChildren();
-          setError("Модуль схем временно недоступен. Обновите страницу и повторите попытку.");
+          setError(t("Модуль схем временно недоступен. Обновите страницу и повторите попытку."));
         });
     }, 180);
     return () => {
@@ -255,14 +256,14 @@ function MermaidBlockView({ node, selected, updateAttributes, deleteNode }: Node
       className="ws-mermaid-block"
     >
       <div className="ws-rich-block-heading" contentEditable={false}>
-        <span>Mermaid-схема</span>
+        <span>{t("Mermaid-схема")}</span>
         {selected ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="size-8 min-h-8"
-            aria-label="Удалить схему"
+            aria-label={t("Удалить схему")}
             onClick={deleteNode}
           >
             <Trash2 className="size-4" aria-hidden="true" />
@@ -279,7 +280,7 @@ function MermaidBlockView({ node, selected, updateAttributes, deleteNode }: Node
       <textarea
         value={source}
         className="ws-mermaid-source"
-        aria-label="Исходный код Mermaid-схемы"
+        aria-label={t("Исходный код Mermaid-схемы")}
         spellCheck={false}
         onChange={(event) => setSource(event.target.value)}
         onBlur={() => updateAttributes({ code: source.trim() })}
@@ -288,8 +289,8 @@ function MermaidBlockView({ node, selected, updateAttributes, deleteNode }: Node
         type="text"
         value={caption}
         className="ws-image-caption"
-        placeholder="Подпись к схеме"
-        aria-label="Подпись к схеме"
+        placeholder={t("Подпись к схеме")}
+        aria-label={t("Подпись к схеме")}
         onChange={(event) => setCaption(event.target.value)}
         onBlur={() => updateAttributes({ caption: caption.trim() })}
       />
@@ -298,9 +299,9 @@ function MermaidBlockView({ node, selected, updateAttributes, deleteNode }: Node
 }
 
 export const calloutPresentation = {
-  info: { label: "Информация", icon: Info },
-  idea: { label: "Идея", icon: Lightbulb },
-  warning: { label: "Предупреждение", icon: AlertTriangle },
+  info: { label: t("Информация"), icon: Info },
+  idea: { label: t("Идея"), icon: Lightbulb },
+  warning: { label: t("Предупреждение"), icon: AlertTriangle },
   todo: { label: "TODO", icon: Pencil },
 } as const;
 

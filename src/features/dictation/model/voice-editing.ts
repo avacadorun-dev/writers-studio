@@ -1,4 +1,5 @@
 import type { CommandEvent } from "~entities/dictation";
+import { t } from "~shared/i18n";
 
 import { groupLiveTranscriptSegments, type LiveFlowSegment } from "./live-transcript-flow";
 
@@ -47,7 +48,7 @@ export function resolveVoiceEditTarget(
       ...paragraph,
       selectionStart: paragraph.text.length,
       selectionEnd: paragraph.text.length,
-      label: `${command.ordinal}-й абзац`,
+      label: t("{0}-й абзац", command.ordinal),
     };
   }
 
@@ -61,7 +62,7 @@ export function resolveVoiceEditTarget(
             ...paragraph,
             selectionStart: range.start,
             selectionEnd: range.end,
-            label: `${command.ordinal}-е предложение`,
+            label: t("{0}-е предложение", command.ordinal),
           };
         }
       }
@@ -89,14 +90,14 @@ export function resolveVoiceEditTarget(
         ...paragraph,
         selectionStart: sentence.start,
         selectionEnd: sentence.end,
-        label: `предложение «${query}»`,
+        label: t("предложение «{0}»", query),
       };
     }
     return {
       ...paragraph,
       selectionStart: match.start,
       selectionEnd: match.end,
-      label: `слова «${paragraph.text.slice(match.start, match.end)}»`,
+      label: t("слова «{0}»", paragraph.text.slice(match.start, match.end)),
     };
   }
   return null;

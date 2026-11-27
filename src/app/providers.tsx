@@ -1,6 +1,7 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { APIError } from "~shared/api";
 
 import {
   applyWriterPreferences,
@@ -18,7 +19,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 15_000,
             retry: (count, error) =>
-              count < 2 && !(error instanceof Error && error.message.includes("Сессия")),
+              count < 2 && !(error instanceof APIError && error.status === 401),
           },
           mutations: {
             retry: false,

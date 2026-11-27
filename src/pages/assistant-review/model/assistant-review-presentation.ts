@@ -3,17 +3,18 @@ import type {
   AssistantChangeSet,
   AssistantResolvedTarget,
 } from "~entities/assistant";
+import { t } from "~shared/i18n";
 
 export type ReviewPrimaryAction = "apply" | "send-feedback" | "undo" | "return";
 
 export function reviewStatusLabel(state: AssistantChangeSet["state"]): string {
   return {
-    staged: "Не применено",
-    applied: "Применено",
-    rejected: "Отклонено",
-    stale: "Устарело",
-    failed: "Ошибка",
-    undone: "Отменено",
+    staged: t("Не применено"),
+    applied: t("Применено"),
+    rejected: t("Отклонено"),
+    stale: t("Устарело"),
+    failed: t("Ошибка"),
+    undone: t("Отменено"),
   }[state];
 }
 
@@ -22,41 +23,41 @@ export function reviewPrimaryAction(
   requestingChanges: boolean,
 ): { action: ReviewPrimaryAction; label: string } {
   if (state === "staged" && requestingChanges) {
-    return { action: "send-feedback", label: "Отправить замечания" };
+    return { action: "send-feedback", label: t("Отправить замечания") };
   }
-  if (state === "staged") return { action: "apply", label: "Применить изменения" };
-  if (state === "applied") return { action: "undo", label: "Отменить набор" };
-  return { action: "return", label: "Вернуться" };
+  if (state === "staged") return { action: "apply", label: t("Применить изменения") };
+  if (state === "applied") return { action: "undo", label: t("Отменить набор") };
+  return { action: "return", label: t("Вернуться") };
 }
 
 const groupLabels: Record<string, string> = {
-  document: "Текст и структура",
-  dictionary: "Словарь",
-  memory: "Память проекта",
-  guide: "Руководство ассистента",
-  version: "Именованная версия",
-  canvas: "Canvas-доска",
+  document: t("Текст и структура"),
+  dictionary: t("Словарь"),
+  memory: t("Память проекта"),
+  guide: t("Руководство ассистента"),
+  version: t("Именованная версия"),
+  canvas: t("Canvas-доска"),
 };
 
 const operationLabels: Record<string, string> = {
-  "document.replace_range": "Точная правка текста",
-  "annotation.propose_fixes": "Исправления по заметкам",
-  "document.append": "Продолжение документа",
-  "document.append_chunk": "Большой фрагмент документа",
-  "document.insert": "Вставка в документ",
-  "document.set_title": "Новый заголовок",
-  "document.apply_marks": "Форматирование текста",
-  "tree.create_node": "Новый материал проекта",
-  "tree.rename_node": "Переименование материала",
-  "tree.move_node": "Изменение структуры",
-  "dictionary.add": "Новая запись словаря",
-  "dictionary.update": "Обновление словаря",
-  "project_memory.add": "Новая запись памяти",
-  "project_memory.update": "Обновление памяти проекта",
-  "assistant_guide.propose_create": "Новое руководство ассистента",
-  "assistant_guide.propose_update": "Обновление руководства ассистента",
-  "canvas.propose_patch": "Предложение для доски",
-  "canvas.promote_cards": "Карточки станут документами",
+  "document.replace_range": t("Точная правка текста"),
+  "annotation.propose_fixes": t("Исправления по заметкам"),
+  "document.append": t("Продолжение документа"),
+  "document.append_chunk": t("Большой фрагмент документа"),
+  "document.insert": t("Вставка в документ"),
+  "document.set_title": t("Новый заголовок"),
+  "document.apply_marks": t("Форматирование текста"),
+  "tree.create_node": t("Новый материал проекта"),
+  "tree.rename_node": t("Переименование материала"),
+  "tree.move_node": t("Изменение структуры"),
+  "dictionary.add": t("Новая запись словаря"),
+  "dictionary.update": t("Обновление словаря"),
+  "project_memory.add": t("Новая запись памяти"),
+  "project_memory.update": t("Обновление памяти проекта"),
+  "assistant_guide.propose_create": t("Новое руководство ассистента"),
+  "assistant_guide.propose_update": t("Обновление руководства ассистента"),
+  "canvas.propose_patch": t("Предложение для доски"),
+  "canvas.promote_cards": t("Карточки станут документами"),
 };
 
 export interface CanvasGhostNode {
@@ -127,7 +128,7 @@ function canvasSnapshot(
         ? node.text.split("\n", 1)[0]
         : typeof node.label === "string"
           ? node.label
-          : String(node.type ?? "Карточка");
+          : String(node.type ?? t("Карточка"));
     return [
       {
         id: node.id,
@@ -158,15 +159,15 @@ export interface ExactTextEdit {
 export function operationLabel(toolName: string): string {
   if (operationLabels[toolName]) return operationLabels[toolName];
   if (toolName.startsWith("document.") || toolName.startsWith("note.")) {
-    return "Изменение документа";
+    return t("Изменение документа");
   }
-  if (toolName.startsWith("annotation.")) return "Изменение по заметкам";
-  if (toolName.startsWith("tree.")) return "Изменение структуры";
-  if (toolName.startsWith("dictionary.")) return "Изменение словаря";
-  if (toolName.startsWith("project_memory.")) return "Изменение памяти проекта";
-  if (toolName.startsWith("assistant_guide.")) return "Изменение руководства";
-  if (toolName.startsWith("canvas.")) return "Изменение Canvas-доски";
-  return "Предложенное изменение";
+  if (toolName.startsWith("annotation.")) return t("Изменение по заметкам");
+  if (toolName.startsWith("tree.")) return t("Изменение структуры");
+  if (toolName.startsWith("dictionary.")) return t("Изменение словаря");
+  if (toolName.startsWith("project_memory.")) return t("Изменение памяти проекта");
+  if (toolName.startsWith("assistant_guide.")) return t("Изменение руководства");
+  if (toolName.startsWith("canvas.")) return t("Изменение Canvas-доски");
+  return t("Предложенное изменение");
 }
 
 export function changeGroupLabel(operations: AssistantChangeOperation[], group: string): string {
@@ -174,13 +175,13 @@ export function changeGroupLabel(operations: AssistantChangeOperation[], group: 
   if (fixedLabel) return fixedLabel;
   const operation = operations.find((item) => item.groupKey === group);
   const title = operation?.beforeSnapshot?.title;
-  if (title) return `Текст · ${title}`;
+  if (title) return t("Текст · {0}", title);
   const trace = operation?.trace;
   if (trace && "targetTitle" in trace && typeof trace.targetTitle === "string") {
-    return `Текст · ${trace.targetTitle}`;
+    return t("Текст · {0}", trace.targetTitle);
   }
-  if (group.startsWith("document:")) return "Отдельный документ";
-  return "Связанное изменение";
+  if (group.startsWith("document:")) return t("Отдельный документ");
+  return t("Связанное изменение");
 }
 
 export function withRequiredChangeGroups(

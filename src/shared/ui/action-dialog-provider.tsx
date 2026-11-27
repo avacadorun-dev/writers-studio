@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { t } from "~shared/i18n";
 
 import { Button } from "./button";
 import { ConfirmationDialog } from "./dialog";
@@ -168,7 +169,9 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
           description={pending.options.description}
           icon={pending.options.icon}
           tone={pending.options.tone}
-          confirmLabel={pending.options.confirmLabel ?? (isConfirmation ? "Подтвердить" : "Готово")}
+          confirmLabel={
+            pending.options.confirmLabel ?? (isConfirmation ? t("Подтвердить") : t("Готово"))
+          }
           cancelLabel={pending.options.cancelLabel}
           confirmDisabled={confirmDisabled}
           onConfirm={confirm}
@@ -194,7 +197,7 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
                 label={pending.options.label}
                 hint={
                   requiredValue !== undefined
-                    ? `Для подтверждения введите: ${requiredValue}`
+                    ? t("Для подтверждения введите: {0}", requiredValue)
                     : undefined
                 }
               >
@@ -216,7 +219,7 @@ export function ActionDialogProvider({ children }: { children: ReactNode }) {
                 )}
               </Field>
               <Button type="submit" className="sr-only" tabIndex={-1} aria-hidden="true">
-                {pending.options.confirmLabel ?? "Готово"}
+                {pending.options.confirmLabel ?? t("Готово")}
               </Button>
             </form>
           ) : pending.kind === "select" ? (

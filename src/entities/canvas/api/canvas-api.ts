@@ -1,4 +1,5 @@
 import { apiRequest } from "~shared/api";
+import { t } from "~shared/i18n";
 
 import type {
   CanvasDocument,
@@ -72,7 +73,7 @@ export function createCanvas(projectId: string, title: string): Promise<{ canvas
 export function importCanvas(
   projectId: string,
   file: Blob,
-  title = "Импортированная доска",
+  title = t("Импортированная доска"),
 ): Promise<{ canvas: CanvasSummary }> {
   return apiRequest(
     `/api/projects/${projectId}/canvases/import?title=${encodeURIComponent(title)}`,

@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 import type { CanvasDocument, CanvasNode } from "./types";
 
 export type CanvasLayoutMode =
@@ -79,7 +81,7 @@ export function requestCanvasLayout(
     const worker = new Worker(new URL("./layout.worker.ts", import.meta.url), { type: "module" });
     const timeout = globalThis.setTimeout(() => {
       worker.terminate();
-      reject(new Error("Раскладка не успела завершиться"));
+      reject(new Error(t("Раскладка не успела завершиться")));
     }, 15_000);
     worker.addEventListener(
       "message",
@@ -96,7 +98,7 @@ export function requestCanvasLayout(
       () => {
         globalThis.clearTimeout(timeout);
         worker.terminate();
-        reject(new Error("Не удалось запустить алгоритм раскладки"));
+        reject(new Error(t("Не удалось запустить алгоритм раскладки")));
       },
       { once: true },
     );

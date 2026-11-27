@@ -10,9 +10,9 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-
 import { getRecoveryItems, retryDictation } from "~entities/dictation";
 import { synchronizeLocalRecording } from "~features/dictation";
+import { t } from "~shared/i18n";
 import {
   deleteLocalRecording,
   type LocalRecording,
@@ -66,7 +66,7 @@ export function RecoveryPage() {
             variant="ghost"
             size="icon"
             className="mb-4"
-            aria-label="Назад к проектам"
+            aria-label={t("Назад к проектам")}
           >
             <Link to="/projects">
               <ArrowLeft className="size-4" aria-hidden="true" />
@@ -75,11 +75,13 @@ export function RecoveryPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-                Сохранённая работа на устройствах
+                {t("Сохранённая работа на устройствах")}
               </p>
-              <h1 className="font-display mt-2 text-[38px] leading-tight">Центр восстановления</h1>
+              <h1 className="font-display mt-2 text-[38px] leading-tight">
+                {t("Центр восстановления")}
+              </h1>
               <p className="mt-2 text-sm text-[var(--ink-secondary)]">
-                Незавершённые записи и данные, которые ещё не синхронизированы.
+                {t("Незавершённые записи и данные, которые ещё не синхронизированы.")}
               </p>
             </div>
             <Button
@@ -89,23 +91,23 @@ export function RecoveryPage() {
               onClick={() => void Promise.all([local.refetch(), remote.refetch()])}
             >
               <RotateCcw className="size-4" aria-hidden="true" />
-              Проверить снова
+              {t("Проверить снова")}
             </Button>
           </div>
           <Banner
             className="mt-6"
             variant="info"
-            title="Эти записи не являются кэшем"
-            body="Они останутся здесь, пока вы их не восстановите или не удалите сами."
+            title={t("Эти записи не являются кэшем")}
+            body={t("Они останутся здесь, пока вы их не восстановите или не удалите сами.")}
           />
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <section>
               <h2 className="flex items-center gap-2 text-sm font-semibold">
                 <HardDrive className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                На этом устройстве
+                {t("На этом устройстве")}
               </h2>
               {local.isPending ? (
-                <Spinner label="Проверяем локальное хранилище…" />
+                <Spinner label={t("Проверяем локальное хранилище…")} />
               ) : (
                 <div className="mt-3 grid gap-3">
                   {local.data?.map((recording) => (
@@ -116,36 +118,38 @@ export function RecoveryPage() {
                       onSync={() => sync.mutate(recording.localId)}
                       onListen={() =>
                         void playLocalRecording(recording).catch(() =>
-                          showToast({ title: "Локальное аудио пока недоступно" }),
+                          showToast({ title: t("Локальное аудио пока недоступно") }),
                         )
                       }
                       onDownload={() => void downloadLocalRecording(recording)}
                       onDelete={async () => {
                         const confirmation = await requestInput({
-                          title: "Удалить запись с этого устройства?",
-                          description:
+                          title: t("Удалить запись с этого устройства?"),
+                          description: t(
                             "Эта копия существует только локально. После удаления восстановить аудио и расшифровку будет невозможно.",
-                          label: "Подтверждение",
-                          requiredValue: "УДАЛИТЬ",
+                          ),
+                          label: t("Подтверждение"),
+                          requiredValue: t("УДАЛИТЬ"),
                           icon: HardDrive,
                           tone: "danger",
-                          confirmLabel: "Удалить безвозвратно",
+                          confirmLabel: t("Удалить безвозвратно"),
                         });
-                        if (confirmation !== "УДАЛИТЬ") {
+                        if (confirmation !== t("УДАЛИТЬ")) {
                           return;
                         }
                         await deleteLocalRecording(recording.localId);
                         await queryClient.invalidateQueries({ queryKey: ["recovery-local"] });
                         showToast({
-                          title: "Локальная запись удалена",
-                          description:
+                          title: t("Локальная запись удалена"),
+                          description: t(
                             "Это действие нельзя отменить. Серверная копия, если она была, не затронута.",
+                          ),
                         });
                       }}
                     />
                   ))}
                   {local.data?.length === 0 ? (
-                    <EmptyRecovery text="Несинхронизированных локальных записей нет." />
+                    <EmptyRecovery text={t("Несинхронизированных локальных записей нет.")} />
                   ) : null}
                 </div>
               )}
@@ -153,7 +157,7 @@ export function RecoveryPage() {
             <section>
               <h2 className="flex items-center gap-2 text-sm font-semibold">
                 <CloudUpload className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                На сервере
+                {t("На сервере")}
               </h2>
               <div className="mt-3 grid gap-3">
                 {remote.data?.items.map((item) => (
@@ -167,7 +171,7 @@ export function RecoveryPage() {
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-medium">{item.projectTitle}</h3>
                       <p className="text-xs text-[var(--ink-tertiary)]">
-                        {item.destinationTitle ?? "Без места вставки"} ·{" "}
+                        {item.destinationTitle ?? t("Без места вставки")} ·{" "}
                         {formatDuration(item.durationMs)} · {item.status}
                       </p>
                     </div>
@@ -177,7 +181,7 @@ export function RecoveryPage() {
                           to="/dictations/$sessionId/review"
                           params={{ sessionId: item.sessionId }}
                         >
-                          Открыть черновик
+                          {t("Открыть черновик")}
                         </Link>
                       </Button>
                     ) : ["finalization_failed", "missing_chunks"].includes(item.status) ? (
@@ -189,7 +193,7 @@ export function RecoveryPage() {
                         onClick={() => retry.mutate(item.sessionId)}
                       >
                         <RotateCcw className="size-4" aria-hidden="true" />
-                        Повторить
+                        {t("Повторить")}
                       </Button>
                     ) : (
                       <Button asChild variant="secondary" size="compact">
@@ -197,14 +201,14 @@ export function RecoveryPage() {
                           to="/dictations/$sessionId/finalizing"
                           params={{ sessionId: item.sessionId }}
                         >
-                          Проверить
+                          {t("Проверить")}
                         </Link>
                       </Button>
                     )}
                   </article>
                 ))}
                 {!remote.isPending && remote.data?.items.length === 0 ? (
-                  <EmptyRecovery text="Серверных записей для восстановления нет." />
+                  <EmptyRecovery text={t("Серверных записей для восстановления нет.")} />
                 ) : null}
               </div>
             </section>
@@ -213,8 +217,8 @@ export function RecoveryPage() {
             <Banner
               className="mt-5"
               variant="danger"
-              title="Синхронизация не завершена"
-              body={`${sync.error.message}. Локальная копия сохранена.`}
+              title={t("Синхронизация не завершена")}
+              body={t("{0}. Локальная копия сохранена.", sync.error.message)}
             />
           ) : null}
         </main>
@@ -245,7 +249,7 @@ function RecoveryCard({
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold">{recording.projectTitle}</h3>
           <p className="mt-1 text-xs text-[var(--ink-secondary)]">
-            {recording.destinationTitle ?? "Голосовая сессия"} ·{" "}
+            {recording.destinationTitle ?? t("Голосовая сессия")} ·{" "}
             {formatDuration(recording.durationMs)} · {recording.status}
           </p>
         </div>
@@ -259,20 +263,20 @@ function RecoveryCard({
             onClick={onSync}
           >
             <CloudUpload className="size-4" aria-hidden="true" />
-            Синхронизировать
+            {t("Синхронизировать")}
           </Button>
         ) : null}
         <Button type="button" variant="secondary" size="compact" onClick={onListen}>
           <Play className="size-4" aria-hidden="true" />
-          Прослушать
+          {t("Прослушать")}
         </Button>
         <Button type="button" variant="secondary" size="compact" onClick={onDownload}>
           <Download className="size-4" aria-hidden="true" />
-          Скачать аудио
+          {t("Скачать аудио")}
         </Button>
         <Button type="button" variant="ghost" size="compact" onClick={onDelete}>
           <Trash2 className="size-4" aria-hidden="true" />
-          Удалить с устройства
+          {t("Удалить с устройства")}
         </Button>
       </div>
     </article>

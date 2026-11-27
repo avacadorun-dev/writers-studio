@@ -8,6 +8,7 @@ import {
   Database,
   Download,
   Keyboard,
+  Languages,
   Mic,
   Network,
   Server,
@@ -16,10 +17,10 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-
 import { getProjectAssistantSettings, updateProjectAssistantSettings } from "~entities/project";
 import { useSession } from "~entities/session";
 import { apiRequest } from "~shared/api";
+import { localizeMessage, t } from "~shared/i18n";
 import {
   type AssistantSilenceCheckpointMs,
   applyWriterPreferences,
@@ -42,6 +43,7 @@ import {
   Button,
   Field,
   Input,
+  InterfaceLanguagePicker,
   Select,
   Switch,
   useActionDialog,
@@ -129,9 +131,9 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
     (!Number.isInteger(assistantStepLimit) ||
       assistantStepLimit < 1 ||
       assistantStepLimit > 1_000_000)
-      ? "Введите целое число от 1 до 1 000 000 или оставьте поле пустым."
+      ? t("Введите целое число от 1 до 1 000 000 или оставьте поле пустым.")
       : projectAssistantSettings.isError
-        ? "Не удалось загрузить настройку проекта. Остальные настройки можно сохранить."
+        ? t("Не удалось загрузить настройку проекта. Остальные настройки можно сохранить.")
         : undefined;
 
   const save = useMutation({
@@ -161,16 +163,19 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
         void queryClient.invalidateQueries({ queryKey: ["projects"] });
       }
       showToast({
-        title: "Настройки сохранены",
+        title: t("Настройки сохранены"),
         description:
           response.deletedObjects > 0
-            ? `Удалено просроченных аудиообъектов: ${response.deletedObjects}.`
+            ? t("Удалено просроченных аудиообъектов: {0}.", response.deletedObjects)
             : projectId
-              ? "Настройки интерфейса действуют в этом браузере, лимит ассистента — для текущего проекта."
-              : "Настройки редактора действуют в этом браузере, срок хранения — для аккаунта.",
+              ? t(
+                  "Настройки интерфейса действуют в этом браузере, лимит ассистента — для текущего проекта.",
+                )
+              : t("Настройки редактора действуют в этом браузере, срок хранения — для аккаунта."),
       });
     },
-    onError: (error) => showToast({ title: "Настройки не сохранены", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Настройки не сохранены"), description: error.message }),
   });
   const purgeAccount = useMutation({
     mutationFn: (confirmation: string) =>
@@ -182,17 +187,18 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
       await clearLocalRecoveryData();
       localStorage.clear();
       queryClient.clear();
-      showToast({ title: "Аккаунт удалён", description: notice });
+      showToast({ title: t("Аккаунт удалён"), description: localizeMessage(notice) });
       await navigate({ to: "/login", replace: true });
     },
-    onError: (error) => showToast({ title: "Удаление не завершено", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Удаление не завершено"), description: error.message }),
   });
 
   return (
     <RequireSession>
       <main className="mx-auto min-h-full w-full max-w-[1120px] px-5 py-10 lg:px-0">
         <header className="mb-6 flex min-h-14 items-center gap-3 border-b border-[var(--border-subtle)] pb-5">
-          <Button asChild variant="ghost" size="icon" aria-label="Назад">
+          <Button asChild variant="ghost" size="icon" aria-label={t("Назад")}>
             {projectId && nodeId ? (
               <Link to="/projects/$projectId/studio/$nodeId" params={{ projectId, nodeId }}>
                 <ArrowLeft className="size-4" aria-hidden="true" />
@@ -209,24 +215,25 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
           </Button>
           <div className="min-w-0">
             <h1 className="font-display truncate text-[30px] leading-tight sm:text-[34px]">
-              Настройки
+              {t("Настройки")}
             </h1>
             <p className="mt-1 text-sm text-[var(--ink-tertiary)]">
-              {projectId ? "Проект и рабочее пространство" : "Рабочее пространство"}
+              {projectId ? t("Проект и рабочее пространство") : t("Рабочее пространство")}
             </p>
           </div>
         </header>
         <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-9">
           <nav
-            aria-label="Разделы настроек"
+            aria-label={t("Разделы настроек")}
             className="flex gap-1 overflow-x-auto pb-1 lg:sticky lg:top-6 lg:h-fit lg:flex-col lg:overflow-visible"
           >
             {[
-              ["#assistant-settings", "AI и ассистент"],
-              ["#editor-settings", "Интерфейс редактора"],
-              ["#dictation-settings", "Диктовка и команды"],
-              ["#local-storage", "Хранение"],
-              ["#privacy-settings", "Приватность"],
+              ["#interface-language", t("Язык интерфейса")],
+              ["#assistant-settings", t("AI и ассистент")],
+              ["#editor-settings", t("Интерфейс редактора")],
+              ["#dictation-settings", t("Диктовка и команды")],
+              ["#local-storage", t("Хранение")],
+              ["#privacy-settings", t("Приватность")],
             ].map(([href, label]) => (
               <a
                 key={href}
@@ -239,15 +246,24 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
           </nav>
           <div className="grid min-w-0 gap-6">
             <section className="grid min-w-0 gap-6">
-              <SettingsSection id="assistant-settings" icon={Bot} title="AI и ассистент">
+              <SettingsSection
+                id="interface-language"
+                icon={Languages}
+                title={t("Язык интерфейса")}
+              >
+                <InterfaceLanguagePicker />
+              </SettingsSection>
+              <SettingsSection id="assistant-settings" icon={Bot} title={t("AI и ассистент")}>
                 <p className="text-sm leading-6 text-[var(--ink-secondary)]">
-                  Выберите системную модель или добавьте свой OpenAI-compatible endpoint. Перед
-                  использованием приложение проверит настоящую цепочку tool-calls и возврат
-                  результата.
+                  {t(
+                    "Выберите системную модель или добавьте свой OpenAI-compatible endpoint. Перед использованием приложение проверит настоящую цепочку tool-calls и возврат результата.",
+                  )}
                 </p>
                 <Field
-                  label="Пауза перед предложением выполнить"
-                  hint="Срабатывает только после распознанной речи. Поручение никогда не отправляется автоматически."
+                  label={t("Пауза перед предложением выполнить")}
+                  hint={t(
+                    "Срабатывает только после распознанной речи. Поручение никогда не отправляется автоматически.",
+                  )}
                 >
                   <Select
                     value={preferences.assistantSilenceCheckpointMs}
@@ -260,16 +276,18 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       }))
                     }
                   >
-                    <option value={3000}>3 секунды</option>
-                    <option value={5000}>5 секунд — по умолчанию</option>
-                    <option value={8000}>8 секунд</option>
-                    <option value={0}>Выключено</option>
+                    <option value={3000}>{t("3 секунды")}</option>
+                    <option value={5000}>{t("5 секунд — по умолчанию")}</option>
+                    <option value={8000}>{t("8 секунд")}</option>
+                    <option value={0}>{t("Выключено")}</option>
                   </Select>
                 </Field>
                 {projectId ? (
                   <Field
-                    label="Максимум шагов на поручение"
-                    hint="Пустое поле снимает ограничение. Укажите лимит, если хотите заранее ограничить расход токенов и стоимость долгой задачи."
+                    label={t("Максимум шагов на поручение")}
+                    hint={t(
+                      "Пустое поле снимает ограничение. Укажите лимит, если хотите заранее ограничить расход токенов и стоимость долгой задачи.",
+                    )}
                     error={assistantStepLimitError}
                   >
                     <Input
@@ -279,7 +297,7 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       max={1_000_000}
                       step={1}
                       value={assistantStepLimit ?? ""}
-                      placeholder="Без ограничений"
+                      placeholder={t("Без ограничений")}
                       disabled={
                         projectAssistantSettings.isLoading || projectAssistantSettings.isError
                       }
@@ -296,7 +314,7 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     <Link to="/settings/assistant-providers">
                       <span className="flex items-center gap-3">
                         <Server className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                        Модели и провайдеры
+                        {t("Модели и провайдеры")}
                       </span>
                       <ArrowRight className="size-4" aria-hidden="true" />
                     </Link>
@@ -306,7 +324,7 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       <Link to="/projects/$projectId/assistant-context" params={{ projectId }}>
                         <span className="flex items-center gap-3">
                           <Brain className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                          Контекст текущего проекта
+                          {t("Контекст текущего проекта")}
                         </span>
                         <ArrowRight className="size-4" aria-hidden="true" />
                       </Link>
@@ -316,16 +334,16 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     <Link to="/settings/mcp">
                       <span className="flex items-center gap-3">
                         <Network className="size-4 text-[var(--accent)]" aria-hidden="true" />
-                        Агенты и MCP
+                        {t("Агенты и MCP")}
                       </span>
                       <ArrowRight className="size-4" aria-hidden="true" />
                     </Link>
                   </Button>
                 </div>
               </SettingsSection>
-              <SettingsSection id="dictation-settings" icon={Mic} title="Диктовка">
+              <SettingsSection id="dictation-settings" icon={Mic} title={t("Диктовка")}>
                 <div className="grid items-start gap-x-5 gap-y-4 sm:grid-cols-2">
-                  <Field label="Язык по умолчанию">
+                  <Field label={t("Язык по умолчанию")}>
                     <Select
                       value={preferences.language}
                       onChange={(event) =>
@@ -335,13 +353,13 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value="ru">Русский</option>
+                      <option value="ru">{t("Русский")}</option>
                       <option value="en">English</option>
                     </Select>
                   </Field>
                   <Field
-                    label="Микрофон по умолчанию"
-                    hint="Названия устройств появляются после разрешения доступа в браузере."
+                    label={t("Микрофон по умолчанию")}
+                    hint={t("Названия устройств появляются после разрешения доступа в браузере.")}
                   >
                     <Select
                       value={preferences.microphoneId}
@@ -352,25 +370,25 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value="">Системный по умолчанию</option>
+                      <option value="">{t("Системный по умолчанию")}</option>
                       {preferences.microphoneId &&
                       !microphones.some(
                         (device) => device.deviceId === preferences.microphoneId,
                       ) ? (
                         <option value={preferences.microphoneId}>
-                          Сохранённый микрофон сейчас недоступен
+                          {t("Сохранённый микрофон сейчас недоступен")}
                         </option>
                       ) : null}
                       {microphones.map((device, index) => (
                         <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Микрофон ${index + 1}`}
+                          {device.label || t("Микрофон {0}", index + 1)}
                         </option>
                       ))}
                     </Select>
                   </Field>
                   <Field
-                    label="Префикс голосовых команд"
-                    hint="Команда выполнится только после этого слова."
+                    label={t("Префикс голосовых команд")}
+                    hint={t("Команда выполнится только после этого слова.")}
                     className="sm:col-span-2"
                   >
                     <Input
@@ -391,22 +409,24 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     onChange={(commandsEnabled) =>
                       setPreferences((current) => ({ ...current, commandsEnabled }))
                     }
-                    label="Распознавать голосовые команды"
-                    body="Поддерживаются: новый абзац, начало диалога, отбивка, метка, отмена и переход к абзацу, предложению или словам для правки."
+                    label={t("Распознавать голосовые команды")}
+                    body={t(
+                      "Поддерживаются: новый абзац, начало диалога, отбивка, метка, отмена и переход к абзацу, предложению или словам для правки.",
+                    )}
                   />
                   <Toggle
                     checked={preferences.liveTranscript}
                     onChange={(liveTranscript) =>
                       setPreferences((current) => ({ ...current, liveTranscript }))
                     }
-                    label="Показывать живую расшифровку"
-                    body="Отключение текста не останавливает запись аудио."
+                    label={t("Показывать живую расшифровку")}
+                    body={t("Отключение текста не останавливает запись аудио.")}
                   />
                 </div>
               </SettingsSection>
-              <SettingsSection id="editor-settings" icon={Keyboard} title="Редактор">
+              <SettingsSection id="editor-settings" icon={Keyboard} title={t("Редактор")}>
                 <div className="grid items-start gap-x-5 gap-y-4 sm:grid-cols-2">
-                  <Field label="Шрифт рукописи">
+                  <Field label={t("Шрифт рукописи")}>
                     <Select
                       value={preferences.fontFamily}
                       onChange={(event) =>
@@ -416,12 +436,14 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value="sofia">Sofia Sans — округлый (по умолчанию)</option>
-                      <option value="inter">Inter — утилитарный без засечек</option>
-                      <option value="source-serif">Source Serif 4 — утилитарный с засечками</option>
+                      <option value="sofia">{t("Sofia Sans — округлый (по умолчанию)")}</option>
+                      <option value="inter">{t("Inter — утилитарный без засечек")}</option>
+                      <option value="source-serif">
+                        {t("Source Serif 4 — утилитарный с засечками")}
+                      </option>
                     </Select>
                   </Field>
-                  <Field label="Кегль">
+                  <Field label={t("Кегль")}>
                     <Select
                       value={preferences.fontSize}
                       onChange={(event) =>
@@ -431,12 +453,12 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value={17}>17 px — компактный</option>
-                      <option value={19}>19 px — обычный</option>
-                      <option value={21}>21 px — крупный</option>
+                      <option value={17}>{t("17 px — компактный")}</option>
+                      <option value={19}>{t("19 px — обычный")}</option>
+                      <option value={21}>{t("21 px — крупный")}</option>
                     </Select>
                   </Field>
-                  <Field label="Межстрочный интервал">
+                  <Field label={t("Межстрочный интервал")}>
                     <Select
                       value={preferences.lineHeight}
                       onChange={(event) =>
@@ -446,12 +468,12 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value={1.5}>1,5 — плотный</option>
-                      <option value={1.75}>1,75 — обычный</option>
-                      <option value={2}>2 — свободный</option>
+                      <option value={1.5}>{t("1,5 — плотный")}</option>
+                      <option value={1.75}>{t("1,75 — обычный")}</option>
+                      <option value={2}>{t("2 — свободный")}</option>
                     </Select>
                   </Field>
-                  <Field label="Интервал между абзацами">
+                  <Field label={t("Интервал между абзацами")}>
                     <Select
                       value={preferences.paragraphSpacing}
                       onChange={(event) =>
@@ -461,12 +483,12 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value={0.65}>0,65 em — плотный</option>
-                      <option value={0.9}>0,9 em — обычный</option>
-                      <option value={1.1}>1,1 em — свободный</option>
+                      <option value={0.65}>{t("0,65 em — плотный")}</option>
+                      <option value={0.9}>{t("0,9 em — обычный")}</option>
+                      <option value={1.1}>{t("1,1 em — свободный")}</option>
                     </Select>
                   </Field>
-                  <Field label="Интервал элементов списка">
+                  <Field label={t("Интервал элементов списка")}>
                     <Select
                       value={preferences.listItemSpacing}
                       onChange={(event) =>
@@ -476,12 +498,12 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value={0}>Без дополнительного интервала</option>
-                      <option value={0.25}>0,25 em — обычный</option>
-                      <option value={0.5}>0,5 em — свободный</option>
+                      <option value={0}>{t("Без дополнительного интервала")}</option>
+                      <option value={0.25}>{t("0,25 em — обычный")}</option>
+                      <option value={0.5}>{t("0,5 em — свободный")}</option>
                     </Select>
                   </Field>
-                  <Field label="Ширина рукописи">
+                  <Field label={t("Ширина рукописи")}>
                     <Select
                       value={preferences.manuscriptWidth}
                       onChange={(event) =>
@@ -491,14 +513,14 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value={60}>60 знаков — узкая</option>
-                      <option value={70}>70 знаков — обычная</option>
-                      <option value={80}>80 знаков — широкая</option>
+                      <option value={60}>{t("60 знаков — узкая")}</option>
+                      <option value={70}>{t("70 знаков — обычная")}</option>
+                      <option value={80}>{t("80 знаков — широкая")}</option>
                     </Select>
                   </Field>
                   <Field
-                    label="Панель форматирования"
-                    hint="Авто раскрывает основные действия, когда редактору хватает ширины."
+                    label={t("Панель форматирования")}
+                    hint={t("Авто раскрывает основные действия, когда редактору хватает ширины.")}
                   >
                     <Select
                       value={preferences.toolbarMode}
@@ -509,12 +531,12 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         }))
                       }
                     >
-                      <option value="auto">Авто</option>
-                      <option value="expanded">Расширенная</option>
-                      <option value="compact">Компактная</option>
+                      <option value="auto">{t("Авто")}</option>
+                      <option value="expanded">{t("Расширенная")}</option>
+                      <option value="compact">{t("Компактная")}</option>
                     </Select>
                   </Field>
-                  <Field label="Тема">
+                  <Field label={t("Тема")}>
                     <Select
                       value={preferences.theme}
                       onChange={(event) => {
@@ -529,15 +551,17 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         });
                       }}
                     >
-                      <option value="system">Как в системе</option>
-                      <option value="light">Светлая</option>
-                      <option value="dark">Тёмная</option>
+                      <option value="system">{t("Как в системе")}</option>
+                      <option value="light">{t("Светлая")}</option>
+                      <option value="dark">{t("Тёмная")}</option>
                     </Select>
                   </Field>
                   <Field
-                    label="Цветовая тема"
+                    label={t("Цветовая тема")}
                     className="sm:col-span-2"
-                    hint="Палитра применяется независимо от светлого или тёмного режима. Наведите на цвет, чтобы увидеть его назначение."
+                    hint={t(
+                      "Палитра применяется независимо от светлого или тёмного режима. Наведите на цвет, чтобы увидеть его назначение.",
+                    )}
                   >
                     <EditorThemePicker
                       value={preferences.style}
@@ -554,8 +578,8 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     />
                   </Field>
                   <Field
-                    label="Цель по словам"
-                    hint="0 отключает цель. Прогресс показывается внизу редактора."
+                    label={t("Цель по словам")}
+                    hint={t("0 отключает цель. Прогресс показывается внизу редактора.")}
                   >
                     <Input
                       type="number"
@@ -579,28 +603,36 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     onChange={(spellcheck) =>
                       setPreferences((current) => ({ ...current, spellcheck }))
                     }
-                    label="Проверять орфографию средствами браузера"
-                    body="Подчёркивание ошибок зависит от словарей, установленных в браузере."
+                    label={t("Проверять орфографию средствами браузера")}
+                    body={t("Подчёркивание ошибок зависит от словарей, установленных в браузере.")}
                   />
                   <Toggle
                     checked={preferences.autoPlaySource}
                     onChange={(autoPlaySource) =>
                       setPreferences((current) => ({ ...current, autoPlaySource }))
                     }
-                    label="Автоматически воспроизводить источник"
-                    body="При переходе к абзацу с голосовым происхождением."
+                    label={t("Автоматически воспроизводить источник")}
+                    body={t("При переходе к абзацу с голосовым происхождением.")}
                   />
                 </div>
               </SettingsSection>
-              <SettingsSection id="privacy-settings" icon={Shield} title="Хранение и приватность">
+              <SettingsSection
+                id="privacy-settings"
+                icon={Shield}
+                title={t("Хранение и приватность")}
+              >
                 <Banner
                   variant="info"
-                  title="Где обрабатывается голос"
-                  body="Живое аудио отправляется в Deepgram для расшифровки. OpenRouter используется только при явном повторном распознавании или как резерв, если live-сервис недоступен. Ключи провайдеров остаются на сервере."
+                  title={t("Где обрабатывается голос")}
+                  body={t(
+                    "Живое аудио отправляется в Deepgram для расшифровки. OpenRouter используется только при явном повторном распознавании или как резерв, если live-сервис недоступен. Ключи провайдеров остаются на сервере.",
+                  )}
                 />
                 <Field
-                  label="Срок хранения исходного аудио на сервере"
-                  hint="Просроченные объекты удаляются при применении настройки. Тексты и история версий сохраняются."
+                  label={t("Срок хранения исходного аудио на сервере")}
+                  hint={t(
+                    "Просроченные объекты удаляются при применении настройки. Тексты и история версий сохраняются.",
+                  )}
                 >
                   <Select
                     value={audioRetentionDays}
@@ -608,9 +640,9 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                       setAudioRetentionDays(Number(event.target.value) as 30 | 90 | 365)
                     }
                   >
-                    <option value={30}>30 дней</option>
-                    <option value={90}>90 дней</option>
-                    <option value={365}>1 год</option>
+                    <option value={30}>{t("30 дней")}</option>
+                    <option value={90}>{t("90 дней")}</option>
+                    <option value={365}>{t("1 год")}</option>
                   </Select>
                 </Field>
                 <div id="data-retention" className="text-sm leading-6 text-[var(--ink-secondary)]">
@@ -618,38 +650,42 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     href="#data-retention-details"
                     className="font-medium text-[var(--accent)] underline underline-offset-2"
                   >
-                    Политика хранения данных
+                    {t("Политика хранения данных")}
                   </a>
                   <p id="data-retention-details" className="mt-2">
-                    Просроченное рабочее аудио удаляется при применении настройки. Рукописи,
-                    расшифровки и версии хранятся до удаления проекта или аккаунта. Срок физического
-                    удаления инфраструктурных резервных копий определяется оператором развёртывания.
+                    {t(
+                      "Просроченное рабочее аудио удаляется при применении настройки. Рукописи, расшифровки и версии хранятся до удаления проекта или аккаунта. Срок физического удаления инфраструктурных резервных копий определяется оператором развёртывания.",
+                    )}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm leading-6 text-[var(--ink-secondary)]">
-                    ZIP-бэкап включает проекты, текущие документы, историю редакций, словарь,
-                    расшифровки и доступное исходное аудио. Пароль и серверные сессии в архив не
-                    попадают.
+                    {t(
+                      "ZIP-бэкап включает проекты, текущие документы, историю редакций, словарь, расшифровки и доступное исходное аудио. Пароль и серверные сессии в архив не попадают.",
+                    )}
                   </p>
                   <Button asChild type="button" variant="secondary" className="mt-3">
                     <a href="/api/account/backup" download>
                       <Download className="size-4" aria-hidden="true" />
-                      Скачать полный бэкап
+                      {t("Скачать полный бэкап")}
                     </a>
                   </Button>
                 </div>
                 {projectId ? (
                   <p className="text-sm leading-6 text-[var(--ink-secondary)]">
-                    Удаление текущего проекта доступно в разделе «Проекты»: сначала переместите его
-                    в корзину, затем подтвердите окончательное удаление точным названием.
+                    {t(
+                      "Удаление текущего проекта доступно в разделе «Проекты»: сначала переместите его в корзину, затем подтвердите окончательное удаление точным названием.",
+                    )}
                   </p>
                 ) : null}
                 <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/40 bg-[var(--danger-soft)] p-4">
-                  <h3 className="text-sm font-medium text-[var(--danger)]">Удалить аккаунт</h3>
+                  <h3 className="text-sm font-medium text-[var(--danger)]">
+                    {t("Удалить аккаунт")}
+                  </h3>
                   <p className="mt-1 text-xs leading-5 text-[var(--ink-secondary)]">
-                    Будут безвозвратно удалены проекты, рукописи, версии, словари, облачное аудио и
-                    локальные незавершённые записи этого браузера. Перед удалением скачайте бэкап.
+                    {t(
+                      "Будут безвозвратно удалены проекты, рукописи, версии, словари, облачное аудио и локальные незавершённые записи этого браузера. Перед удалением скачайте бэкап.",
+                    )}
                   </p>
                   <Button
                     type="button"
@@ -662,14 +698,15 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                         return;
                       }
                       void requestInput({
-                        title: "Удалить аккаунт безвозвратно?",
-                        description:
+                        title: t("Удалить аккаунт безвозвратно?"),
+                        description: t(
                           "Отменить удаление нельзя. Резервные копии инфраструктуры могут храниться по политике оператора.",
-                        label: "Адрес электронной почты",
+                        ),
+                        label: t("Адрес электронной почты"),
                         requiredValue: email,
                         icon: Trash2,
                         tone: "danger",
-                        confirmLabel: "Удалить аккаунт",
+                        confirmLabel: t("Удалить аккаунт"),
                       }).then((confirmation) => {
                         if (confirmation !== undefined) {
                           purgeAccount.mutate(confirmation);
@@ -678,7 +715,7 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                     }}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
-                    Удалить аккаунт
+                    {t("Удалить аккаунт")}
                   </Button>
                 </div>
               </SettingsSection>
@@ -691,14 +728,17 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                 }
                 onClick={() => save.mutate()}
               >
-                Сохранить настройки
+                {t("Сохранить настройки")}
               </Button>
             </section>
             <aside className="grid h-fit gap-4">
-              <SettingsSection id="local-storage" icon={Database} title="Локальное хранилище">
+              <SettingsSection id="local-storage" icon={Database} title={t("Локальное хранилище")}>
                 <p className="text-sm leading-6 text-[var(--ink-secondary)]">
-                  Использовано {formatBytes(storage.usage)} из {formatBytes(storage.quota)}. Здесь
-                  хранятся незавершённые аудиофрагменты и аварийные снимки редактора.
+                  {t("Использовано ")}
+                  {formatBytes(storage.usage)}
+                  {t(" из ")}
+                  {formatBytes(storage.quota)}
+                  {t(". Здесь хранятся незавершённые аудиофрагменты и аварийные снимки редактора.")}
                 </p>
                 <Button
                   type="button"
@@ -710,18 +750,23 @@ export function SettingsPage({ projectId, nodeId }: { projectId?: string; nodeId
                   }}
                 >
                   <Shield className="size-4" aria-hidden="true" />
-                  {storage.persistent ? "Защищённое хранение включено" : "Защитить от автоочистки"}
+                  {storage.persistent
+                    ? t("Защищённое хранение включено")
+                    : t("Защитить от автоочистки")}
                 </Button>
               </SettingsSection>
               <Banner
                 variant="warning"
-                title="Не очищайте данные сайта во время записи"
-                body="При работе без сети локальная копия может быть единственным полным источником до синхронизации."
+                title={t("Не очищайте данные сайта во время записи")}
+                body={t(
+                  "При работе без сети локальная копия может быть единственным полным источником до синхронизации.",
+                )}
               />
               <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4 text-sm text-[var(--ink-secondary)]">
                 <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                Проект и редактор требуют сервер для окончательного сохранения; запись аудио может
-                продолжаться офлайн.
+                {t(
+                  "Проект и редактор требуют сервер для окончательного сохранения; запись аудио может продолжаться офлайн.",
+                )}
               </div>
             </aside>
           </div>
@@ -783,7 +828,7 @@ function Toggle({
 }
 
 function formatBytes(value?: number): string {
-  if (value === undefined) return "неизвестно";
-  if (value > 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(1)} ГБ`;
-  return `${Math.round(value / 1024 / 1024)} МБ`;
+  if (value === undefined) return t("неизвестно");
+  if (value > 1024 * 1024 * 1024) return t("{0} ГБ", (value / 1024 / 1024 / 1024).toFixed(1));
+  return t("{0} МБ", Math.round(value / 1024 / 1024));
 }

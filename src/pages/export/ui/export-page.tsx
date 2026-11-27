@@ -30,7 +30,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-
 import {
   createExport,
   createMarkdownTreeExport,
@@ -44,6 +43,7 @@ import {
   saveExportProfile,
   uploadProjectImage,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 import { Banner, Button, Checkbox, Field, Input, Select, Spinner } from "~shared/ui";
 import { ProjectUtilityShell } from "~widgets/project-utility-shell";
 
@@ -201,7 +201,7 @@ export function ExportPage({
   });
 
   if (project.isPending || profileQuery.isPending || !project.data || !profile) {
-    return <Spinner label="Готовим экспорт…" />;
+    return <Spinner label={t("Готовим экспорт…")} />;
   }
 
   const visibleQueue = queueIds
@@ -247,15 +247,15 @@ export function ExportPage({
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Сборка рукописи
+              {t("Сборка рукописи")}
             </p>
-            <h1 className="font-display mt-2 text-[34px] leading-tight">Экспорт</h1>
+            <h1 className="font-display mt-2 text-[34px] leading-tight">{t("Экспорт")}</h1>
             <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
               {saveProfile.isPending
-                ? "Сохраняем профиль…"
+                ? t("Сохраняем профиль…")
                 : saveProfile.isError
-                  ? "Конфликт сохранения профиля — обновите страницу"
-                  : "Профиль оформления сохранён в проекте"}
+                  ? t("Конфликт сохранения профиля — обновите страницу")
+                  : t("Профиль оформления сохранён в проекте")}
             </p>
           </div>
           <Button
@@ -264,29 +264,34 @@ export function ExportPage({
             onClick={() => create.mutate()}
           >
             <Download className="size-4" aria-hidden="true" />
-            {create.isPending ? "Собираем…" : `Собрать ${profile.lastFormat.toUpperCase()}`}
+            {create.isPending ? t("Собираем…") : t("Собрать {0}", profile.lastFormat.toUpperCase())}
           </Button>
         </header>
 
         {initialOptions ? (
           <Banner
             className="mt-5"
-            title="Параметры подготовлены ассистентом"
-            body="Проверьте порядок, оформление и состав. Проект не изменится до подтверждения других действий."
+            title={t("Параметры подготовлены ассистентом")}
+            body={t(
+              "Проверьте порядок, оформление и состав. Проект не изменится до подтверждения других действий.",
+            )}
           />
         ) : null}
 
         <section className="mt-5 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-[var(--accent-soft)] p-5 sm:flex-row sm:items-center">
           <FileArchive className="size-6 shrink-0 text-[var(--accent)]" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">Полная резервная копия Writers Studio</h2>
+            <h2 className="text-sm font-semibold">{t("Полная резервная копия Writers Studio")}</h2>
             <p className="mt-1 text-xs text-[var(--ink-secondary)]">
-              Структура, тексты, версии, медиа и профиль экспорта в переносимом файле проекта.
+              {t(
+                "Структура, тексты, версии, медиа и профиль экспорта в переносимом файле проекта.",
+              )}
             </p>
           </div>
           <Button asChild variant="secondary">
             <a href={`/api/projects/${projectId}/transfer`} download>
-              <Download className="size-4" aria-hidden="true" /> Скачать .wstudio
+              <Download className="size-4" aria-hidden="true" />
+              {t(" Скачать .wstudio")}
             </a>
           </Button>
         </section>
@@ -294,17 +299,19 @@ export function ExportPage({
         <section className="mt-3 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5 sm:flex-row sm:items-center">
           <FolderOpen className="size-6 shrink-0 text-[var(--accent)]" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">Markdown-дерево для Obsidian</h2>
+            <h2 className="text-sm font-semibold">{t("Markdown-дерево для Obsidian")}</h2>
             <p className="mt-1 text-xs text-[var(--ink-secondary)]">
-              Все активные документы, вложенные папки, frontmatter, переносимые ссылки и изображения
-              в ZIP.
+              {t(
+                "Все активные документы, вложенные папки, frontmatter, переносимые ссылки и изображения в ZIP.",
+              )}
             </p>
           </div>
           {markdownTreeJob.data?.export.status === "ready" &&
           markdownTreeJob.data.export.downloadUrl ? (
             <Button asChild variant="secondary">
               <a href={markdownTreeJob.data.export.downloadUrl} download>
-                <Download className="size-4" /> Скачать ZIP
+                <Download className="size-4" />
+                {t(" Скачать ZIP")}
               </a>
             </Button>
           ) : (
@@ -319,7 +326,7 @@ export function ExportPage({
               ) : (
                 <Download className="size-4" />
               )}
-              {markdownTreeWorking ? "Собираем ZIP…" : "Экспортировать дерево"}
+              {markdownTreeWorking ? t("Собираем ZIP…") : t("Экспортировать дерево")}
             </Button>
           )}
         </section>
@@ -327,30 +334,30 @@ export function ExportPage({
           <Banner
             className="mt-3"
             variant="danger"
-            title="Markdown-дерево не экспортировано"
-            body={createMarkdownTree.error?.message ?? "Не удалось собрать ZIP."}
+            title={t("Markdown-дерево не экспортировано")}
+            body={createMarkdownTree.error?.message ?? t("Не удалось собрать ZIP.")}
           />
         ) : null}
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(380px,1fr)_minmax(340px,0.9fr)]">
           <aside className="h-fit rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5">
-            <h2 className="font-display text-xl">Оформление</h2>
+            <h2 className="font-display text-xl">{t("Оформление")}</h2>
             <div className="mt-4 grid gap-4">
-              <Field label="Формат">
+              <Field label={t("Формат")}>
                 <Select
                   value={profile.lastFormat}
                   onChange={(event) =>
                     updateProfile({ lastFormat: event.target.value as ExportFormat })
                   }
                 >
-                  <option value="docx">DOCX · редактор</option>
-                  <option value="epub">EPUB · электронная книга</option>
-                  <option value="pdf">PDF · готово к чтению</option>
+                  <option value="docx">{t("DOCX · редактор")}</option>
+                  <option value="epub">{t("EPUB · электронная книга")}</option>
+                  <option value="pdf">{t("PDF · готово к чтению")}</option>
                   <option value="markdown">Markdown</option>
                   <option value="txt">TXT</option>
                 </Select>
               </Field>
-              <Field label="Пресет">
+              <Field label={t("Пресет")}>
                 <Select
                   value={profile.style.preset}
                   onChange={(event) => {
@@ -358,13 +365,15 @@ export function ExportPage({
                     if (preset !== "custom") setProfile(applyExportPreset(profile, preset));
                   }}
                 >
-                  <option value="book">Книга</option>
-                  <option value="modern">Современный</option>
-                  <option value="manuscript">Рукопись</option>
-                  {profile.style.preset === "custom" ? <option value="custom">Свой</option> : null}
+                  <option value="book">{t("Книга")}</option>
+                  <option value="modern">{t("Современный")}</option>
+                  <option value="manuscript">{t("Рукопись")}</option>
+                  {profile.style.preset === "custom" ? (
+                    <option value="custom">{t("Свой")}</option>
+                  ) : null}
                 </Select>
               </Field>
-              <Field label="Шрифт">
+              <Field label={t("Шрифт")}>
                 <Select
                   value={profile.style.fontFamily}
                   onChange={(event) =>
@@ -380,7 +389,7 @@ export function ExportPage({
                 </Select>
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Кегль">
+                <Field label={t("Кегль")}>
                   <Select
                     value={profile.style.fontSizePt}
                     onChange={(event) => updateStyle({ fontSizePt: Number(event.target.value) })}
@@ -392,7 +401,7 @@ export function ExportPage({
                     ))}
                   </Select>
                 </Field>
-                <Field label="Интервал">
+                <Field label={t("Интервал")}>
                   <Select
                     value={profile.style.lineHeight}
                     onChange={(event) => updateStyle({ lineHeight: Number(event.target.value) })}
@@ -405,19 +414,19 @@ export function ExportPage({
                   </Select>
                 </Field>
               </div>
-              <Field label="Абзацы">
+              <Field label={t("Абзацы")}>
                 <Select
                   value={profile.style.paragraphMode}
                   onChange={(event) =>
                     updateStyle({ paragraphMode: event.target.value as "indent" | "spaced" })
                   }
                 >
-                  <option value="indent">Красная строка</option>
-                  <option value="spaced">Интервалы между абзацами</option>
+                  <option value="indent">{t("Красная строка")}</option>
+                  <option value="spaced">{t("Интервалы между абзацами")}</option>
                 </Select>
               </Field>
               {profile.style.paragraphMode === "indent" ? (
-                <Field label="Отступ первой строки">
+                <Field label={t("Отступ первой строки")}>
                   <Select
                     value={profile.style.firstLineIndentEm}
                     onChange={(event) =>
@@ -432,7 +441,7 @@ export function ExportPage({
                   </Select>
                 </Field>
               ) : (
-                <Field label="Интервал после абзаца">
+                <Field label={t("Интервал после абзаца")}>
                   <Select
                     value={profile.style.paragraphSpaceEm}
                     onChange={(event) =>
@@ -447,20 +456,20 @@ export function ExportPage({
                   </Select>
                 </Field>
               )}
-              <Field label="Выравнивание">
+              <Field label={t("Выравнивание")}>
                 <Select
                   value={profile.style.textAlign}
                   onChange={(event) =>
                     updateStyle({ textAlign: event.target.value as "left" | "justify" })
                   }
                 >
-                  <option value="left">По левому краю</option>
-                  <option value="justify">По ширине</option>
+                  <option value="left">{t("По левому краю")}</option>
+                  <option value="justify">{t("По ширине")}</option>
                 </Select>
               </Field>
               <Field
-                label="Разделитель сцен"
-                hint="Показывается между документами, если разрыв страницы выключен"
+                label={t("Разделитель сцен")}
+                hint={t("Показывается между документами, если разрыв страницы выключен")}
               >
                 <Select
                   value={profile.style.sceneSeparator}
@@ -478,8 +487,8 @@ export function ExportPage({
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field
-                  label="Страница"
-                  hint={profile.lastFormat === "epub" ? "EPUB адаптируется к экрану" : undefined}
+                  label={t("Страница")}
+                  hint={profile.lastFormat === "epub" ? t("EPUB адаптируется к экрану") : undefined}
                 >
                   <Select
                     disabled={profile.lastFormat === "epub"}
@@ -493,7 +502,7 @@ export function ExportPage({
                     <option value="letter">Letter</option>
                   </Select>
                 </Field>
-                <Field label="Поля">
+                <Field label={t("Поля")}>
                   <Select
                     disabled={profile.lastFormat === "epub"}
                     value={profile.style.marginMm}
@@ -501,7 +510,8 @@ export function ExportPage({
                   >
                     {[15, 20, 25, 30].map((value) => (
                       <option key={value} value={value}>
-                        {value} мм
+                        {value}
+                        {t(" мм")}
                       </option>
                     ))}
                   </Select>
@@ -511,27 +521,27 @@ export function ExportPage({
                 <CheckOption
                   checked={profile.titlePage}
                   onChange={(titlePage) => updateProfile({ titlePage })}
-                  label="Титульная страница"
+                  label={t("Титульная страница")}
                 />
                 <CheckOption
                   checked={profile.tableOfContents}
                   onChange={(tableOfContents) => updateProfile({ tableOfContents })}
-                  label="Оглавление"
+                  label={t("Оглавление")}
                 />
                 <CheckOption
                   checked={profile.chapterTitles}
                   onChange={(chapterTitles) => updateProfile({ chapterTitles })}
-                  label="Заголовки документов"
+                  label={t("Заголовки документов")}
                 />
                 <CheckOption
                   checked={profile.chapterPageBreak}
                   onChange={(chapterPageBreak) => updateProfile({ chapterPageBreak })}
-                  label="Новый документ с новой страницы"
+                  label={t("Новый документ с новой страницы")}
                 />
                 <CheckOption
                   checked={profile.includeNotes}
                   onChange={toggleNotes}
-                  label="Включить заметки"
+                  label={t("Включить заметки")}
                 />
               </div>
             </div>
@@ -539,13 +549,14 @@ export function ExportPage({
 
           <section className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display mr-auto text-2xl">Что войдёт в файл</h2>
+              <h2 className="font-display mr-auto text-2xl">{t("Что войдёт в файл")}</h2>
               <Button
                 variant="ghost"
                 size="compact"
                 onClick={() => setSelected(new Set(visibleQueue.map((item) => item.id)))}
               >
-                <CheckCheck className="size-4" /> Все
+                <CheckCheck className="size-4" />
+                {t(" Все")}
               </Button>
               <Button
                 variant="ghost"
@@ -561,11 +572,12 @@ export function ExportPage({
                   );
                 }}
               >
-                <RotateCcw className="size-4" /> Сбросить
+                <RotateCcw className="size-4" />
+                {t(" Сбросить")}
               </Button>
             </div>
             <p className="mt-2 text-xs text-[var(--ink-tertiary)]">
-              Порядок ниже относится только к этому экспортному файлу.
+              {t("Порядок ниже относится только к этому экспортному файлу.")}
             </p>
             <DndContext
               sensors={sensors}
@@ -618,9 +630,9 @@ export function ExportPage({
 
           <aside className="h-fit space-y-5 xl:sticky xl:top-5">
             <section className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5">
-              <h2 className="font-display text-xl">Издание</h2>
+              <h2 className="font-display text-xl">{t("Издание")}</h2>
               <div className="mt-4 grid gap-4">
-                <Field label="Название">
+                <Field label={t("Название")}>
                   <Input
                     value={profile.metadata.title}
                     maxLength={200}
@@ -632,7 +644,7 @@ export function ExportPage({
                     }
                   />
                 </Field>
-                <Field label="Автор">
+                <Field label={t("Автор")}>
                   <Input
                     value={profile.metadata.author}
                     maxLength={200}
@@ -644,7 +656,7 @@ export function ExportPage({
                     }
                   />
                 </Field>
-                <Field label="Подзаголовок">
+                <Field label={t("Подзаголовок")}>
                   <Input
                     value={profile.metadata.subtitle}
                     maxLength={200}
@@ -656,7 +668,7 @@ export function ExportPage({
                     }
                   />
                 </Field>
-                <Field label="Аннотация">
+                <Field label={t("Аннотация")}>
                   <textarea
                     className="min-h-24 w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-3 text-sm"
                     value={profile.metadata.annotation}
@@ -669,7 +681,7 @@ export function ExportPage({
                     }
                   />
                 </Field>
-                <Field label="Обложка">
+                <Field label={t("Обложка")}>
                   <Select
                     value={profile.metadata.coverAssetId ?? ""}
                     onChange={(event) =>
@@ -682,7 +694,7 @@ export function ExportPage({
                       })
                     }
                   >
-                    <option value="">Без обложки</option>
+                    <option value="">{t("Без обложки")}</option>
                     {imageMedia.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.originalName}
@@ -692,7 +704,7 @@ export function ExportPage({
                 </Field>
                 <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--accent)]">
                   <ImagePlus className="size-4" />{" "}
-                  {uploadCover.isPending ? "Загружаем…" : "Загрузить новую обложку"}
+                  {uploadCover.isPending ? t("Загружаем…") : t("Загрузить новую обложку")}
                   <input
                     className="sr-only"
                     type="file"
@@ -716,18 +728,21 @@ export function ExportPage({
             {job.data?.export.status === "ready" && job.data.export.downloadUrl ? (
               <Button asChild className="w-full">
                 <a href={job.data.export.downloadUrl}>
-                  <Download className="size-4" /> Скачать {profile.lastFormat.toUpperCase()}
+                  <Download className="size-4" />
+                  {t(" Скачать ")}
+                  {profile.lastFormat.toUpperCase()}
                 </a>
               </Button>
             ) : jobId && job.data?.export.status !== "failed" ? (
               <div className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--accent-soft)] px-3 py-3 text-sm text-[var(--accent-ink)]">
-                <LoaderCircle className="size-4 animate-spin" /> Собираем файл…
+                <LoaderCircle className="size-4 animate-spin" />
+                {t(" Собираем файл…")}
               </div>
             ) : null}
             {create.error || job.data?.export.status === "failed" ? (
               <Banner
                 variant="danger"
-                title="Экспорт не готов"
+                title={t("Экспорт не готов")}
                 body={exportFailureMessage(job.data?.export.errorCode)}
               />
             ) : null}
@@ -741,13 +756,13 @@ export function ExportPage({
 function exportFailureMessage(errorCode?: string): string {
   switch (errorCode) {
     case "media_unavailable":
-      return "Обложка или изображение недоступно. Проверьте медиа проекта и повторите сборку.";
+      return t("Обложка или изображение недоступно. Проверьте медиа проекта и повторите сборку.");
     case "invalid_export_profile":
-      return "Проверьте метаданные и параметры оформления.";
+      return t("Проверьте метаданные и параметры оформления.");
     case "pdf_renderer_unavailable":
-      return "Сервис PDF временно недоступен. Можно собрать DOCX или EPUB и повторить позже.";
+      return t("Сервис PDF временно недоступен. Можно собрать DOCX или EPUB и повторить позже.");
     default:
-      return "Проверьте параметры и попробуйте создать файл ещё раз.";
+      return t("Проверьте параметры и попробуйте создать файл ещё раз.");
   }
 }
 
@@ -780,8 +795,8 @@ function SortableExportRow({
         ref={setActivatorNodeRef}
         type="button"
         className="ui-tooltip grid size-8 touch-none place-items-center rounded text-[var(--ink-tertiary)] hover:bg-[var(--surface-raised)]"
-        aria-label={`Изменить порядок «${item.title}»`}
-        data-ui-tooltip={`Изменить порядок «${item.title}»`}
+        aria-label={t("Изменить порядок «{0}»", item.title)}
+        data-ui-tooltip={t("Изменить порядок «{0}»", item.title)}
         data-ui-tooltip-side="right"
         {...attributes}
         {...listeners}
@@ -791,7 +806,7 @@ function SortableExportRow({
       <Checkbox
         checked={checked}
         onCheckedChange={onCheckedChange}
-        aria-label={`Включить «${item.title}»`}
+        aria-label={t("Включить «{0}»", item.title)}
       />
       <FileText className="size-4 shrink-0 text-[var(--ink-tertiary)]" />
       <div className="min-w-0 flex-1">
@@ -842,10 +857,12 @@ function PublicationPreview({
     <section className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-xs font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
-          Предпросмотр
+          {t("Предпросмотр")}
         </h2>
         <span className="text-[11px] text-[var(--ink-tertiary)]">
-          {activePageIndex >= 0 ? `${activePageIndex + 1} из ${pages.length}` : "Нет страниц"}
+          {activePageIndex >= 0
+            ? t("{0} из {1}", activePageIndex + 1, pages.length)
+            : t("Нет страниц")}
         </span>
       </div>
       {pages.length > 0 ? (
@@ -855,7 +872,7 @@ function PublicationPreview({
             variant="ghost"
             size="compact"
             className="px-2"
-            aria-label="Предыдущая страница предпросмотра"
+            aria-label={t("Предыдущая страница предпросмотра")}
             disabled={activePageIndex <= 0}
             onClick={() => setSelectedPageId(pages[activePageIndex - 1]?.id ?? "")}
           >
@@ -863,7 +880,7 @@ function PublicationPreview({
           </Button>
           <Select
             className="h-9 min-w-0 flex-1 text-xs"
-            aria-label="Страница предпросмотра"
+            aria-label={t("Страница предпросмотра")}
             value={activePage?.id ?? ""}
             onChange={(event) => setSelectedPageId(event.target.value)}
           >
@@ -878,7 +895,7 @@ function PublicationPreview({
             variant="ghost"
             size="compact"
             className="px-2"
-            aria-label="Следующая страница предпросмотра"
+            aria-label={t("Следующая страница предпросмотра")}
             disabled={activePageIndex < 0 || activePageIndex >= pages.length - 1}
             onClick={() => setSelectedPageId(pages[activePageIndex + 1]?.id ?? "")}
           >
@@ -891,11 +908,11 @@ function PublicationPreview({
           activePage?.kind === "cover" ? "p-0" : "px-[12%] py-[10%]"
         }`}
         style={style}
-        aria-label={activePage?.label ?? "Пустой предпросмотр"}
+        aria-label={activePage?.label ?? t("Пустой предпросмотр")}
       >
         {activePage?.kind === "cover" && coverUrl ? (
           <div className="h-full w-full">
-            <img src={coverUrl} alt="Обложка" className="h-full w-full object-cover" />
+            <img src={coverUrl} alt={t("Обложка")} className="h-full w-full object-cover" />
           </div>
         ) : null}
         {activePage?.kind === "title" ? (
@@ -912,7 +929,7 @@ function PublicationPreview({
         {activePage?.kind === "toc" ? (
           <div>
             <h4 className="text-center text-xs font-semibold tracking-wide uppercase">
-              Оглавление
+              {t("Оглавление")}
             </h4>
             <ol className="mt-2 grid gap-1 text-[10px]">
               {documents.map((document) => (
@@ -939,7 +956,9 @@ function PublicationPreview({
             >
               {previewNode.data?.node.plainText?.slice(0, 650) ||
                 activeDocument?.plainText?.slice(0, 650) ||
-                (previewNode.isFetching ? "Загружаем текст…" : "В документе пока нет текста.")}
+                (previewNode.isFetching
+                  ? t("Загружаем текст…")
+                  : t("В документе пока нет текста."))}
             </p>
             {!profile.chapterPageBreak && nextDocument ? (
               <>
@@ -966,7 +985,7 @@ function PublicationPreview({
         ) : null}
         {!activePage ? (
           <p className="text-center text-sm text-[var(--ink-tertiary)]">
-            Выберите документы, чтобы увидеть начало рукописи.
+            {t("Выберите документы, чтобы увидеть начало рукописи.")}
           </p>
         ) : null}
       </article>

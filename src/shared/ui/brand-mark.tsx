@@ -1,9 +1,10 @@
 import type { SVGProps } from "react";
+import { t } from "~shared/i18n";
 
 export function BrandMark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false" {...props}>
-      <title>Студия автора</title>
+      <title>{t("Студия автора")}</title>
       <path
         d="M20 1c9 0 16 6 16 15v11c0 5-7 10-16 12C11 37 4 32 4 27V16C4 7 11 1 20 1Z"
         fill="var(--brand-mark-shield)"

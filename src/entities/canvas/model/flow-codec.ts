@@ -1,5 +1,6 @@
 import { type Edge, MarkerType, type Node, Position } from "@xyflow/react";
 import type { ProjectMedia } from "~entities/project";
+import { t } from "~shared/i18n";
 import type {
   CanvasDocument,
   CanvasDocumentPreview,
@@ -89,7 +90,7 @@ export function canvasToFlow(
       markerEnd: item.toEnd !== "none" ? { type: MarkerType.ArrowClosed } : undefined,
       zIndex: 2,
       data: { canvasEdge: item },
-      ariaLabel: item.label ? `Связь: ${item.label}` : "Связь между карточками",
+      ariaLabel: item.label ? t("Связь: {0}", item.label) : t("Связь между карточками"),
     })),
   };
 }
@@ -207,25 +208,26 @@ function canvasNodeAriaLabel(
   documents: Map<string, CanvasDocumentPreview>,
   media: Map<string, ProjectMedia>,
 ): string {
-  if (item.type === "text") return item.text.trim().slice(0, 120) || "Пустая заметка";
+  if (item.type === "text") return item.text.trim().slice(0, 120) || t("Пустая заметка");
   if (item.type === "link") {
-    return `Ссылка ${item["x-writers-studio"]?.preview?.title ?? item.url}`;
+    return t("Ссылка {0}", item["x-writers-studio"]?.preview?.title ?? item.url);
   }
   if (item.type === "group") {
     const element = item["x-writers-studio"]?.element;
-    if (element?.kind === "stroke") return `${element.brush === "pen" ? "Штрих" : "Маркер"}`;
-    if (element?.kind === "shape") return `Фигура ${element.label || element.shape}`;
-    if (element?.kind === "frame") return `Фрейм ${element.label || item.label || element.order}`;
-    return `Группа ${item.label || "без названия"}`;
+    if (element?.kind === "stroke") return `${element.brush === "pen" ? t("Штрих") : t("Маркер")}`;
+    if (element?.kind === "shape") return t("Фигура {0}", element.label || element.shape);
+    if (element?.kind === "frame")
+      return t("Фрейм {0}", element.label || item.label || element.order);
+    return t("Группа {0}", item.label || t("без названия"));
   }
   const resource = item["x-writers-studio"]?.resource;
-  if (!resource) return `Файл ${item.file}`;
+  if (!resource) return t("Файл {0}", item.file);
   if (resource.kind === "document") {
-    return `Документ ${documents.get(resource.id)?.title ?? "недоступен"}`;
+    return t("Документ {0}", documents.get(resource.id)?.title ?? t("недоступен"));
   }
-  if (resource.kind === "canvas") return "Вложенная доска";
+  if (resource.kind === "canvas") return t("Вложенная доска");
   const asset = media.get(resource.id);
-  return `${asset?.mediaType === "application/pdf" ? "PDF" : "Изображение"} ${asset?.originalName ?? "недоступно"}`;
+  return `${asset?.mediaType === "application/pdf" ? "PDF" : t("Изображение")} ${asset?.originalName ?? t("недоступно")}`;
 }
 
 function normalizeSide(value: string | null | undefined): CanvasSide | undefined {

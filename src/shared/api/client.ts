@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "~shared/config";
+import { localizeMessage, t } from "~shared/i18n";
 
 export interface APIErrorPayload {
   error?: {
@@ -18,7 +19,7 @@ export class APIError extends Error {
   readonly conflictCanvasId?: string;
 
   constructor(status: number, payload: APIErrorPayload) {
-    super(payload.error?.message ?? "Не удалось выполнить действие");
+    super(localizeMessage(payload.error?.message ?? t("Не удалось выполнить действие")));
     this.name = "APIError";
     this.status = status;
     this.code = payload.error?.code ?? "unknown_error";

@@ -8,6 +8,11 @@ A self-hosted writing workspace built with Go and React. Organize long-form work
 dictate drafts, check the original audio, develop ideas on visual boards, and
 review assistant proposals before they change a manuscript.
 
+**Interface languages: English, Russian, and Simplified Chinese.** Select a
+language on the sign-in screen or in Settings and apply it to reload the page.
+The workspace remembers the choice in that browser. Project and dictation
+languages are selected independently. Built-in help and specifications are in English.
+
 > **Project status: frozen.** This repository preserves the Go/web edition as an
 > open-source reference. Development is moving to a separate desktop application.
 > Further feature development here is unlikely, and maintenance, security fixes,
@@ -18,7 +23,7 @@ Licensed under [MIT](LICENSE).
 
 ![Studio in the light Fog and Graphite theme](public/docs/images/studio-overview.png)
 
-The screenshot uses synthetic project data; the application controls remain Russian.
+The screenshot shows the Russian interface with a synthetic project.
 
 ## What it does
 
@@ -35,10 +40,6 @@ The screenshot uses synthetic project data; the application controls remain Russ
   archives carrying project data and history without account credentials.
 - **Self-hosting:** PostgreSQL and S3-compatible storage, a Docker Compose stack,
   and an optional project-scoped MCP gateway for trusted LAN/VPN use.
-
-The application interface remains primarily Russian. Repository documentation
-and built-in help are English. The previously started multilingual-interface
-experiment is not part of this publication.
 
 ## Quick start
 
@@ -148,8 +149,8 @@ Database integration tests and Playwright require additional services. See
 | [Documentation index](docs/README.md) | Architecture, specifications, decisions and release records |
 | [Product brief](PRODUCT_BRIEF.md) | Product intent and boundaries of the frozen edition |
 | [Architecture](docs/architecture/ARC42.md) | Components, persistence, runtime flows and trust boundaries |
-| [Workflows](docs/specification/WORKFLOWS.md) | End-to-end behavior and acceptance identifiers |
-| [Assistant specification](docs/specification/ASSISTANT_MODE.md) | Tools, scope, staging, providers and recovery |
+| [OpenSpec capabilities](openspec/README.md) | Observable behavior, requirements, and acceptance scenarios |
+| [Public API reference](internal/httpapi/openapi.go) | OpenAPI document served at `/api/openapi.json` |
 | [Built-in help](content/docs/index.mdx) | User guides, also available at `/docs` in a running app |
 | [Deployment](docs/DEPLOYMENT.md) | Installation, TLS, upgrades and backups |
 | [Security policy](SECURITY.md) | Reporting and deployment responsibilities |

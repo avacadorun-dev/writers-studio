@@ -42,6 +42,7 @@ import {
   setDocumentAnnotations,
   validateEditorImageFile,
 } from "~features/editor";
+import { interfaceLanguage, t } from "~shared/i18n";
 import {
   cn,
   createClientId,
@@ -157,7 +158,7 @@ export function ManuscriptEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        "aria-label": `Текст документа «${node.title}»`,
+        "aria-label": t("Текст документа «{0}»", node.title),
         spellcheck: String(preferences.spellcheck),
       },
       handleClick: (_view, _position, event) => {
@@ -249,8 +250,8 @@ export function ManuscriptEditor({
       setRecovered(Boolean(canRecover));
       if (canRecover) {
         showToast({
-          title: "Локальная версия восстановлена",
-          description: "Последние несинхронизированные правки снова в редакторе.",
+          title: t("Локальная версия восстановлена"),
+          description: t("Последние несинхронизированные правки снова в редакторе."),
         });
       }
       updateTextStats(editor.getText());
@@ -304,8 +305,8 @@ export function ManuscriptEditor({
       .trim();
     if (!quote || ranges.length === 0) {
       showToast({
-        title: "Не удалось прикрепить выделение",
-        description: "Выделите текст внутри одного или нескольких абзацев.",
+        title: t("Не удалось прикрепить выделение"),
+        description: t("Выделите текст внутри одного или нескольких абзацев."),
       });
       return;
     }
@@ -316,7 +317,7 @@ export function ManuscriptEditor({
       ranges,
       quote,
     });
-    showToast({ title: "Фрагмент прикреплён к следующему поручению" });
+    showToast({ title: t("Фрагмент прикреплён к следующему поручению") });
   }, [autosave, editor, node.id, onAssistantSelectionChange, showToast]);
 
   const startAnnotation = useCallback(
@@ -325,8 +326,8 @@ export function ManuscriptEditor({
       const anchor = annotationAnchorFromSelection(editor);
       if (!anchor) {
         showToast({
-          title: "Выделите фрагмент в одном абзаце",
-          description: "Заметка или ссылка не может пересекать границу между абзацами.",
+          title: t("Выделите фрагмент в одном абзаце"),
+          description: t("Заметка или ссылка не может пересекать границу между абзацами."),
         });
         return;
       }
@@ -455,7 +456,7 @@ export function ManuscriptEditor({
       if (!file || position === undefined) return;
       const validation = validateEditorImageFile(file);
       if (!validation.valid) {
-        showToast({ title: "Изображение не добавлено", description: validation.message });
+        showToast({ title: t("Изображение не добавлено"), description: validation.message });
         return;
       }
       setImageUploading(true);
@@ -477,12 +478,12 @@ export function ManuscriptEditor({
               },
             })
             .run();
-          showToast({ title: "Изображение добавлено" });
+          showToast({ title: t("Изображение добавлено") });
         })
         .catch((error: unknown) => {
           showToast({
-            title: "Не удалось загрузить изображение",
-            description: error instanceof Error ? error.message : "Повторите попытку",
+            title: t("Не удалось загрузить изображение"),
+            description: error instanceof Error ? error.message : t("Повторите попытку"),
           });
         })
         .finally(() => setImageUploading(false));
@@ -509,7 +510,7 @@ export function ManuscriptEditor({
         ...editor.options.editorProps,
         attributes: {
           ...editor.options.editorProps.attributes,
-          "aria-label": `Текст документа «${node.title}»`,
+          "aria-label": t("Текст документа «{0}»", node.title),
           spellcheck: String(preferences.spellcheck),
         },
       },
@@ -521,19 +522,19 @@ export function ManuscriptEditor({
       return;
     }
     void requestInput({
-      title: "Найти в документе",
-      description: "Первое совпадение будет выделено в открытом документе.",
-      label: "Текст для поиска",
+      title: t("Найти в документе"),
+      description: t("Первое совпадение будет выделено в открытом документе."),
+      label: t("Текст для поиска"),
       icon: Search,
-      confirmLabel: "Найти",
+      confirmLabel: t("Найти"),
     }).then((query) => {
       if (!query) {
         return;
       }
       if (!selectFirstMatch(editor, query)) {
         showToast({
-          title: "Ничего не найдено",
-          description: `В документе нет «${query}».`,
+          title: t("Ничего не найдено"),
+          description: t("В документе нет «{0}».", query),
         });
       }
     });
@@ -579,8 +580,8 @@ export function ManuscriptEditor({
     const segmentId = sourceRefs[0];
     if (!segmentId) {
       showToast({
-        title: "Для выбранного абзаца нет аудиоисточника",
-        description: "Источник появляется у текста, перенесённого из диктовки.",
+        title: t("Для выбранного абзаца нет аудиоисточника"),
+        description: t("Источник появляется у текста, перенесённого из диктовки."),
       });
       return;
     }
@@ -608,8 +609,8 @@ export function ManuscriptEditor({
       }
     } catch (error) {
       showToast({
-        title: "Источник недоступен",
-        description: error instanceof Error ? error.message : "Не удалось открыть аудио",
+        title: t("Источник недоступен"),
+        description: error instanceof Error ? error.message : t("Не удалось открыть аудио"),
       });
     }
   }, [showToast, sourceRefs]);
@@ -636,14 +637,14 @@ export function ManuscriptEditor({
           ? "fixed inset-0 z-50 flex min-h-0 min-w-0 flex-col bg-[var(--surface-app)]"
           : "relative flex min-h-0 min-w-0 flex-1 flex-col"
       }
-      aria-label="Редактор документа"
+      aria-label={t("Редактор документа")}
     >
       {focusMode ? (
         <div className="flex h-14 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-4">
           <SaveStatus state={autosave.saveState} />
           <Button type="button" variant="ghost" onClick={() => setFocusMode(false)}>
             <Minimize2 className="size-4" aria-hidden="true" />
-            Выйти из фокуса
+            {t("Выйти из фокуса")}
           </Button>
         </div>
       ) : null}
@@ -666,15 +667,15 @@ export function ManuscriptEditor({
           <Banner
             className="m-4 mb-0"
             variant="danger"
-            title="Мы сохранили оба варианта"
-            body="Откройте конфликтующую копию в дереве проекта и выберите нужный текст."
+            title={t("Мы сохранили оба варианта")}
+            body={t("Откройте конфликтующую копию в дереве проекта и выберите нужный текст.")}
           />
         ) : recovered ? (
           <Banner
             className="m-4 mb-0"
             variant="info"
-            title="Восстановлены правки с этого устройства"
-            body="Они сохранятся на сервере после восстановления соединения."
+            title={t("Восстановлены правки с этого устройства")}
+            body={t("Они сохранятся на сервере после восстановления соединения.")}
           />
         ) : null}
         <div ref={editorScrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
@@ -692,7 +693,7 @@ export function ManuscriptEditor({
                 ref={nodeTitleInputRef}
                 value={nodeTitleDraft}
                 maxLength={maximumNodeTitleLength}
-                aria-label={`Новое название для «${node.title}»`}
+                aria-label={t("Новое название для «{0}»", node.title)}
                 className="font-display mt-2 w-full rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-2 text-[34px] leading-[1.25] outline-none"
                 onFocus={(event) => event.currentTarget.select()}
                 onChange={(event) => setNodeTitleDraft(event.target.value)}
@@ -711,10 +712,10 @@ export function ManuscriptEditor({
             ) : (
               <h1
                 className="font-display mt-2 w-fit max-w-full cursor-text rounded px-1 text-[34px] leading-[1.25] hover:bg-[var(--surface-subtle)]"
-                title="Дважды нажмите, чтобы переименовать"
+                title={t("Дважды нажмите, чтобы переименовать")}
                 onDoubleClick={() => onRenameNode && setEditingNodeTitle(true)}
               >
-                <span className="sr-only">Название материала: </span>
+                <span className="sr-only">{t("Название материала: ")}</span>
                 {node.title}
               </h1>
             )}
@@ -731,7 +732,7 @@ export function ManuscriptEditor({
                   onClick={revealAttachedSelection}
                 >
                   <span className="block font-semibold text-[var(--accent-ink)]">
-                    Выделение прикреплено
+                    {t("Выделение прикреплено")}
                   </span>
                   <span className="mt-0.5 block truncate text-[var(--ink-secondary)]">
                     {assistantSelection.quote}
@@ -742,7 +743,7 @@ export function ManuscriptEditor({
                   variant="ghost"
                   size="icon"
                   className="size-7 min-h-7"
-                  aria-label="Убрать прикреплённое выделение"
+                  aria-label={t("Убрать прикреплённое выделение")}
                   onClick={() => onAssistantSelectionChange?.(undefined)}
                 >
                   <X className="size-3.5" aria-hidden="true" />
@@ -757,11 +758,11 @@ export function ManuscriptEditor({
                     variant="secondary"
                     onClick={() => editor.chain().focus("start").run()}
                   >
-                    Начать писать
+                    {t("Начать писать")}
                   </Button>
                   <Button type="button" variant="secondary" onClick={onDictate}>
                     <Mic className="size-4" aria-hidden="true" />
-                    Диктовать
+                    {t("Диктовать")}
                   </Button>
                 </div>
               ) : null}
@@ -782,7 +783,7 @@ export function ManuscriptEditor({
             >
               <div className="h-0.5 bg-[var(--accent)] shadow-[0_0_0_3px_var(--accent-soft)]" />
               <span className="mt-1 inline-flex rounded-full bg-[var(--accent-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--ink-on-inverse)]">
-                {imageUploading ? "Загружаем изображение…" : "Вставить изображение здесь"}
+                {imageUploading ? t("Загружаем изображение…") : t("Вставить изображение здесь")}
               </span>
             </div>
           ) : null}
@@ -809,7 +810,7 @@ export function ManuscriptEditor({
             )}
           >
             <span aria-live="polite">
-              {new Intl.NumberFormat("ru").format(textStats.words)} слов
+              {t("{0} слов", new Intl.NumberFormat(interfaceLanguage).format(textStats.words))}
             </span>
             {sourceRefs.length > 0 ? (
               <Button
@@ -817,8 +818,8 @@ export function ManuscriptEditor({
                 variant="ghost"
                 size="icon"
                 className="size-8 min-h-8"
-                aria-label="Прослушать источник этого абзаца"
-                title="Прослушать источник"
+                aria-label={t("Прослушать источник этого абзаца")}
+                title={t("Прослушать источник")}
                 onClick={() => void playSource()}
               >
                 <Headphones className="size-4" aria-hidden="true" />
@@ -831,7 +832,7 @@ export function ManuscriptEditor({
         <div
           ref={selectionMenuRef}
           role="menu"
-          aria-label="Действия с выделением"
+          aria-label={t("Действия с выделением")}
           className="fixed z-[90] grid w-[268px] rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-1 shadow-[0_20px_40px_var(--shadow-color)]"
           style={{ left: selectionMenu.x, top: selectionMenu.y }}
         >
@@ -843,7 +844,7 @@ export function ManuscriptEditor({
               onClick={() => runSelectionAction(() => startAnnotation("dictionary_link"))}
             >
               <BookMarked className="size-4 text-[var(--accent)]" aria-hidden="true" />
-              Связать со словарём
+              {t("Связать со словарём")}
             </button>
           ) : null}
           {onCreateNote ? (
@@ -854,7 +855,7 @@ export function ManuscriptEditor({
               onClick={() => runSelectionAction(() => startAnnotation("note"))}
             >
               <MessageSquarePlus className="size-4 text-[var(--warning)]" aria-hidden="true" />
-              Добавить заметку
+              {t("Добавить заметку")}
             </button>
           ) : null}
           {onAssistantSelectionChange ? (
@@ -865,7 +866,7 @@ export function ManuscriptEditor({
               onClick={() => runSelectionAction(attachSelection)}
             >
               <Paperclip className="size-4 text-[var(--ink-secondary)]" aria-hidden="true" />
-              Прикрепить к ассистенту
+              {t("Прикрепить к ассистенту")}
             </button>
           ) : null}
         </div>
@@ -875,7 +876,7 @@ export function ManuscriptEditor({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-                {contextPanel === "overview" ? "Обзор документа" : "Статистика"}
+                {contextPanel === "overview" ? t("Обзор документа") : t("Статистика")}
               </p>
               <h2 className="font-display mt-2 text-2xl">{node.title}</h2>
             </div>
@@ -884,7 +885,7 @@ export function ManuscriptEditor({
               variant="ghost"
               size="icon"
               className="size-9 min-h-9"
-              aria-label="Закрыть контекстную панель"
+              aria-label={t("Закрыть контекстную панель")}
               onClick={() => setContextPanel(null)}
             >
               <Minimize2 className="size-4" aria-hidden="true" />
@@ -893,34 +894,34 @@ export function ManuscriptEditor({
           {contextPanel === "overview" ? (
             <dl className="mt-5 grid gap-3 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--ink-secondary)]">Статус</dt>
+                <dt className="text-[var(--ink-secondary)]">{t("Статус")}</dt>
                 <dd>{node.status}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--ink-secondary)]">Редакция</dt>
+                <dt className="text-[var(--ink-secondary)]">{t("Редакция")}</dt>
                 <dd>{currentRevision}</dd>
               </div>
             </dl>
           ) : (
             <dl className="mt-5 grid gap-3 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--ink-secondary)]">Слов</dt>
-                <dd>{new Intl.NumberFormat("ru").format(textStats.words)}</dd>
+                <dt className="text-[var(--ink-secondary)]">{t("Слов")}</dt>
+                <dd>{new Intl.NumberFormat(interfaceLanguage).format(textStats.words)}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--ink-secondary)]">Знаков</dt>
-                <dd>{new Intl.NumberFormat("ru").format(textStats.characters)}</dd>
+                <dt className="text-[var(--ink-secondary)]">{t("Знаков")}</dt>
+                <dd>{new Intl.NumberFormat(interfaceLanguage).format(textStats.characters)}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--ink-secondary)]">Чтение</dt>
+                <dt className="text-[var(--ink-secondary)]">{t("Чтение")}</dt>
                 <dd>{formatReadingTime(textStats.words)}</dd>
               </div>
               {preferences.wordGoal > 0 ? (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-[var(--ink-secondary)]">Цель</dt>
+                  <dt className="text-[var(--ink-secondary)]">{t("Цель")}</dt>
                   <dd>
-                    {new Intl.NumberFormat("ru").format(textStats.words)} /{" "}
-                    {new Intl.NumberFormat("ru").format(preferences.wordGoal)}
+                    {new Intl.NumberFormat(interfaceLanguage).format(textStats.words)} /{" "}
+                    {new Intl.NumberFormat(interfaceLanguage).format(preferences.wordGoal)}
                   </dd>
                 </div>
               ) : null}
@@ -976,7 +977,7 @@ function AssistantProposalPreview({
   return (
     <aside
       data-testid="assistant-live-preview"
-      aria-label="Неприменённое предложение ассистента"
+      aria-label={t("Неприменённое предложение ассистента")}
       className={cn(
         "mt-6 rounded-[var(--radius-md)] border px-4 py-4",
         integratedWorkspace ? "editor-shell-width mx-auto" : "mx-5 sm:mx-[72px]",
@@ -988,8 +989,8 @@ function AssistantProposalPreview({
       <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] uppercase">
         <Sparkles className="size-3.5" aria-hidden="true" />
         {preview.stale
-          ? "Предложение устарело · применить нельзя"
-          : "Предложение · ещё не применено"}
+          ? t("Предложение устарело · применить нельзя")
+          : t("Предложение · ещё не применено")}
       </div>
       {edits.length > 0 ? (
         <div className="mt-3 space-y-3">
@@ -1000,18 +1001,18 @@ function AssistantProposalPreview({
             >
               <div className="rounded-[var(--radius-sm)] bg-[var(--diff-delete)] px-3 py-2">
                 <span className="text-[9px] font-semibold tracking-wider text-[var(--danger)] uppercase">
-                  Было
+                  {t("Было")}
                 </span>
                 <p className="font-manuscript mt-1 whitespace-pre-wrap text-sm leading-6">
-                  {edit.expectedText || "Пустой диапазон"}
+                  {edit.expectedText || t("Пустой диапазон")}
                 </p>
               </div>
               <div className="rounded-[var(--radius-sm)] bg-[var(--surface-paper)]/70 px-3 py-2">
                 <span className="text-[9px] font-semibold tracking-wider text-[var(--success)] uppercase">
-                  Предложено
+                  {t("Предложено")}
                 </span>
                 <p className="font-manuscript mt-1 whitespace-pre-wrap text-sm leading-6">
-                  {edit.replacement || "Удалить этот фрагмент"}
+                  {edit.replacement || t("Удалить этот фрагмент")}
                 </p>
               </div>
             </div>
@@ -1019,11 +1020,11 @@ function AssistantProposalPreview({
         </div>
       ) : (
         <p className="font-manuscript mt-3 line-clamp-6 whitespace-pre-wrap text-sm leading-6">
-          {fallback || "Ассистент подготовил структурное изменение этого документа."}
+          {fallback || t("Ассистент подготовил структурное изменение этого документа.")}
         </p>
       )}
       <p className="mt-3 text-[11px] text-[var(--ink-secondary)]">
-        Это отдельный preview: рукопись, autosave и история отмены пока не изменены.
+        {t("Это отдельный preview: рукопись, autosave и история отмены пока не изменены.")}
       </p>
     </aside>
   );
@@ -1059,9 +1060,9 @@ function manuscriptSnapshotText(value: unknown): string {
 
 function formatReadingTime(words: number): string {
   if (words === 0) {
-    return "0 мин чтения";
+    return t("0 мин чтения");
   }
-  return `≈ ${Math.max(1, Math.ceil(words / 180))} мин чтения`;
+  return t("≈ {0} мин чтения", Math.max(1, Math.ceil(words / 180)));
 }
 
 function selectFirstMatch(editor: Editor, query: string): boolean {

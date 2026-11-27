@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 import type { CanvasColor, CanvasDocument, CanvasEdge, CanvasGroupNode, CanvasNode } from "./types";
 
 export interface CanvasBounds {
@@ -159,7 +161,7 @@ export function createGroupAroundSelection(
   document: CanvasDocument,
   selectedNodeIds: Iterable<string>,
   idFactory: () => string,
-  label = "Новая группа",
+  label = t("Новая группа"),
   color?: CanvasColor,
 ): { document: CanvasDocument; groupId?: string } {
   const selected = new Set(selectedNodeIds);
@@ -187,7 +189,7 @@ export function createFrameAroundSelection(
   document: CanvasDocument,
   selectedNodeIds: Iterable<string>,
   idFactory: () => string,
-  label = "Новый фрейм",
+  label = t("Новый фрейм"),
 ): { document: CanvasDocument; frameId?: string } {
   const selected = new Set(selectedNodeIds);
   const bounds = selectionBounds(document.nodes.filter((item) => selected.has(item.id)));

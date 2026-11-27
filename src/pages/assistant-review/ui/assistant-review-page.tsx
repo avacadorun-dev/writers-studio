@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-
 import {
   type AssistantChangeOperation,
   applyAssistantChangeSet,
@@ -25,6 +24,7 @@ import {
   undoAssistantChangeSet,
 } from "~entities/assistant";
 import { getProject } from "~entities/project";
+import { t } from "~shared/i18n";
 import { AssistantMessage, Banner, Button, Checkbox, Spinner, useToast } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 
@@ -181,12 +181,13 @@ export function AssistantReviewPage({
       showToast({
         title:
           selectedGroups.size === groups.length
-            ? "Изменения применены"
-            : "Выбранные группы применены",
-        description: "Весь набор можно отменить одной кнопкой.",
+            ? t("Изменения применены")
+            : t("Выбранные группы применены"),
+        description: t("Весь набор можно отменить одной кнопкой."),
       });
     },
-    onError: (error) => showToast({ title: "Изменения не применены", description: error.message }),
+    onError: (error) =>
+      showToast({ title: t("Изменения не применены"), description: error.message }),
   });
   const reject = useMutation({
     mutationFn: () => rejectAssistantChangeSet(runId, changeSetId),
@@ -197,9 +198,11 @@ export function AssistantReviewPage({
       await rejectAssistantChangeSet(runId, changeSetId);
       return createAssistantTurn(runId, {
         instruction:
-          "Исправь предыдущее предложение по замечаниям автора. " +
-          `Замечания: ${feedback.trim()}. ` +
-          "Подготовь новый полный change set через инструменты; ничего не применяй автоматически.",
+          t("Исправь предыдущее предложение по замечаниям автора. ") +
+          t("Замечания: {0}. ", feedback.trim()) +
+          t(
+            "Подготовь новый полный change set через инструменты; ничего не применяй автоматически.",
+          ),
         inputMode: "chat",
         requireConfirmation: false,
         execute: true,
@@ -210,11 +213,14 @@ export function AssistantReviewPage({
         queryClient.invalidateQueries({ queryKey: ["assistant-run", runId] }),
         queryClient.invalidateQueries({ queryKey: ["assistant-turns", runId] }),
       ]);
-      showToast({ title: "Замечания отправлены", description: "Ассистент готовит новую версию." });
+      showToast({
+        title: t("Замечания отправлены"),
+        description: t("Ассистент готовит новую версию."),
+      });
       returnToSession();
     },
     onError: (error) =>
-      showToast({ title: "Не удалось запросить исправление", description: error.message }),
+      showToast({ title: t("Не удалось запросить исправление"), description: error.message }),
   });
   const undo = useMutation({
     mutationFn: () => undoAssistantChangeSet(runId, changeSetId),
@@ -225,19 +231,19 @@ export function AssistantReviewPage({
           queryKey: ["assistant-change-set", runId, changeSetId],
         }),
       ]);
-      showToast({ title: "Набор изменений отменён" });
+      showToast({ title: t("Набор изменений отменён") });
     },
   });
 
   if (changeSet.isPending || run.isPending || project.isPending || turns.isPending) {
-    return <Spinner label="Готовим точный diff…" />;
+    return <Spinner label={t("Готовим точный diff…")} />;
   }
   if (changeSet.isError || !changeSet.data || run.isError || project.isError || turns.isError) {
     return (
       <Banner
         variant="danger"
-        title="Предложение недоступно"
-        body="Откройте сессию и повторите поручение."
+        title={t("Предложение недоступно")}
+        body={t("Откройте сессию и повторите поручение.")}
       />
     );
   }
@@ -252,7 +258,7 @@ export function AssistantReviewPage({
         <div className="fixed inset-0 z-50 grid place-items-center p-4">
           <button
             type="button"
-            aria-label="Закрыть проверку изменения"
+            aria-label={t("Закрыть проверку изменения")}
             className="absolute inset-0 cursor-default bg-[var(--ink-primary)]/25"
             onClick={returnToSession}
           />
@@ -267,8 +273,10 @@ export function AssistantReviewPage({
             <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] px-5 sm:px-6">
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-                  {reviewStatusLabel(value.state)} · выбрано {selectedGroups.size} из{" "}
-                  {groups.length}
+                  {reviewStatusLabel(value.state)}
+                  {t(" · выбрано ")}
+                  {selectedGroups.size}
+                  {t(" из")} {groups.length}
                 </p>
                 <h1 id="assistant-review-title" className="font-display mt-0.5 truncate text-xl">
                   {value.title}
@@ -282,7 +290,7 @@ export function AssistantReviewPage({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Закрыть проверку"
+                aria-label={t("Закрыть проверку")}
                 onClick={returnToSession}
               >
                 <X className="size-4" aria-hidden="true" />
@@ -290,7 +298,7 @@ export function AssistantReviewPage({
             </header>
 
             <main className="grid min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5 lg:overflow-hidden">
-              <section className="min-w-0 lg:overflow-y-auto lg:pr-1" aria-label="Точный diff">
+              <section className="min-w-0 lg:overflow-y-auto lg:pr-1" aria-label={t("Точный diff")}>
                 <div className="mb-4 flex items-start gap-3 rounded-[var(--radius-md)] bg-[var(--info-soft)] p-3">
                   <ShieldCheck
                     className="mt-0.5 size-4 shrink-0 text-[var(--info)]"
@@ -298,11 +306,14 @@ export function AssistantReviewPage({
                   />
                   <div>
                     <p className="text-[14px] font-semibold">
-                      {selectedGroups.size} из {groups.length} групп · {value.operations.length}{" "}
-                      точных изменений
+                      {selectedGroups.size}
+                      {t(" из ")}
+                      {groups.length}
+                      {t(" групп · ")}
+                      {value.operations.length} {t("точных изменений")}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[var(--ink-secondary)]">
-                      Рукопись, autosave и история пока не изменены
+                      {t("Рукопись, autosave и история пока не изменены")}
                     </p>
                   </div>
                 </div>
@@ -328,7 +339,7 @@ export function AssistantReviewPage({
               <aside className="mt-5 space-y-3 border-t border-[var(--border-subtle)] pt-5 lg:mt-0 lg:overflow-y-auto lg:border-t-0 lg:pt-0">
                 <div className="rounded-[var(--radius-md)] bg-[var(--accent-soft)] p-4">
                   <p className="text-[9px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-                    Поручение
+                    {t("Поручение")}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-[14px] leading-[1.45]">
                     {turns.data?.turns.at(-1)?.instruction ?? value.summary}
@@ -336,7 +347,7 @@ export function AssistantReviewPage({
                 </div>
                 <div className="rounded-[var(--radius-md)] bg-[var(--surface-subtle)] p-4">
                   <p className="text-[9px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-                    Группы изменений
+                    {t("Группы изменений")}
                   </p>
                   <div className="mt-3 space-y-2">
                     {groups.map((group, groupIndex) => {
@@ -381,11 +392,11 @@ export function AssistantReviewPage({
                             </span>
                             {!selected ? (
                               <span className="mt-0.5 block text-[10px] text-[var(--ink-tertiary)]">
-                                Исключена из применения
+                                {t("Исключена из применения")}
                               </span>
                             ) : requiredBy.length > 0 ? (
                               <span className="mt-0.5 block text-[10px] text-[var(--ink-tertiary)]">
-                                Обязательна для:{" "}
+                                {t("Обязательна для:")}{" "}
                                 {requiredBy
                                   .map((item) => changeGroupLabel(value.operations, item))
                                   .join(", ")}
@@ -398,14 +409,16 @@ export function AssistantReviewPage({
                   </div>
                 </div>
                 <div className="rounded-[var(--radius-md)] bg-[var(--info-soft)] p-4">
-                  <p className="text-[13px] font-semibold">Можно применить без смены экрана</p>
+                  <p className="text-[13px] font-semibold">
+                    {t("Можно применить без смены экрана")}
+                  </p>
                   <p className="mt-1 text-[11px] leading-5 text-[var(--ink-secondary)]">
-                    После применения весь набор останется отменяемым в Studio.
+                    {t("После применения весь набор останется отменяемым в Studio.")}
                   </p>
                 </div>
                 <details className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
                   <summary className="cursor-pointer text-[12px] font-semibold">
-                    Полный контекст сессии
+                    {t("Полный контекст сессии")}
                   </summary>
                   <div className="mt-3 space-y-3">
                     {(turns.data?.turns ?? []).map((turn) => (
@@ -420,7 +433,7 @@ export function AssistantReviewPage({
                 </details>
                 <details className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
                   <summary className="cursor-pointer text-[12px] font-semibold">
-                    Трассировка и JSON
+                    {t("Трассировка и JSON")}
                   </summary>
                   <div className="mt-3">
                     <AssistantMessage>
@@ -448,7 +461,7 @@ export function AssistantReviewPage({
                   }}
                 >
                   <label htmlFor="assistant-modal-change-request" className="sr-only">
-                    Что нужно исправить в предложении?
+                    {t("Что нужно исправить в предложении?")}
                   </label>
                   <textarea
                     id="assistant-modal-change-request"
@@ -457,7 +470,7 @@ export function AssistantReviewPage({
                     onChange={(event) => setChangeRequest(event.target.value)}
                     rows={2}
                     maxLength={8_000}
-                    placeholder="Что нужно исправить?"
+                    placeholder={t("Что нужно исправить?")}
                     className="min-h-11 flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] outline-none focus:border-[var(--focus)]"
                   />
                   <div className="flex shrink-0 items-end gap-2">
@@ -467,13 +480,13 @@ export function AssistantReviewPage({
                       onClick={() => setRequestingChanges(false)}
                       disabled={requestChanges.isPending}
                     >
-                      Отмена
+                      {t("Отмена")}
                     </Button>
                     <Button
                       type="submit"
                       disabled={!changeRequest.trim() || requestChanges.isPending}
                     >
-                      {requestChanges.isPending ? "Отправляем…" : primaryAction.label}
+                      {requestChanges.isPending ? t("Отправляем…") : primaryAction.label}
                     </Button>
                   </div>
                 </form>
@@ -487,7 +500,7 @@ export function AssistantReviewPage({
                         disabled={reject.isPending}
                       >
                         <X className="size-4" aria-hidden="true" />
-                        Отклонить
+                        {t("Отклонить")}
                       </Button>
                       <Button
                         variant="secondary"
@@ -495,14 +508,14 @@ export function AssistantReviewPage({
                         disabled={requestChanges.isPending}
                       >
                         <MessageCircle className="size-4" aria-hidden="true" />
-                        Попросить исправить
+                        {t("Попросить исправить")}
                       </Button>
                       <Button
                         onClick={() => apply.mutate()}
                         disabled={selectedGroups.size === 0 || apply.isPending}
                       >
                         <Check className="size-4" aria-hidden="true" />
-                        {apply.isPending ? "Применяем…" : primaryAction.label}
+                        {apply.isPending ? t("Применяем…") : primaryAction.label}
                       </Button>
                     </>
                   ) : applied ? (
@@ -535,13 +548,13 @@ export function AssistantReviewPage({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Назад к сессии"
+              aria-label={t("Назад к сессии")}
               onClick={returnToSession}
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
             </Button>
           ) : (
-            <Button asChild variant="ghost" size="icon" aria-label="Назад к сессии">
+            <Button asChild variant="ghost" size="icon" aria-label={t("Назад к сессии")}>
               <Link to="/projects/$projectId/assistant/$runId" params={{ projectId, runId }}>
                 <ArrowLeft className="size-4" aria-hidden="true" />
               </Link>
@@ -549,7 +562,10 @@ export function AssistantReviewPage({
           )}
           <p className="ml-2 min-w-0 truncate text-sm font-semibold">{value.title}</p>
           <span className="ml-3 hidden text-[11px] text-[var(--ink-tertiary)] sm:inline">
-            Выбрано {selectedGroups.size} из {groups.length}
+            {t("Выбрано ")}
+            {selectedGroups.size}
+            {t(" из ")}
+            {groups.length}
           </span>
           <span className="ml-auto rounded-full bg-[var(--surface-subtle)] px-3 py-1 text-[11px]">
             {reviewStatusLabel(value.state)}
@@ -558,7 +574,7 @@ export function AssistantReviewPage({
         <main className="grid min-h-0 flex-1 overflow-y-auto xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:overflow-hidden">
           <aside className="border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5">
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-              Набор изменений
+              {t("Набор изменений")}
             </p>
             <h1 className="font-display mt-4 text-3xl">{value.title}</h1>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-secondary)]">{value.summary}</p>
@@ -567,21 +583,23 @@ export function AssistantReviewPage({
               variant={staged ? "info" : applied ? "success" : "warning"}
               title={
                 staged
-                  ? "Сначала проверьте каждую группу"
+                  ? t("Сначала проверьте каждую группу")
                   : applied
-                    ? "Изменения записаны"
-                    : "Набор не активен"
+                    ? t("Изменения записаны")
+                    : t("Набор не активен")
               }
               body={
                 staged
-                  ? "Независимые группы можно исключить. Для связанных групп интерфейс сохранит обязательные условия."
+                  ? t(
+                      "Независимые группы можно исключить. Для связанных групп интерфейс сохранит обязательные условия.",
+                    )
                   : applied
-                    ? "Применённые операции связаны одним operation ID и отменяются вместе."
-                    : "Канонический проект соответствует состоянию, указанному выше."
+                    ? t("Применённые операции связаны одним operation ID и отменяются вместе.")
+                    : t("Канонический проект соответствует состоянию, указанному выше.")
               }
             />
             <h2 className="mt-6 text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Группы изменений
+              {t("Группы изменений")}
             </h2>
             <div className="mt-2 space-y-2">
               {groups.map((group, groupIndex) => {
@@ -625,11 +643,11 @@ export function AssistantReviewPage({
                       <span className="block text-sm">{label}</span>
                       {!selected ? (
                         <span className="mt-1 block text-[10px] text-[var(--ink-tertiary)]">
-                          Исключена из применения
+                          {t("Исключена из применения")}
                         </span>
                       ) : requiredBy.length > 0 ? (
                         <span className="mt-1 block text-[10px] text-[var(--ink-tertiary)]">
-                          Требуется для:{" "}
+                          {t("Требуется для:")}{" "}
                           {requiredBy
                             .map((dependent) => changeGroupLabel(value.operations, dependent))
                             .join(", ")}
@@ -646,21 +664,23 @@ export function AssistantReviewPage({
             <div className="mt-6 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] p-3 text-[11px] leading-5 text-[var(--ink-secondary)]">
               <p className="flex items-center gap-2 font-semibold text-[var(--ink-primary)]">
                 <Link2 className="size-3.5" aria-hidden="true" />
-                Связь поручения и результата
+                {t("Связь поручения и результата")}
               </p>
               <p className="mt-2">
-                Каждая карточка показывает действие, точную цель и защищённые диапазоны. Связанные
-                группы включают необходимые условия автоматически.
+                {t(
+                  "Каждая карточка показывает действие, точную цель и защищённые диапазоны. Связанные группы включают необходимые условия автоматически.",
+                )}
               </p>
             </div>
           </aside>
           <section className="min-w-0 p-4 pb-28 sm:p-8 sm:pb-28 xl:overflow-y-auto">
             <div className="mx-auto max-w-[920px]">
               <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-                {project.data?.project.structure.rootLabel} · предложенная редактура
+                {project.data?.project.structure.rootLabel}
+                {t(" · предложенная редактура")}
               </p>
               <h2 className="font-display mt-3 text-3xl">
-                Проверьте цель, ограничения и результат
+                {t("Проверьте цель, ограничения и результат")}
               </h2>
               <div className="mt-6 space-y-5">
                 {value.operations.map((operation) => (
@@ -683,14 +703,14 @@ export function AssistantReviewPage({
           </section>
           <aside className="border-t border-[var(--border-subtle)] bg-[var(--surface-panel)] p-5 pb-28 xl:overflow-y-auto xl:border-t-0 xl:border-l">
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--accent)] uppercase">
-              Дополнительные материалы
+              {t("Дополнительные материалы")}
             </p>
-            <h2 className="font-display mt-3 text-2xl">Поручение и ход работы</h2>
+            <h2 className="font-display mt-3 text-2xl">{t("Поручение и ход работы")}</h2>
             <details className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
               <summary className="cursor-pointer text-sm font-semibold">
-                Полный контекст сессии
+                {t("Полный контекст сессии")}
               </summary>
-              <ol className="mt-4 space-y-4" aria-label="Стенограмма сессии ассистента">
+              <ol className="mt-4 space-y-4" aria-label={t("Стенограмма сессии ассистента")}>
                 {(turns.data?.turns ?? []).map((turn) => (
                   <li key={turn.id} className="space-y-2">
                     <AssistantMessage compact>{turn.instruction}</AssistantMessage>
@@ -703,7 +723,7 @@ export function AssistantReviewPage({
             </details>
             <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-3">
               <summary className="cursor-pointer text-sm font-semibold">
-                Трассировка и сырые данные
+                {t("Трассировка и сырые данные")}
               </summary>
               <div className="mt-4 space-y-3">
                 {value.operations.map((operation) => {
@@ -712,7 +732,7 @@ export function AssistantReviewPage({
                     <div key={operation.id} className="text-[11px] text-[var(--ink-secondary)]">
                       <p className="font-semibold text-[var(--ink-primary)]">
                         {operationLabel(operation.toolName)}
-                        {target ? ` · ${target.ranges.length} диапазонов` : ""}
+                        {target ? t(" · {0} диапазонов", target.ranges.length) : ""}
                       </p>
                       <AssistantMessage compact>
                         {JSON.stringify({
@@ -740,7 +760,7 @@ export function AssistantReviewPage({
                   }}
                 >
                   <label htmlFor="assistant-change-request" className="text-sm font-semibold">
-                    Что нужно исправить в предложении?
+                    {t("Что нужно исправить в предложении?")}
                   </label>
                   <textarea
                     id="assistant-change-request"
@@ -749,7 +769,7 @@ export function AssistantReviewPage({
                     onChange={(event) => setChangeRequest(event.target.value)}
                     rows={2}
                     maxLength={8_000}
-                    placeholder="Например: сократи первый абзац и не меняй последнюю реплику"
+                    placeholder={t("Например: сократи первый абзац и не меняй последнюю реплику")}
                     className="mt-2 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-sm leading-5 outline-none focus:border-[var(--focus)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--focus)]"
                   />
                   <div className="mt-2 flex justify-end gap-2">
@@ -759,13 +779,13 @@ export function AssistantReviewPage({
                       onClick={() => setRequestingChanges(false)}
                       disabled={requestChanges.isPending}
                     >
-                      Отмена
+                      {t("Отмена")}
                     </Button>
                     <Button
                       type="submit"
                       disabled={!changeRequest.trim() || requestChanges.isPending}
                     >
-                      {requestChanges.isPending ? "Отправляем…" : primaryAction.label}
+                      {requestChanges.isPending ? t("Отправляем…") : primaryAction.label}
                     </Button>
                   </div>
                 </form>
@@ -778,7 +798,7 @@ export function AssistantReviewPage({
                     disabled={reject.isPending}
                   >
                     <X className="size-4" aria-hidden="true" />
-                    Отклонить
+                    {t("Отклонить")}
                   </Button>
                   <Button
                     variant="secondary"
@@ -786,14 +806,14 @@ export function AssistantReviewPage({
                     disabled={reject.isPending || requestChanges.isPending}
                   >
                     <MessageCircle className="size-4" aria-hidden="true" />
-                    Попросить исправить
+                    {t("Попросить исправить")}
                   </Button>
                   <Button
                     onClick={() => apply.mutate()}
                     disabled={selectedGroups.size === 0 || apply.isPending}
                   >
                     <Check className="size-4" aria-hidden="true" />
-                    {apply.isPending ? "Применяем…" : primaryAction.label}
+                    {apply.isPending ? t("Применяем…") : primaryAction.label}
                   </Button>
                 </div>
               ) : null}
@@ -864,13 +884,13 @@ function OperationCard({
           <h3 className="font-semibold">{changeGroupLabel([operation], operation.groupKey)}</h3>
           <p className="mt-1 text-[11px] text-[var(--ink-tertiary)]">
             {operationLabel(operation.toolName)}
-            {targetTitle ? ` · ${targetTitle}` : ""} · исходная версия{" "}
-            {operation.baseRevision ?? "—"}
+            {targetTitle ? ` · ${targetTitle}` : ""}
+            {t(" · исходная версия")} {operation.baseRevision ?? "—"}
           </p>
         </div>
         {excluded ? (
           <span className="rounded-full bg-[var(--surface-subtle)] px-3 py-1 text-[10px]">
-            Не применять
+            {t("Не применять")}
           </span>
         ) : null}
       </div>
@@ -878,11 +898,12 @@ function OperationCard({
         <div className="mt-4 rounded-[var(--radius-md)] bg-[var(--info-soft)] p-3 text-[11px] leading-5">
           <p className="flex items-center gap-2 font-semibold">
             <ShieldCheck className="size-4 text-[var(--info)]" aria-hidden="true" />
-            Точная цель: {target.sourcePhrase}
+            {t("Точная цель: ")}
+            {target.sourcePhrase}
           </p>
           <p className="mt-1 text-[var(--ink-secondary)]">
             {target.ranges
-              .map((range) => `${range.reason} · символы ${range.start}–${range.end}`)
+              .map((range) => t("{0} · символы {1}–{2}", range.reason, range.start, range.end))
               .join("; ")}
           </p>
           {target.protectedRanges.length > 0 ? (
@@ -892,7 +913,8 @@ function OperationCard({
                   key={`${range.blockId}:${range.start}`}
                   className="rounded-full border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-2 py-1 text-[10px] text-[var(--warning)]"
                 >
-                  Защищено · {range.reason}
+                  {t("Защищено · ")}
+                  {range.reason}
                 </span>
               ))}
             </div>
@@ -907,9 +929,13 @@ function OperationCard({
               key={fix.annotationId}
               className="rounded-[var(--radius-md)] border border-[var(--warning)]/25 bg-[var(--warning-soft)] p-3 text-[11px] leading-5"
             >
-              <p className="font-semibold">Заметка: {fix.note}</p>
+              <p className="font-semibold">
+                {t("Заметка: ")}
+                {fix.note}
+              </p>
               <p className="mt-1 text-[var(--ink-secondary)]">
-                Якорь будет заменён: «{fix.originalText}» → «{fix.replacement}»
+                {t("Якорь будет заменён: «")}
+                {fix.originalText}» → «{fix.replacement}»
               </p>
               <div className="mt-2 flex items-center gap-2 font-semibold text-[var(--ink-secondary)]">
                 <Checkbox
@@ -921,7 +947,7 @@ function OperationCard({
                   }
                 />
                 <span id={`annotation-resolution-${fix.annotationId}`}>
-                  После применения отметить исправленной
+                  {t("После применения отметить исправленной")}
                 </span>
               </div>
             </div>
@@ -937,24 +963,25 @@ function OperationCard({
             >
               {edits.length > 1 ? (
                 <p className="bg-[var(--surface-subtle)] px-4 py-2 text-[10px] font-semibold tracking-wider text-[var(--ink-tertiary)] uppercase">
-                  Точная правка {index + 1}
+                  {t("Точная правка ")}
+                  {index + 1}
                 </p>
               ) : null}
               <div className="grid sm:grid-cols-2">
                 <div className="bg-[var(--diff-delete)] px-4 py-3">
                   <p className="text-[9px] font-semibold tracking-wider text-[var(--danger)] uppercase">
-                    Было
+                    {t("Было")}
                   </p>
                   <p className="font-manuscript mt-2 whitespace-pre-wrap text-[15px] leading-6">
-                    {edit.before || "Пустой диапазон"}
+                    {edit.before || t("Пустой диапазон")}
                   </p>
                 </div>
                 <div className="bg-[var(--diff-insert)] px-4 py-3">
                   <p className="text-[9px] font-semibold tracking-wider text-[var(--success)] uppercase">
-                    Предложено
+                    {t("Предложено")}
                   </p>
                   <p className="font-manuscript mt-2 whitespace-pre-wrap text-[15px] leading-6">
-                    {edit.after || "Удалить этот фрагмент"}
+                    {edit.after || t("Удалить этот фрагмент")}
                   </p>
                 </div>
               </div>
@@ -966,7 +993,7 @@ function OperationCard({
           {before && before !== after ? (
             <div className="rounded-[var(--radius-md)] bg-[var(--diff-delete)] px-4 py-3">
               <p className="text-[9px] font-semibold tracking-wider text-[var(--danger)] uppercase">
-                Было
+                {t("Было")}
               </p>
               <p className="font-manuscript mt-2 whitespace-pre-wrap text-[15px] leading-6">
                 {before}
@@ -975,7 +1002,7 @@ function OperationCard({
           ) : null}
           <div className="rounded-[var(--radius-md)] bg-[var(--diff-insert)] px-4 py-3">
             <p className="text-[9px] font-semibold tracking-wider text-[var(--success)] uppercase">
-              Предложено
+              {t("Предложено")}
             </p>
             <p className="font-manuscript mt-2 whitespace-pre-wrap text-[15px] leading-6">
               {after || JSON.stringify(operation.proposedSnapshot, null, 2)}
@@ -1004,10 +1031,19 @@ function CanvasGhostOverlay({
   return (
     <div className="mt-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-app)]">
       <div className="flex flex-wrap gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-[10px] text-[var(--ink-secondary)]">
-        <strong className="text-[var(--ink-primary)]">Ghost preview</strong>
-        <span>{preview.changedNodes} карточек изменится</span>
-        <span>+{preview.addedEdges} связей</span>
-        <span>−{preview.deletedEdges} связей</span>
+        <strong className="text-[var(--ink-primary)]">{t("Предпросмотр изменений")}</strong>
+        <span>
+          {preview.changedNodes}
+          {t(" карточек изменится")}
+        </span>
+        <span>
+          +{preview.addedEdges}
+          {t(" связей")}
+        </span>
+        <span>
+          −{preview.deletedEdges}
+          {t(" связей")}
+        </span>
       </div>
       <div className="relative h-[280px] overflow-hidden">
         {visible.map((node) => {

@@ -24,6 +24,7 @@ import {
   useReactFlow,
   ViewportPortal,
 } from "@xyflow/react";
+import { t } from "~shared/i18n";
 import "@xyflow/react/dist/style.css";
 import {
   Activity,
@@ -252,13 +253,13 @@ const defaultCardWidth = 280;
 const defaultCardHeight = 180;
 
 const palette: Array<{ value?: CanvasColor; color: string; label: string }> = [
-  { color: "var(--surface-raised)", label: "Без цвета" },
-  { value: "1", color: "var(--danger-soft)", label: "Красный" },
-  { value: "2", color: "var(--warning-soft)", label: "Оранжевый" },
-  { value: "3", color: "var(--diff-delete)", label: "Жёлтый" },
-  { value: "4", color: "var(--success-soft)", label: "Зелёный" },
-  { value: "5", color: "var(--info-soft)", label: "Синий" },
-  { value: "6", color: "var(--creative-soft)", label: "Фиолетовый" },
+  { color: "var(--surface-raised)", label: t("Без цвета") },
+  { value: "1", color: "var(--danger-soft)", label: t("Красный") },
+  { value: "2", color: "var(--warning-soft)", label: t("Оранжевый") },
+  { value: "3", color: "var(--diff-delete)", label: t("Жёлтый") },
+  { value: "4", color: "var(--success-soft)", label: t("Зелёный") },
+  { value: "5", color: "var(--info-soft)", label: t("Синий") },
+  { value: "6", color: "var(--creative-soft)", label: t("Фиолетовый") },
 ];
 
 const colorValue: Record<string, string> = Object.fromEntries(
@@ -393,7 +394,7 @@ function CanvasTextCard({ data, selected }: NodeProps<CanvasFlowNode>) {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") save();
           }}
           className="nodrag nowheel size-full resize-none bg-transparent p-4 font-mono text-[13px] leading-5 outline-none"
-          aria-label="Markdown заметки"
+          aria-label={t("Markdown заметки")}
         />
       ) : (
         <div className="nowheel size-full overflow-auto p-4 text-[13px] leading-5">
@@ -412,14 +413,16 @@ function CanvasTextCard({ data, selected }: NodeProps<CanvasFlowNode>) {
                   </a>
                 ),
                 img: ({ alt }) => (
-                  <span className="text-[var(--ink-secondary)]">[{alt || "изображение"}]</span>
+                  <span className="text-[var(--ink-secondary)]">[{alt || t("изображение")}]</span>
                 ),
               }}
             >
               {item.text}
             </ReactMarkdown>
           ) : (
-            <p className="text-[var(--ink-tertiary)]">Дважды нажмите, чтобы написать заметку…</p>
+            <p className="text-[var(--ink-tertiary)]">
+              {t("Дважды нажмите, чтобы написать заметку…")}
+            </p>
           )}
         </div>
       )}
@@ -432,7 +435,7 @@ function CanvasDocumentCard({ data, selected }: NodeProps<CanvasFlowNode>) {
   const item = data.canvasNode;
   if (item.type !== "file" || item["x-writers-studio"]?.resource?.kind !== "document") return null;
   const document = data.document;
-  const status = document ? statusLabel(document.status) : "Недоступен";
+  const status = document ? statusLabel(document.status) : t("Недоступен");
   return (
     <article
       data-testid={`canvas-document-${item.id}`}
@@ -449,7 +452,7 @@ function CanvasDocumentCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardTypeBadge node={item} />
       <div className="flex h-10 items-center gap-2 border-b border-[var(--border-subtle)] px-3">
         <FilePlus2 className="size-4 shrink-0" aria-hidden="true" />
-        <strong className="truncate text-sm">{document?.title ?? "Документ недоступен"}</strong>
+        <strong className="truncate text-sm">{document?.title ?? t("Документ недоступен")}</strong>
       </div>
       <div className="p-3">
         <span className="rounded-full bg-[var(--surface-on-solid)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide">
@@ -458,8 +461,8 @@ function CanvasDocumentCard({ data, selected }: NodeProps<CanvasFlowNode>) {
         <p className="mt-3 line-clamp-5 text-[12px] leading-5 text-[var(--ink-secondary)]">
           {document?.plainText.trim() ||
             (editable
-              ? "Пустой документ. Дважды нажмите, чтобы открыть Studio."
-              : "Пустой документ. Нажмите, чтобы открыть Studio.")}
+              ? t("Пустой документ. Дважды нажмите, чтобы открыть Studio.")
+              : t("Пустой документ. Нажмите, чтобы открыть Studio."))}
         </p>
       </div>
     </article>
@@ -493,7 +496,7 @@ function CanvasImageCard({ data, selected }: NodeProps<CanvasFlowNode>) {
         />
       ) : (
         <div className="grid size-full place-items-center p-4 text-center text-xs text-[var(--ink-secondary)]">
-          Изображение недоступно
+          {t("Изображение недоступно")}
         </div>
       )}
       {data.media ? (
@@ -522,11 +525,12 @@ function CanvasExternalFileCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardResizer selected={selected} />
       <CardHandles interactive={editable} />
       <span className="flex items-center gap-2 text-xs uppercase tracking-wide text-[var(--ink-tertiary)]">
-        <FilePlus2 className="size-4" aria-hidden="true" /> Внешний файл
+        <FilePlus2 className="size-4" aria-hidden="true" />
+        {t(" Внешний файл")}
       </span>
       <strong className="mt-3 block break-words text-sm">{item.file}</strong>
       <p className="mt-2 text-xs leading-5 text-[var(--ink-secondary)]">
-        Путь сохранён из JSON Canvas. Добавьте файл в проект, чтобы открыть содержимое.
+        {t("Путь сохранён из JSON Canvas. Добавьте файл в проект, чтобы открыть содержимое.")}
       </p>
     </article>
   );
@@ -594,14 +598,19 @@ function CanvasPDFCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardTypeBadge node={item} />
       {previewFailed ? (
         <div className="grid size-full place-items-center p-5 text-center text-xs text-[var(--ink-secondary)]">
-          Нажмите дважды, чтобы открыть PDF
+          {t("Нажмите дважды, чтобы открыть PDF")}
         </div>
       ) : (
         <canvas ref={previewCanvas} className="mx-auto block max-w-full bg-[var(--ink-on-solid)]" />
       )}
       <footer className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-[var(--surface-overlay)] px-3 py-2 text-xs text-[var(--ink-on-solid)]">
         <span className="truncate">{media.originalName}</span>
-        {media.pageCount ? <span className="shrink-0">{media.pageCount} стр.</span> : null}
+        {media.pageCount ? (
+          <span className="shrink-0">
+            {media.pageCount}
+            {t(" стр.")}
+          </span>
+        ) : null}
       </footer>
     </article>
   );
@@ -649,7 +658,9 @@ function CanvasMediaCard({ data, selected }: NodeProps<CanvasFlowNode>) {
           </audio>
           {media.durationMs ? (
             <span className="text-[10px] text-[var(--ink-tertiary)]">
-              Метаданные длительности: {Math.round(media.durationMs / 1000)} сек.
+              {t("Метаданные длительности: ")}
+              {Math.round(media.durationMs / 1000)}
+              {t(" сек.")}
             </span>
           ) : null}
         </div>
@@ -671,10 +682,10 @@ function CanvasGroupCard({ data, selected }: NodeProps<CanvasFlowNode>) {
   const rename = () => {
     if (!editable) return;
     void requestInput({
-      title: "Название группы",
-      label: "Название",
+      title: t("Название группы"),
+      label: t("Название"),
       defaultValue: item.label ?? "",
-      confirmLabel: "Сохранить",
+      confirmLabel: t("Сохранить"),
     }).then((label) => {
       if (label !== undefined) {
         updateNode(item.id, (node) =>
@@ -702,9 +713,9 @@ function CanvasGroupCard({ data, selected }: NodeProps<CanvasFlowNode>) {
         onKeyDown={(event) => {
           if (event.key === "Enter") rename();
         }}
-        aria-label={`Переименовать группу «${item.label || "Группа"}»`}
+        aria-label={t("Переименовать группу «{0}»", item.label || t("Группа"))}
       >
-        {item.label || "Группа"}
+        {item.label || t("Группа")}
       </button>
     </section>
   );
@@ -761,7 +772,7 @@ function CanvasShapeCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardHandles interactive={editable} />
       <CardTypeBadge node={item} />
       <svg viewBox={`0 0 ${item.width} ${item.height}`} className="size-full overflow-visible">
-        <title>{element.label || `Фигура ${element.shape}`}</title>
+        <title>{element.label || t("Фигура {0}", element.shape)}</title>
         <defs>
           <marker
             id={markerId}
@@ -842,7 +853,7 @@ function CanvasFrameCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardResizer selected={selected} group />
       <CardHandles interactive={editable} />
       <span className="absolute -top-8 left-2 rounded-full bg-[var(--surface-raised)] px-3 py-1 text-xs font-semibold shadow-sm">
-        {element.order}. {element.label || item.label || "Фрейм"}
+        {element.order}. {element.label || item.label || t("Фрейм")}
       </span>
     </section>
   );
@@ -907,11 +918,11 @@ function CanvasNestedCard({ data, selected }: NodeProps<CanvasFlowNode>) {
       <CardHandles interactive={editable} />
       <CardTypeBadge node={item} />
       <span className="text-xs uppercase tracking-wide text-[var(--ink-tertiary)]">
-        Другая доска
+        {t("Другая доска")}
       </span>
       <strong className="mt-3 block">{title}</strong>
       <p className="mt-2 text-xs text-[var(--ink-secondary)]">
-        Дважды нажмите, чтобы перейти без рекурсивного embed.
+        {t("Дважды нажмите, чтобы перейти без рекурсивного embed.")}
       </p>
     </article>
   );
@@ -941,7 +952,7 @@ function CanvasConnection(props: EdgeProps<CanvasFlowEdge>) {
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
             onDoubleClick={() => editable && editEdgeLabel(props.id, edge?.label ?? "")}
           >
-            {edge?.label || "Добавить подпись"}
+            {edge?.label || t("Добавить подпись")}
           </button>
         </EdgeLabelRenderer>
       )}
@@ -950,7 +961,9 @@ function CanvasConnection(props: EdgeProps<CanvasFlowEdge>) {
 }
 
 function statusLabel(status: CanvasDocumentPreview["status"]): string {
-  return { idea: "Идея", draft: "Черновик", editing: "Редактура", ready: "Готово" }[status];
+  return { idea: t("Идея"), draft: t("Черновик"), editing: t("Редактура"), ready: t("Готово") }[
+    status
+  ];
 }
 
 function isFormTarget(target: EventTarget | null): boolean {
@@ -1239,7 +1252,10 @@ function CanvasBoardInner({
       setFocusNow(now);
       if (now < focusEndsAt) return;
       setFocusEndsAt(undefined);
-      showToast({ title: "Фокус-сессия завершена", description: "Пора зафиксировать результат" });
+      showToast({
+        title: t("Фокус-сессия завершена"),
+        description: t("Пора зафиксировать результат"),
+      });
     };
     tick();
     const interval = window.setInterval(tick, 1_000);
@@ -1344,27 +1360,27 @@ function CanvasBoardInner({
 
   const chooseCanvasView = useCallback(() => {
     void requestSelect({
-      title: "Представление доски",
-      label: "Одна модель, разные способы просмотра",
+      title: t("Представление доски"),
+      label: t("Одна модель, разные способы просмотра"),
       options: [
-        { value: "free", label: "Свободный Canvas · редактирование" },
+        { value: "free", label: t("Свободный Canvas · редактирование") },
         { value: "mind-map", label: "Mind map" },
-        { value: "timeline", label: "Timeline по полю date" },
-        { value: "swimlanes", label: "Swimlanes по типам карточек" },
+        { value: "timeline", label: t("Timeline по полю date") },
+        { value: "swimlanes", label: t("Swimlanes по типам карточек") },
         { value: "dependency", label: "Dependency graph" },
-        { value: "filtered", label: "Фильтр по типу" },
+        { value: "filtered", label: t("Фильтр по типу") },
       ],
-      confirmLabel: "Показать",
+      confirmLabel: t("Показать"),
     }).then(async (selectedView) => {
       if (!selectedView) return;
       const view = selectedView as CanvasViewMode;
       let filterTypeId = viewFilterTypeId;
       if (view === "filtered") {
         filterTypeId = await requestSelect({
-          title: "Фильтр карточек",
-          label: "Показать только тип",
+          title: t("Фильтр карточек"),
+          label: t("Показать только тип"),
           options: typeSchema.cardTypes.map((type) => ({ value: type.id, label: type.name })),
-          confirmLabel: "Применить",
+          confirmLabel: t("Применить"),
         });
         if (!filterTypeId) return;
       }
@@ -1445,10 +1461,10 @@ function CanvasBoardInner({
   const editEdgeLabel = useCallback(
     (edgeId: string, current: string) => {
       void requestInput({
-        title: "Подпись связи",
-        label: "Подпись",
+        title: t("Подпись связи"),
+        label: t("Подпись"),
         defaultValue: current,
-        confirmLabel: "Сохранить",
+        confirmLabel: t("Сохранить"),
       }).then((label) => {
         if (label === undefined) return;
         commit({
@@ -1463,7 +1479,7 @@ function CanvasBoardInner({
   );
 
   const addText = useCallback(
-    (position?: { x: number; y: number }, text = "# Новая заметка\n\nЗапишите идею…") => {
+    (position?: { x: number; y: number }, text = t("# Новая заметка\n\nЗапишите идею…")) => {
       if (!canEdit) return;
       const center =
         position ??
@@ -1556,14 +1572,14 @@ function CanvasBoardInner({
     if (!canEdit) return;
     const available = projectDocuments.filter((item) => !item.trashedAt);
     if (available.length === 0) {
-      showToast({ title: "В проекте пока нет документов" });
+      showToast({ title: t("В проекте пока нет документов") });
       return;
     }
     void requestSelect({
-      title: "Добавить документ",
-      label: "Документ проекта",
+      title: t("Добавить документ"),
+      label: t("Документ проекта"),
       options: available.map((item) => ({ value: item.id, label: item.title })),
-      confirmLabel: "Добавить",
+      confirmLabel: t("Добавить"),
     }).then((nodeId) => {
       const document = available.find((item) => item.id === nodeId);
       if (!document) return;
@@ -1656,7 +1672,7 @@ function CanvasBoardInner({
         setSelectedNodeIds([node.id]);
       } catch (error) {
         showToast({
-          title: "Не удалось добавить файл",
+          title: t("Не удалось добавить файл"),
           description: error instanceof Error ? error.message : undefined,
         });
       }
@@ -1747,17 +1763,17 @@ function CanvasBoardInner({
   const alignSelection = useCallback(() => {
     if (!canEdit || selectedNodeIds.length < 2) return;
     void requestSelect({
-      title: "Выровнять элементы",
-      label: "Ориентир",
+      title: t("Выровнять элементы"),
+      label: t("Ориентир"),
       options: [
-        { value: "left", label: "По левому краю" },
-        { value: "center-x", label: "По центру по горизонтали" },
-        { value: "right", label: "По правому краю" },
-        { value: "top", label: "По верхнему краю" },
-        { value: "center-y", label: "По центру по вертикали" },
-        { value: "bottom", label: "По нижнему краю" },
+        { value: "left", label: t("По левому краю") },
+        { value: "center-x", label: t("По центру по горизонтали") },
+        { value: "right", label: t("По правому краю") },
+        { value: "top", label: t("По верхнему краю") },
+        { value: "center-y", label: t("По центру по вертикали") },
+        { value: "bottom", label: t("По нижнему краю") },
       ],
-      confirmLabel: "Выровнять",
+      confirmLabel: t("Выровнять"),
     }).then((alignment) => {
       if (!alignment) return;
       commit(
@@ -1774,13 +1790,13 @@ function CanvasBoardInner({
   const distributeSelection = useCallback(() => {
     if (!canEdit || selectedNodeIds.length < 3) return;
     void requestSelect({
-      title: "Распределить элементы",
-      label: "Направление",
+      title: t("Распределить элементы"),
+      label: t("Направление"),
       options: [
-        { value: "horizontal", label: "Равные интервалы по горизонтали" },
-        { value: "vertical", label: "Равные интервалы по вертикали" },
+        { value: "horizontal", label: t("Равные интервалы по горизонтали") },
+        { value: "vertical", label: t("Равные интервалы по вертикали") },
       ],
-      confirmLabel: "Распределить",
+      confirmLabel: t("Распределить"),
     }).then((axis) => {
       if (axis !== "horizontal" && axis !== "vertical") return;
       commit(
@@ -1798,15 +1814,15 @@ function CanvasBoardInner({
   const previewAutomaticLayout = useCallback(() => {
     if (!canEdit) return;
     void requestSelect({
-      title: "Автоматическая раскладка",
-      label: "Алгоритм",
+      title: t("Автоматическая раскладка"),
+      label: t("Алгоритм"),
       options: [
-        { value: "hierarchy-horizontal", label: "Иерархия слева направо" },
-        { value: "hierarchy-vertical", label: "Иерархия сверху вниз" },
+        { value: "hierarchy-horizontal", label: t("Иерархия слева направо") },
+        { value: "hierarchy-vertical", label: t("Иерархия сверху вниз") },
         { value: "mind-map", label: "Mind map / radial" },
-        { value: "organic", label: "Органическая сеть" },
+        { value: "organic", label: t("Органическая сеть") },
       ],
-      confirmLabel: "Показать preview",
+      confirmLabel: t("Показать preview"),
     }).then((mode) => {
       if (!mode) return;
       setLayoutPending(true);
@@ -1818,7 +1834,7 @@ function CanvasBoardInner({
         .then(setLayoutPreview)
         .catch((error: unknown) =>
           showToast({
-            title: "Не удалось рассчитать раскладку",
+            title: t("Не удалось рассчитать раскладку"),
             description: error instanceof Error ? error.message : undefined,
           }),
         )
@@ -1829,13 +1845,13 @@ function CanvasBoardInner({
   const addTemplate = useCallback(() => {
     if (!canEdit) return;
     void requestSelect({
-      title: "Шаблон доски",
-      label: "Сценарий работы",
+      title: t("Шаблон доски"),
+      label: t("Сценарий работы"),
       options: canvasTemplates.map((template) => ({
         value: template.id,
         label: `${template.title} — ${template.description}`,
       })),
-      confirmLabel: "Добавить",
+      confirmLabel: t("Добавить"),
     }).then((templateId) => {
       if (!templateId) return;
       const center = reactFlow.screenToFlowPosition({
@@ -1848,7 +1864,7 @@ function CanvasBoardInner({
         { x: Math.round(center.x - 600), y: Math.round(center.y - 280) },
       );
       if (template.nodes.length === 0) {
-        showToast({ title: "Чистый шаблон не добавляет элементов" });
+        showToast({ title: t("Чистый шаблон не добавляет элементов") });
         return;
       }
       commit(
@@ -1871,7 +1887,10 @@ function CanvasBoardInner({
     const result = analyzeCanvasGraph(historyRef.current.present, "all");
     diagnosticsPanel.open(result.diagnostics);
     if (result.diagnostics.length === 0) {
-      showToast({ title: "Граф выглядит согласованно", description: "Предупреждений не найдено" });
+      showToast({
+        title: t("Граф выглядит согласованно"),
+        description: t("Предупреждений не найдено"),
+      });
     }
   }, [diagnosticsPanel, showToast]);
 
@@ -1891,35 +1910,35 @@ function CanvasBoardInner({
 
   const startPlaythrough = useCallback(() => {
     void requestSelect({
-      title: "Ручной play-through",
-      label: "Тип графа",
+      title: t("Ручной play-through"),
+      label: t("Тип графа"),
       options: [
-        { value: "dialogue", label: "Диалог" },
-        { value: "quest", label: "Квесты" },
+        { value: "dialogue", label: t("Диалог") },
+        { value: "quest", label: t("Квесты") },
         { value: "state", label: "State machine" },
       ],
-      confirmLabel: "Начать",
+      confirmLabel: t("Начать"),
     }).then(async (value) => {
       if (!value) return;
       const profile = value as CanvasPlaythroughProfile;
       const starts = canvasPlaythroughStarts(historyRef.current.present, profile);
       if (starts.length === 0) {
-        showToast({ title: "Для этого сценария нет типизированных карточек" });
+        showToast({ title: t("Для этого сценария нет типизированных карточек") });
         return;
       }
       const startId =
         starts.length === 1
           ? starts[0]?.id
           : await requestSelect({
-              title: "Точка входа",
-              label: "С чего начать прохождение",
+              title: t("Точка входа"),
+              label: t("С чего начать прохождение"),
               options: starts.map((node) => ({
                 value: node.id,
                 label:
                   listCanvasObjects({ nodes: [node], edges: [] }, documents, localMedia)[0]
                     ?.title ?? node.id,
               })),
-              confirmLabel: "Старт",
+              confirmLabel: t("Старт"),
             });
       if (!startId) return;
       setPlaythrough(startCanvasPlaythrough(profile, startId));
@@ -1953,7 +1972,7 @@ function CanvasBoardInner({
   const showPresentationFrame = useCallback(
     (index: number) => {
       if (presentationFrames.length === 0) {
-        showToast({ title: "На доске пока нет фреймов" });
+        showToast({ title: t("На доске пока нет фреймов") });
         return;
       }
       const nextIndex = Math.max(0, Math.min(presentationFrames.length - 1, Math.trunc(index)));
@@ -1973,13 +1992,13 @@ function CanvasBoardInner({
 
   const startFocusTimer = useCallback(() => {
     void requestSelect({
-      title: "Фокус-сессия",
-      label: "Продолжительность",
+      title: t("Фокус-сессия"),
+      label: t("Продолжительность"),
       options: [5, 10, 15, 25, 45].map((minutes) => ({
         value: String(minutes),
-        label: `${minutes} минут`,
+        label: t("{0} минут", minutes),
       })),
-      confirmLabel: "Начать",
+      confirmLabel: t("Начать"),
     }).then((value) => {
       if (!value) return;
       const now = Date.now();
@@ -2022,13 +2041,13 @@ function CanvasBoardInner({
   const assignCardType = useCallback(() => {
     if (!canEdit || selectedNodeIds.length === 0) return;
     void requestSelect({
-      title: "Тип карточки",
-      label: "Проектный тип",
+      title: t("Тип карточки"),
+      label: t("Проектный тип"),
       options: typeSchema.cardTypes.map((type) => ({
         value: type.id,
         label: `${type.name} · ${type.category}`,
       })),
-      confirmLabel: "Назначить",
+      confirmLabel: t("Назначить"),
     }).then((typeId) => {
       if (!typeId) return;
       const selected = new Set(selectedNodeIds);
@@ -2058,10 +2077,10 @@ function CanvasBoardInner({
   const assignRelationType = useCallback(() => {
     if (!canEdit || selectedEdgeIds.length === 0) return;
     void requestSelect({
-      title: "Тип связи",
-      label: "Семантика",
+      title: t("Тип связи"),
+      label: t("Семантика"),
       options: typeSchema.relationTypes.map((type) => ({ value: type.id, label: type.name })),
-      confirmLabel: "Назначить",
+      confirmLabel: t("Назначить"),
     }).then((typeId) => {
       const type = typeSchema.relationTypes.find((item) => item.id === typeId);
       if (!type) return;
@@ -2099,13 +2118,13 @@ function CanvasBoardInner({
         ? node.text
         : node.type === "link"
           ? (node["x-writers-studio"]?.preview?.title ?? node.url)
-          : (node.label ?? "Новый документ");
+          : (node.label ?? t("Новый документ"));
     const suggestedTitle =
       source
         .split("\n", 1)[0]
         ?.replace(/^#{1,6}\s*/u, "")
         .trim()
-        .slice(0, 120) || "Новый документ";
+        .slice(0, 120) || t("Новый документ");
     const result = await onPromoteNode(node.id, suggestedTitle);
     if (!result) return;
     const nextHistory = createCanvasHistory(result.revision.content);
@@ -2160,15 +2179,15 @@ function CanvasBoardInner({
   const rotateSelection = useCallback(() => {
     if (!canEdit || selectedNodeIds.length === 0) return;
     void requestInput({
-      title: "Повернуть фигуры",
-      label: "Угол в градусах",
+      title: t("Повернуть фигуры"),
+      label: t("Угол в градусах"),
       defaultValue: "15",
-      confirmLabel: "Повернуть",
+      confirmLabel: t("Повернуть"),
     }).then((raw) => {
       if (raw === undefined) return;
       const degrees = Number(raw.replace(",", "."));
       if (!Number.isFinite(degrees)) {
-        showToast({ title: "Введите корректный угол" });
+        showToast({ title: t("Введите корректный угол") });
         return;
       }
       commit(rotateCanvasSelection(historyRef.current.present, selectedNodeIds, degrees));
@@ -2391,7 +2410,7 @@ function CanvasBoardInner({
         const payload = JSON.parse(rawDocument) as { nodeId?: string };
         if (payload.nodeId) addDocumentAt(payload.nodeId, position);
       } catch {
-        showToast({ title: "Не удалось прочитать перетаскиваемый документ" });
+        showToast({ title: t("Не удалось прочитать перетаскиваемый документ") });
       }
       return;
     }
@@ -2449,33 +2468,33 @@ function CanvasBoardInner({
         selectedNodeIds.includes(node.id) && node["x-writers-studio"]?.element?.kind === "frame",
     );
     const scopeOptions = [
-      { value: "all", label: "Вся доска" },
+      { value: "all", label: t("Вся доска") },
       ...(selectedNodeIds.length > 0
-        ? [{ value: "selection", label: `Выделение (${selectedNodeIds.length})` }]
+        ? [{ value: "selection", label: t("Выделение ({0})", selectedNodeIds.length) }]
         : []),
       ...selectedFrames.map((frame) => ({
         value: `frame:${frame.id}`,
-        label: `Фрейм: ${frame.label || "Без названия"}`,
+        label: t("Фрейм: {0}", frame.label || t("Без названия")),
       })),
     ];
 
     void requestSelect({
-      title: "Экспорт доски",
-      label: "Область",
+      title: t("Экспорт доски"),
+      label: t("Область"),
       options: scopeOptions,
-      confirmLabel: "Далее",
+      confirmLabel: t("Далее"),
     }).then(async (scopeValue) => {
       if (!scopeValue) return;
       const format = await requestSelect({
-        title: "Экспорт доски",
-        label: "Формат",
+        title: t("Экспорт доски"),
+        label: t("Формат"),
         options: [
-          { value: "png", label: "PNG — изображение" },
-          { value: "svg", label: "SVG — вектор" },
-          { value: "pdf", label: "PDF — документ" },
-          { value: "canvas", label: ".canvas — редактируемый JSON Canvas" },
+          { value: "png", label: t("PNG — изображение") },
+          { value: "svg", label: t("SVG — вектор") },
+          { value: "pdf", label: t("PDF — документ") },
+          { value: "canvas", label: t(".canvas — редактируемый JSON Canvas") },
         ],
-        confirmLabel: "Экспортировать",
+        confirmLabel: t("Экспортировать"),
       });
       if (format !== "png" && format !== "svg" && format !== "pdf" && format !== "canvas") return;
       if (format === "canvas") {
@@ -2486,7 +2505,7 @@ function CanvasBoardInner({
         anchor.download = canvasExportFileName(title, format);
         anchor.click();
         URL.revokeObjectURL(url);
-        showToast({ title: "JSON Canvas экспортирован" });
+        showToast({ title: t("JSON Canvas экспортирован") });
         return;
       }
 
@@ -2496,7 +2515,7 @@ function CanvasBoardInner({
       const bounds = canvasExportBounds(current, nodeIds);
       const viewport = board.current?.querySelector<HTMLElement>(".react-flow__viewport");
       if (!bounds || !viewport || !board.current) {
-        showToast({ title: "В выбранной области нет элементов" });
+        showToast({ title: t("В выбранной области нет элементов") });
         return;
       }
 
@@ -2511,10 +2530,10 @@ function CanvasBoardInner({
           fileName: canvasExportFileName(title, format),
           format,
         });
-        showToast({ title: `Доска экспортирована в ${format.toUpperCase()}` });
+        showToast({ title: t("Доска экспортирована в {0}", format.toUpperCase()) });
       } catch (error) {
         showToast({
-          title: "Не удалось экспортировать доску",
+          title: t("Не удалось экспортировать доску"),
           description: error instanceof Error ? error.message : undefined,
         });
       } finally {
@@ -2529,7 +2548,7 @@ function CanvasBoardInner({
         ref={board}
         data-testid="canvas-board"
         role="application"
-        aria-label="Canvas-доска"
+        aria-label={t("Canvas-доска")}
         className="relative size-full min-h-0 bg-[var(--surface-app)] outline-none"
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
@@ -2813,14 +2832,16 @@ function CanvasBoardInner({
               position="top-right"
               className="!m-3 flex items-center gap-2 rounded-[12px] border border-[var(--info)] bg-[var(--surface-raised)] p-2 shadow-lg"
             >
-              <span className="px-2 text-xs text-[var(--ink-secondary)]">Preview раскладки</span>
+              <span className="px-2 text-xs text-[var(--ink-secondary)]">
+                {t("Preview раскладки")}
+              </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="compact"
                 onClick={() => setLayoutPreview(undefined)}
               >
-                Отмена
+                {t("Отмена")}
               </Button>
               <Button
                 type="button"
@@ -2830,7 +2851,7 @@ function CanvasBoardInner({
                   setLayoutPreview(undefined);
                 }}
               >
-                Применить
+                {t("Применить")}
               </Button>
             </Panel>
           ) : null}
@@ -2839,11 +2860,13 @@ function CanvasBoardInner({
               position="top-center"
               className="!mt-16 w-[min(420px,calc(100vw-32px))] rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 shadow-lg"
             >
-              <div role="dialog" aria-label="Ручной play-through">
+              <div role="dialog" aria-label={t("Ручной play-through")}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-tertiary)]">
-                      {playthrough.profile} · шаг {playthrough.path.length}
+                      {playthrough.profile}
+                      {t(" · шаг ")}
+                      {playthrough.path.length}
                     </span>
                     <strong className="mt-1 block truncate text-sm">
                       {currentPlaythroughObject?.title ?? playthrough.path.at(-1)}
@@ -2854,7 +2877,7 @@ function CanvasBoardInner({
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    aria-label="Закрыть play-through"
+                    aria-label={t("Закрыть play-through")}
                     onClick={() => setPlaythrough(undefined)}
                   >
                     <X className="size-4" aria-hidden="true" />
@@ -2875,7 +2898,8 @@ function CanvasBoardInner({
                           {choice.label}
                           {choice.condition ? (
                             <small className="ml-2 text-[var(--ink-tertiary)]">
-                              если {String(choice.condition)}
+                              {t("если ")}
+                              {String(choice.condition)}
                             </small>
                           ) : null}
                         </span>
@@ -2884,7 +2908,7 @@ function CanvasBoardInner({
                   </div>
                 ) : (
                   <p className="mt-3 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-xs text-[var(--success)]">
-                    Конечная точка сценария
+                    {t("Конечная точка сценария")}
                   </p>
                 )}
               </div>
@@ -2898,25 +2922,25 @@ function CanvasBoardInner({
               <div
                 ref={diagnosticsPanel.panelRef}
                 role="dialog"
-                aria-label="Диагностика графа"
+                aria-label={t("Диагностика графа")}
                 className="p-3"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <strong className="text-sm">Диагностика графа</strong>
+                  <strong className="text-sm">{t("Диагностика графа")}</strong>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    aria-label="Закрыть диагностику"
-                    title="Закрыть"
+                    aria-label={t("Закрыть диагностику")}
+                    title={t("Закрыть")}
                     onClick={diagnosticsPanel.close}
                   >
                     <X className="size-4" aria-hidden="true" />
                   </Button>
                 </div>
                 {diagnostics.length === 0 ? (
-                  <p className="text-xs text-[var(--ink-secondary)]">Предупреждений нет.</p>
+                  <p className="text-xs text-[var(--ink-secondary)]">{t("Предупреждений нет.")}</p>
                 ) : (
                   <ul className="space-y-1">
                     {diagnostics.map((diagnostic) => (
@@ -2942,7 +2966,8 @@ function CanvasBoardInner({
                         >
                           <span className="font-semibold">{diagnostic.message}</span>
                           <span className="mt-1 block text-[var(--ink-tertiary)]">
-                            {diagnostic.nodeIds.length} элементов
+                            {diagnostic.nodeIds.length}
+                            {t(" элементов")}
                           </span>
                         </button>
                       </li>
@@ -2960,17 +2985,17 @@ function CanvasBoardInner({
               <div
                 ref={navigatorPanel.panelRef}
                 role="dialog"
-                aria-label="Объекты доски"
+                aria-label={t("Объекты доски")}
                 className="p-3"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <strong className="text-sm">Объекты доски</strong>
+                  <strong className="text-sm">{t("Объекты доски")}</strong>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    aria-label="Закрыть список объектов"
+                    aria-label={t("Закрыть список объектов")}
                     onClick={navigatorPanel.close}
                   >
                     <X className="size-4" aria-hidden="true" />
@@ -2991,12 +3016,14 @@ function CanvasBoardInner({
                       navigatorItems.current[0]?.focus();
                     }}
                     className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-app)] pl-9 pr-3 text-sm outline-none focus:border-[var(--accent)]"
-                    placeholder="Название, текст или тип…"
-                    aria-label="Поиск по доске"
+                    placeholder={t("Название, текст или тип…")}
+                    aria-label={t("Поиск по доске")}
                   />
                 </label>
                 <p className="my-2 text-[11px] text-[var(--ink-tertiary)]">
-                  {filteredCanvasObjects.length} из {canvasObjects.length}
+                  {filteredCanvasObjects.length}
+                  {t(" из ")}
+                  {canvasObjects.length}
                 </p>
                 <ul className="max-h-[min(58vh,440px)] space-y-1 overflow-auto">
                   {filteredCanvasObjects.map((object, index) => (
@@ -3041,7 +3068,7 @@ function CanvasBoardInner({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Предыдущий фрейм"
+                aria-label={t("Предыдущий фрейм")}
                 disabled={presentationIndex === 0}
                 onClick={() => showPresentationFrame(presentationIndex - 1)}
               >
@@ -3054,7 +3081,7 @@ function CanvasBoardInner({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Следующий фрейм"
+                aria-label={t("Следующий фрейм")}
                 disabled={presentationIndex === presentationFrames.length - 1}
                 onClick={() => showPresentationFrame(presentationIndex + 1)}
               >
@@ -3064,7 +3091,7 @@ function CanvasBoardInner({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Завершить презентацию"
+                aria-label={t("Завершить презентацию")}
                 onClick={exitPresentation}
               >
                 <X className="size-4" aria-hidden="true" />
@@ -3086,7 +3113,7 @@ function CanvasBoardInner({
                 size="compact"
                 onClick={() => setFocusEndsAt(undefined)}
               >
-                Завершить
+                {t("Завершить")}
               </Button>
             </Panel>
           ) : null}
@@ -3096,7 +3123,7 @@ function CanvasBoardInner({
           >
             <div
               ref={toolRail.railRef}
-              aria-label="Инструменты Canvas"
+              aria-label={t("Инструменты Canvas")}
               aria-orientation="vertical"
               className="relative flex max-h-[calc(100vh-104px)] w-11 flex-col items-center gap-1 overflow-visible rounded-[12px] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-1.5 shadow-lg"
               role="toolbar"
@@ -3105,29 +3132,29 @@ function CanvasBoardInner({
                 <>
                   <ToolButton
                     icon={MousePointer2}
-                    label="Выбор (V)"
+                    label={t("Выбор (V)")}
                     active={tool === "select"}
                     onClick={() => setTool("select")}
                   />
                   <ToolButton
                     icon={Hand}
-                    label="Рука (H)"
+                    label={t("Рука (H)")}
                     active={tool === "hand"}
                     onClick={() => setTool("hand")}
                   />
                   <span className="my-1 h-px w-6 shrink-0 bg-[var(--border-subtle)]" />
                   <ToolRailGroupButton
                     icon={StickyNote}
-                    label="Добавить"
+                    label={t("Добавить")}
                     expanded={toolRail.openMenu === "create"}
                     active={tool === "connector" || tool === "note"}
                     onClick={() => toolRail.toggleMenu("create")}
                   />
                   {toolRail.openMenu === "create" ? (
-                    <ToolFlyout label="Добавить на доску">
+                    <ToolFlyout label={t("Добавить на доску")}>
                       <ToolButton
                         icon={Link2}
-                        label="Связь (C)"
+                        label={t("Связь (C)")}
                         active={tool === "connector"}
                         onClick={() => {
                           setTool("connector");
@@ -3136,7 +3163,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={StickyNote}
-                        label="Заметка (N)"
+                        label={t("Заметка (N)")}
                         active={tool === "note"}
                         onClick={() => {
                           setTool("note");
@@ -3145,7 +3172,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={LayoutTemplate}
-                        label="Шаблон"
+                        label={t("Шаблон")}
                         onClick={() => {
                           toolRail.closeMenu();
                           addTemplate();
@@ -3153,7 +3180,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={FilePlus2}
-                        label="Документ"
+                        label={t("Документ")}
                         onClick={() => {
                           toolRail.closeMenu();
                           addDocument();
@@ -3161,7 +3188,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={ImagePlus}
-                        label="Изображение, PDF, аудио или видео"
+                        label={t("Изображение, PDF, аудио или видео")}
                         onClick={() => {
                           toolRail.closeMenu();
                           fileInput.current?.click();
@@ -3171,58 +3198,58 @@ function CanvasBoardInner({
                   ) : null}
                   <ToolRailGroupButton
                     icon={PenLine}
-                    label="Рисование"
+                    label={t("Рисование")}
                     expanded={toolRail.openMenu === "draw"}
                     active={isDrawingTool(tool)}
                     onClick={() => toolRail.toggleMenu("draw")}
                   />
                   {toolRail.openMenu === "draw" ? (
-                    <ToolFlyout label="Рисование и фигуры">
+                    <ToolFlyout label={t("Рисование и фигуры")}>
                       <ToolButton
                         icon={PenLine}
-                        label="Перо (P)"
+                        label={t("Перо (P)")}
                         active={tool === "pen"}
                         onClick={() => setTool("pen")}
                       />
                       <ToolButton
                         icon={Highlighter}
-                        label="Маркер (M)"
+                        label={t("Маркер (M)")}
                         active={tool === "highlighter"}
                         onClick={() => setTool("highlighter")}
                       />
                       <ToolButton
                         icon={Eraser}
-                        label="Ластик (E)"
+                        label={t("Ластик (E)")}
                         active={tool === "eraser"}
                         onClick={() => setTool("eraser")}
                       />
                       <ToolButton
                         icon={Square}
-                        label="Прямоугольник (R)"
+                        label={t("Прямоугольник (R)")}
                         active={tool === "rectangle"}
                         onClick={() => setTool("rectangle")}
                       />
                       <ToolButton
                         icon={Circle}
-                        label="Эллипс (O)"
+                        label={t("Эллипс (O)")}
                         active={tool === "ellipse"}
                         onClick={() => setTool("ellipse")}
                       />
                       <ToolButton
                         icon={Diamond}
-                        label="Ромб (D)"
+                        label={t("Ромб (D)")}
                         active={tool === "diamond"}
                         onClick={() => setTool("diamond")}
                       />
                       <ToolButton
                         icon={Minus}
-                        label="Линия (L)"
+                        label={t("Линия (L)")}
                         active={tool === "line"}
                         onClick={() => setTool("line")}
                       />
                       <ToolButton
                         icon={ArrowRight}
-                        label="Стрелка (A)"
+                        label={t("Стрелка (A)")}
                         active={tool === "arrow"}
                         onClick={() => setTool("arrow")}
                       />
@@ -3231,45 +3258,45 @@ function CanvasBoardInner({
                   <span className="my-1 h-px w-6 shrink-0 bg-[var(--border-subtle)]" />
                   <ToolButton
                     icon={Undo2}
-                    label="Отменить"
+                    label={t("Отменить")}
                     onClick={handleUndo}
                     disabled={history.past.length === 0}
                   />
                   <ToolButton
                     icon={Redo2}
-                    label="Повторить"
+                    label={t("Повторить")}
                     onClick={handleRedo}
                     disabled={history.future.length === 0}
                   />
                   <ToolRailGroupButton
                     icon={LayoutGrid}
-                    label="Компоновка"
+                    label={t("Компоновка")}
                     expanded={toolRail.openMenu === "arrange"}
                     onClick={() => toolRail.toggleMenu("arrange")}
                   />
                   {toolRail.openMenu === "arrange" ? (
-                    <ToolFlyout label="Компоновка и порядок">
+                    <ToolFlyout label={t("Компоновка и порядок")}>
                       <ToolButton
                         icon={Group}
-                        label="Группа"
+                        label={t("Группа")}
                         onClick={groupSelection}
                         disabled={selectedNodeIds.length === 0}
                       />
                       <ToolButton
                         icon={PanelsTopLeft}
-                        label="Фрейм"
+                        label={t("Фрейм")}
                         onClick={frameSelection}
                         disabled={selectedNodeIds.length === 0}
                       />
                       <ToolButton
                         icon={AlignCenter}
-                        label="Выровнять"
+                        label={t("Выровнять")}
                         onClick={alignSelection}
                         disabled={selectedNodeIds.length < 2}
                       />
                       <ToolButton
                         icon={RotateCw}
-                        label="Повернуть"
+                        label={t("Повернуть")}
                         onClick={rotateSelection}
                         disabled={
                           !history.present.nodes.some(
@@ -3281,19 +3308,19 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={Columns3}
-                        label="Интервалы"
+                        label={t("Интервалы")}
                         onClick={distributeSelection}
                         disabled={selectedNodeIds.length < 3}
                       />
                       <ToolButton
                         icon={LayoutGrid}
-                        label="Упорядочить"
+                        label={t("Упорядочить")}
                         onClick={tidySelection}
                         disabled={selectedNodeIds.length < 2}
                       />
                       <ToolButton
                         icon={Workflow}
-                        label={layoutPending ? "Раскладка…" : "Авто-раскладка"}
+                        label={layoutPending ? t("Раскладка…") : t("Авто-раскладка")}
                         onClick={previewAutomaticLayout}
                         disabled={layoutPending || history.present.nodes.length < 2}
                       />
@@ -3301,7 +3328,7 @@ function CanvasBoardInner({
                   ) : null}
                   <ToolRailGroupButton
                     icon={Layers3}
-                    label="Режимы и анализ"
+                    label={t("Режимы и анализ")}
                     expanded={toolRail.openMenu === "explore"}
                     active={
                       activeView !== "free" ||
@@ -3314,17 +3341,17 @@ function CanvasBoardInner({
                     onClick={() => toolRail.toggleMenu("explore")}
                   />
                   {toolRail.openMenu === "explore" ? (
-                    <ToolFlyout label="Режимы, поиск и анализ">
+                    <ToolFlyout label={t("Режимы, поиск и анализ")}>
                       <ToolButton
                         icon={Layers3}
-                        label={`Вид: ${activeView}`}
+                        label={t("Вид: {0}", activeView)}
                         active={activeView !== "free"}
                         onClick={chooseCanvasView}
                       />
                       <span ref={diagnosticsPanel.triggerRef} className="contents">
                         <ToolButton
                           icon={Activity}
-                          label="Диагностика"
+                          label={t("Диагностика")}
                           active={diagnosticsPanel.isOpen}
                           onClick={runGraphAnalysis}
                         />
@@ -3332,7 +3359,7 @@ function CanvasBoardInner({
                       <span ref={navigatorPanel.triggerRef} className="contents">
                         <ToolButton
                           icon={ListTree}
-                          label="Объекты и поиск"
+                          label={t("Объекты и поиск")}
                           active={navigatorPanel.isOpen}
                           onClick={() => {
                             if (navigatorPanel.isOpen) {
@@ -3346,7 +3373,7 @@ function CanvasBoardInner({
                       </span>
                       <ToolButton
                         icon={Play}
-                        label="Презентация"
+                        label={t("Презентация")}
                         active={presentationIndex !== undefined}
                         disabled={presentationFrames.length === 0}
                         onClick={() =>
@@ -3365,7 +3392,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={TimerReset}
-                        label="Фокус-таймер"
+                        label={t("Фокус-таймер")}
                         active={focusEndsAt !== undefined}
                         onClick={() =>
                           focusEndsAt === undefined ? startFocusTimer() : setFocusEndsAt(undefined)
@@ -3375,22 +3402,22 @@ function CanvasBoardInner({
                   ) : null}
                   <ToolRailGroupButton
                     icon={Tags}
-                    label="Действия с выделением"
+                    label={t("Действия с выделением")}
                     expanded={toolRail.openMenu === "selection"}
                     active={selectedNodeIds.length > 0 || selectedEdgeIds.length > 0}
                     onClick={() => toolRail.toggleMenu("selection")}
                   />
                   {toolRail.openMenu === "selection" ? (
-                    <ToolFlyout label="Действия с выделением">
+                    <ToolFlyout label={t("Действия с выделением")}>
                       <ToolButton
                         icon={Tags}
-                        label="Тип карточки"
+                        label={t("Тип карточки")}
                         onClick={assignCardType}
                         disabled={selectedNodeIds.length === 0}
                       />
                       <ToolButton
                         icon={FileOutput}
-                        label={promotionEnabled ? "В документ" : "Сначала сохраните доску"}
+                        label={promotionEnabled ? t("В документ") : t("Сначала сохраните доску")}
                         onClick={() => void promoteSelection()}
                         disabled={
                           !promotionEnabled ||
@@ -3405,25 +3432,25 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={GitBranch}
-                        label="Тип связи"
+                        label={t("Тип связи")}
                         onClick={assignRelationType}
                         disabled={selectedEdgeIds.length === 0}
                       />
                       <ToolButton
                         icon={Copy}
-                        label="Дублировать"
+                        label={t("Дублировать")}
                         onClick={duplicateSelection}
                         disabled={selectedNodeIds.length === 0}
                       />
                       <ToolButton
                         icon={Trash2}
-                        label="Удалить"
+                        label={t("Удалить")}
                         onClick={removeSelection}
                         disabled={selectedNodeIds.length === 0 && selectedEdgeIds.length === 0}
                       />
                       <ToolButton
                         icon={ArrowUpToLine}
-                        label="На передний план"
+                        label={t("На передний план")}
                         onClick={() => {
                           changeZOrder(true);
                           toolRail.closeMenu();
@@ -3432,7 +3459,7 @@ function CanvasBoardInner({
                       />
                       <ToolButton
                         icon={ArrowDownToLine}
-                        label="На задний план"
+                        label={t("На задний план")}
                         onClick={() => {
                           changeZOrder(false);
                           toolRail.closeMenu();
@@ -3441,7 +3468,7 @@ function CanvasBoardInner({
                       />
                       {(selectedNodeIds.length > 0 || selectedEdgeIds.length > 0) && (
                         <fieldset className="mt-1 grid grid-cols-7 gap-1 border-t border-[var(--border-subtle)] pt-2">
-                          <legend className="sr-only">Цвет выделения</legend>
+                          <legend className="sr-only">{t("Цвет выделения")}</legend>
                           {palette.map((item) => (
                             <button
                               key={item.label}
@@ -3460,16 +3487,18 @@ function CanvasBoardInner({
                 </>
               ) : editable && tablet ? (
                 <>
-                  <span className="sr-only">Проекционный вид · координаты Canvas не меняются</span>
+                  <span className="sr-only">
+                    {t("Проекционный вид · координаты Canvas не меняются")}
+                  </span>
                   <ToolButton
                     icon={Layers3}
-                    label={`Вид: ${activeView}`}
+                    label={t("Вид: {0}", activeView)}
                     active
                     onClick={chooseCanvasView}
                   />
                   <ToolButton
                     icon={Activity}
-                    label="Диагностика"
+                    label={t("Диагностика")}
                     active={diagnosticsPanel.isOpen}
                     onClick={runGraphAnalysis}
                   />
@@ -3483,17 +3512,17 @@ function CanvasBoardInner({
                   />
                 </>
               ) : (
-                <span className="sr-only">На телефоне доступен просмотр доски</span>
+                <span className="sr-only">{t("На телефоне доступен просмотр доски")}</span>
               )}
               <span className="my-1 h-px w-6 shrink-0 bg-[var(--border-subtle)]" />
               <ToolButton
                 icon={Maximize2}
-                label="Показать всё"
+                label={t("Показать всё")}
                 onClick={() => void reactFlow.fitView({ padding: 0.2, duration: 250 })}
               />
               <ToolButton
                 icon={Focus}
-                label="К выделению"
+                label={t("К выделению")}
                 disabled={selectedNodeIds.length === 0}
                 onClick={() =>
                   void reactFlow.fitView({
@@ -3505,7 +3534,7 @@ function CanvasBoardInner({
               />
               <ToolButton
                 icon={Download}
-                label={exportPending ? "Экспорт…" : "Экспорт"}
+                label={exportPending ? t("Экспорт…") : t("Экспорт")}
                 disabled={exportPending || history.present.nodes.length === 0}
                 onClick={exportCanvas}
               />
@@ -3516,7 +3545,7 @@ function CanvasBoardInner({
           <div
             ref={nodeMenu.panelRef}
             role="menu"
-            aria-label="Действия с карточкой"
+            aria-label={t("Действия с карточкой")}
             className="fixed z-[120] grid w-56 gap-1 rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)] p-1.5 shadow-[0_16px_36px_var(--shadow-color)]"
             style={{ left: nodeMenu.value.x, top: nodeMenu.value.y }}
           >
@@ -3532,7 +3561,7 @@ function CanvasBoardInner({
               }}
             >
               <Copy className="size-4" aria-hidden="true" />
-              Дублировать
+              {t("Дублировать")}
             </Button>
             <Button
               type="button"
@@ -3546,7 +3575,7 @@ function CanvasBoardInner({
               }}
             >
               <ArrowUpToLine className="size-4" aria-hidden="true" />
-              На передний план
+              {t("На передний план")}
             </Button>
             <Button
               type="button"
@@ -3560,7 +3589,7 @@ function CanvasBoardInner({
               }}
             >
               <ArrowDownToLine className="size-4" aria-hidden="true" />
-              На задний план
+              {t("На задний план")}
             </Button>
             <div className="my-0.5 h-px bg-[var(--border-subtle)]" aria-hidden="true" />
             <Button
@@ -3575,7 +3604,7 @@ function CanvasBoardInner({
               }}
             >
               <Trash2 className="size-4" aria-hidden="true" />
-              Удалить
+              {t("Удалить")}
             </Button>
           </div>
         ) : null}

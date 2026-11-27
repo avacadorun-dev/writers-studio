@@ -8,6 +8,7 @@ import {
   uploadAudioChunk,
 } from "~entities/dictation";
 import { webSocketURL } from "~shared/api";
+import { t } from "~shared/i18n";
 import {
   createClientId,
   type LocalAudioChunk,
@@ -147,7 +148,7 @@ class RecorderController {
 
   async start(input: StartRecorderInput): Promise<string> {
     if (this.isActive()) {
-      throw new Error("Запись уже идёт");
+      throw new Error(t("Запись уже идёт"));
     }
     const mimeType = supportedMimeType();
     const localId = createClientId();
@@ -274,12 +275,12 @@ class RecorderController {
     }
     const marker = {
       id: createClientId(),
-      text: "Метка",
+      text: t("Метка"),
       startMs: this.snapshot.recordedDurationMs,
       endMs: this.snapshot.recordedDurationMs,
       command: {
         kind: "marker" as const,
-        rawText: "Команда: метка",
+        rawText: t("Команда: метка"),
         executed: true,
       },
     };
@@ -319,7 +320,7 @@ class RecorderController {
       endMs: this.snapshot.recordedDurationMs,
       command: {
         kind,
-        rawText: `Кнопка: ${label}`,
+        rawText: t("Кнопка: {0}", label),
         executed: true,
       },
     };
@@ -381,7 +382,7 @@ class RecorderController {
     const count = Math.max(1, Math.ceil(seconds));
     const recent = chunks.slice(-count);
     if (recent.length === 0) {
-      throw new Error("Аудиофрагменты ещё не готовы");
+      throw new Error(t("Аудиофрагменты ещё не готовы"));
     }
     this.recentAudio?.pause();
     if (this.recentAudioURL) {
@@ -466,7 +467,7 @@ class RecorderController {
       this.setSnapshot({
         status: "local_only",
         connection: navigator.onLine ? "degraded" : "offline",
-        error: "Запись сохранена на этом устройстве и будет синхронизирована позже.",
+        error: t("Запись сохранена на этом устройстве и будет синхронизирована позже."),
       });
       return { localOnly: true };
     }
@@ -879,10 +880,10 @@ class RecorderController {
 
 function quickCommandLabel(kind: QuickDictationCommandKind): string {
   return {
-    new_paragraph: "Новый абзац",
-    dialogue_start: "Начало диалога",
-    scene_break: "Разделитель сцены",
-    undo_command: "Отменить команду",
+    new_paragraph: t("Новый абзац"),
+    dialogue_start: t("Начало диалога"),
+    scene_break: t("Разделитель сцены"),
+    undo_command: t("Отменить команду"),
   }[kind];
 }
 

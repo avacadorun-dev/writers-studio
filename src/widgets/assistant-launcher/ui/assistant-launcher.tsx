@@ -11,7 +11,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-
 import {
   type AssistantInputMode,
   type AssistantTargetKind,
@@ -21,6 +20,7 @@ import {
   listAssistantProviders,
 } from "~entities/assistant";
 import type { DocumentNode, Project } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn, loadWriterPreferences } from "~shared/lib";
 import { Banner, Button, ModalDialog, Select } from "~shared/ui";
 
@@ -136,14 +136,16 @@ export function AssistantLauncher({
     <ModalDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Как ассистенту работать?"
-      description="Поручение можно надиктовать или написать. Изменения появятся только после вашей проверки."
+      title={t("Как ассистенту работать?")}
+      description={t(
+        "Поручение можно надиктовать или написать. Изменения появятся только после вашей проверки.",
+      )}
       icon={Bot}
       className="sm:w-[min(760px,calc(100vw-40px))]"
       footer={
         <>
           <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
-            Отмена
+            {t("Отмена")}
           </Button>
           <Button
             type="button"
@@ -156,7 +158,7 @@ export function AssistantLauncher({
             }
             onClick={() => createRun.mutate()}
           >
-            {createRun.isPending ? "Открываем…" : "Начать сессию"}
+            {createRun.isPending ? t("Открываем…") : t("Начать сессию")}
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
         </>
@@ -167,16 +169,16 @@ export function AssistantLauncher({
       compatibleConnections.length === 0 ? (
         <Banner
           variant="warning"
-          title="Нет модели с рабочими инструментами"
+          title={t("Нет модели с рабочими инструментами")}
           body={
             capabilities.data.systemProviderStatusDetail ||
-            "Добавьте совместимый провайдер или повторите проверку системной модели."
+            t("Добавьте совместимый провайдер или повторите проверку системной модели.")
           }
           action={
             <Button asChild variant="secondary" size="compact">
               <Link to="/settings/assistant-providers">
                 <Settings2 className="size-4" aria-hidden="true" />
-                Открыть AI-настройки
+                {t("Открыть AI-настройки")}
               </Link>
             </Button>
           }
@@ -185,7 +187,7 @@ export function AssistantLauncher({
       {createRun.isError ? (
         <Banner
           variant="danger"
-          title="Не удалось открыть ассистента"
+          title={t("Не удалось открыть ассистента")}
           body={createRun.error.message}
         />
       ) : null}
@@ -205,13 +207,13 @@ export function AssistantLauncher({
             htmlFor="assistant-provider"
             className="text-[11px] font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase"
           >
-            Модель этой сессии
+            {t("Модель этой сессии")}
           </label>
           <Link
             to="/settings/assistant-providers"
             className="text-[11px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
           >
-            Настроить
+            {t("Настроить")}
           </Link>
         </div>
         <Select
@@ -223,40 +225,48 @@ export function AssistantLauncher({
         >
           <option value="" disabled>
             {providers.isPending || capabilities.isPending
-              ? "Проверяем модели…"
-              : "Нет совместимой модели"}
+              ? t("Проверяем модели…")
+              : t("Нет совместимой модели")}
           </option>
           {capabilities.data?.systemProviderConfigured ? (
             <option value="system" disabled={!capabilities.data.systemProviderAvailable}>
-              Системная · {capabilities.data.systemProvider?.model ?? "модель"}
-              {capabilities.data.systemProviderAvailable ? "" : " — инструменты недоступны"}
+              {t("Системная · ")}
+              {capabilities.data.systemProvider?.model ?? t("модель")}
+              {capabilities.data.systemProviderAvailable ? "" : t(" — инструменты недоступны")}
             </option>
           ) : null}
           {compatibleConnections.map((connection) => (
             <option key={connection.id} value={connection.id}>
               {connection.name} · {connection.model}
-              {connection.isDefault ? " · по умолчанию" : ""}
+              {connection.isDefault ? t(" · по умолчанию") : ""}
             </option>
           ))}
         </Select>
         <p className="mt-2 text-[11px] leading-5 text-[var(--ink-tertiary)]">
-          Совместимость проверяется реальной цепочкой из двух tool-calls и возврата результата.
+          {t(
+            "Совместимость проверяется реальной цепочкой из двух tool-calls и возврата результата.",
+          )}
         </p>
       </div>
       <fieldset className="mt-5">
         <legend className="text-[11px] font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase">
-          Область работы
+          {t("Область работы")}
         </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {canvas ? (
             <ChoiceCard
               selected={targetKind === "canvas"}
               icon={FileText}
-              title={`Доска «${canvas.title}»`}
+              title={t("Доска «{0}»", canvas.title)}
               body={
                 canvasContext?.selectionIds.length
-                  ? `Выбрано элементов: ${canvasContext.selectionIds.length}. Ассистент увидит selection и текущую область.`
-                  : "Ассистент увидит доску и текущую область viewport; изменения сначала появятся как preview."
+                  ? t(
+                      "Выбрано элементов: {0}. Ассистент увидит selection и текущую область.",
+                      canvasContext.selectionIds.length,
+                    )
+                  : t(
+                      "Ассистент увидит доску и текущую область viewport; изменения сначала появятся как preview.",
+                    )
               }
               onClick={() => setTargetKind("canvas")}
             />
@@ -264,49 +274,58 @@ export function AssistantLauncher({
             <ChoiceCard
               selected={targetKind === "node"}
               icon={FileText}
-              title={`Только «${node.title}»`}
-              body="Точная работа в открытом документе; остальной проект доступен как контекст."
+              title={t("Только «{0}»", node.title)}
+              body={t(
+                "Точная работа в открытом документе; остальной проект доступен как контекст.",
+              )}
               onClick={() => setTargetKind("node")}
             />
           ) : null}
           <ChoiceCard
             selected={targetKind === "project"}
             icon={Globe2}
-            title="Весь проект"
-            body={`Структура «${project.structure.rootLabel}», словарь, заметки, память и документы.`}
+            title={t("Весь проект")}
+            body={t(
+              "Структура «{0}», словарь, заметки, память и документы.",
+              project.structure.rootLabel,
+            )}
             onClick={() => setTargetKind("project")}
           />
         </div>
       </fieldset>
       <fieldset className="mt-5">
         <legend className="text-[11px] font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase">
-          Начать общение
+          {t("Начать общение")}
         </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <ChoiceCard
             selected={inputMode === "voice"}
             icon={Mic2}
-            title="Голосом · live"
+            title={t("Голосом · live")}
             body={
               silenceCheckpointMs === 0
-                ? "Видите стенограмму; поручение выполняется только по явной команде."
-                : `Видите стенограмму; после ${silenceCheckpointMs / 1000} секунд тишины ассистент спросит, выполнять ли поручение.`
+                ? t("Видите стенограмму; поручение выполняется только по явной команде.")
+                : t(
+                    "Видите стенограмму; после {0} секунд тишины ассистент спросит, выполнять ли поручение.",
+                    silenceCheckpointMs / 1000,
+                  )
             }
             onClick={() => setInputMode("voice")}
           />
           <ChoiceCard
             selected={inputMode === "chat"}
             icon={MessageCircle}
-            title="Чат"
-            body="Тот же контекст, инструменты и review, когда говорить неудобно."
+            title={t("Чат")}
+            body={t("Тот же контекст, инструменты и review, когда говорить неудобно.")}
             onClick={() => setInputMode("chat")}
           />
         </div>
       </fieldset>
       <div className="mt-5 flex items-start gap-3 rounded-[var(--radius-md)] bg-[var(--info-soft)] px-4 py-3 text-[12px] leading-5 text-[var(--ink-secondary)]">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--info)]" aria-hidden="true" />
-        Ассистент покажет поручение → точную цель → вызванные инструменты → diff. Можно принять
-        отдельные группы и мгновенно отменить применённый набор.
+        {t(
+          "Ассистент покажет поручение → точную цель → вызванные инструменты → diff. Можно принять отдельные группы и мгновенно отменить применённый набор.",
+        )}
       </div>
     </ModalDialog>
   );

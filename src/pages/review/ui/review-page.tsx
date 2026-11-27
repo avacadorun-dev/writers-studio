@@ -3,7 +3,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { GitCompareArrows, ListPlus, RefreshCw, Save, Search, Send } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-
 import {
   getDictation,
   getDictationAudio,
@@ -13,6 +12,7 @@ import {
 } from "~entities/dictation";
 import { createNode, getNode, getProject, saveRevision, type TiptapNode } from "~entities/project";
 import { editorExtensions, FormattingToolbar, highlightSourceNode } from "~features/editor";
+import { interfaceLanguage, t } from "~shared/i18n";
 import { loadWriterPreferences } from "~shared/lib";
 import {
   Banner,
@@ -66,7 +66,7 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        "aria-label": "Редактируемый черновик расшифровки",
+        "aria-label": t("Редактируемый черновик расшифровки"),
         spellcheck: String(writerPreferences.spellcheck),
       },
     },
@@ -117,8 +117,8 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
     onSuccess: () => {
       setRetranscriptionBaseline(session.data?.session.suggestionArtifact?.id ?? "");
       showToast({
-        title: "Повторная расшифровка запущена",
-        description: "Исходник и ваши правки останутся без изменений.",
+        title: t("Повторная расшифровка запущена"),
+        description: t("Исходник и ваши правки останутся без изменений."),
       });
     },
   });
@@ -130,8 +130,8 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
     ) {
       setRetranscriptionBaseline(null);
       showToast({
-        title: "Повторная расшифровка не завершена",
-        description: "Аудио, исходные расшифровки и ваши правки сохранены. Попробуйте ещё раз.",
+        title: t("Повторная расшифровка не завершена"),
+        description: t("Аудио, исходные расшифровки и ваши правки сохранены. Попробуйте ещё раз."),
       });
       return;
     }
@@ -142,8 +142,10 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
     ) {
       setRetranscriptionBaseline(null);
       showToast({
-        title: "Новая расшифровка готова",
-        description: "Она сохранена отдельным предложением. Сравните и выберите нужные изменения.",
+        title: t("Новая расшифровка готова"),
+        description: t(
+          "Она сохранена отдельным предложением. Сравните и выберите нужные изменения.",
+        ),
       });
     }
   }, [
@@ -177,16 +179,19 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
   const transfer = useMutation({
     mutationFn: async () => {
       if (!editor || !project.data) {
-        throw new Error("Черновик ещё не готов");
+        throw new Error(t("Черновик ещё не готов"));
       }
       let target = project.data.nodes.find((node) => node.id === destination);
       if (mode === "new_scene") {
         const created = await createNode(project.data.project.id, {
           kind: "scene",
-          title: `Сцена из диктовки ${new Intl.DateTimeFormat("ru", {
-            day: "numeric",
-            month: "short",
-          }).format(new Date())}`,
+          title: t(
+            "Сцена из диктовки {0}",
+            new Intl.DateTimeFormat(interfaceLanguage, {
+              day: "numeric",
+              month: "short",
+            }).format(new Date()),
+          ),
         });
         target = created.node;
       } else if (target) {
@@ -196,7 +201,7 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
         target = (await getNode(target.id)).node;
       }
       if (!target) {
-        throw new Error("Выберите документ");
+        throw new Error(t("Выберите документ"));
       }
       const draft = editor.getJSON() as TiptapNode;
       const content =
@@ -217,9 +222,9 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
         queryClient.invalidateQueries({ queryKey: ["project", target.projectId] }),
       ]);
       showToast({
-        title: "Черновик вставлен в рукопись",
-        description: "Вставка сохранена одной редакцией.",
-        actionLabel: previousContent ? "Отменить" : undefined,
+        title: t("Черновик вставлен в рукопись"),
+        description: t("Вставка сохранена одной редакцией."),
+        actionLabel: previousContent ? t("Отменить") : undefined,
         onAction: previousContent
           ? () => {
               void saveRevision(target.id, {
@@ -232,7 +237,7 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                   queryClient.invalidateQueries({ queryKey: ["node", target.id], exact: true }),
                   queryClient.invalidateQueries({ queryKey: ["project", target.projectId] }),
                 ]);
-                showToast({ title: "Вставка отменена" });
+                showToast({ title: t("Вставка отменена") });
               });
             }
           : undefined,
@@ -245,7 +250,7 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
   });
 
   if (session.isPending) {
-    return <Spinner label="Открываем расшифровку…" />;
+    return <Spinner label={t("Открываем расшифровку…")} />;
   }
   const data = session.data?.session;
   if (!data?.draft) {
@@ -253,12 +258,12 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
       <main className="grid min-h-full place-items-center p-5">
         <Banner
           variant="warning"
-          title="Черновик ещё не готов"
-          body="Вернитесь к экрану обработки записи."
+          title={t("Черновик ещё не готов")}
+          body={t("Вернитесь к экрану обработки записи.")}
           action={
             <Button asChild variant="secondary" size="compact">
               <Link to="/dictations/$sessionId/finalizing" params={{ sessionId }}>
-                Проверить
+                {t("Проверить")}
               </Link>
             </Button>
           }
@@ -267,15 +272,15 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
     );
   }
   if (project.isPending) {
-    return <Spinner label="Открываем проект…" />;
+    return <Spinner label={t("Открываем проект…")} />;
   }
   if (!project.data) {
     return (
       <main className="grid min-h-full place-items-center p-5">
         <Banner
           variant="danger"
-          title="Проект недоступен"
-          body="Черновик сохранён. Попробуйте открыть его позже через центр восстановления."
+          title={t("Проект недоступен")}
+          body={t("Черновик сохранён. Попробуйте открыть его позже через центр восстановления.")}
         />
       </main>
     );
@@ -297,11 +302,12 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
         <header className="flex min-h-[82px] items-center gap-3 px-4 sm:px-8">
           <div>
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Голосовая сессия · {formatClock(data.durationMs)}
+              {t("Голосовая сессия · ")}
+              {formatClock(data.durationMs)}
             </p>
             <h1 className="font-display mt-1 text-[28px] leading-tight">
               {project.data.nodes.find((node) => node.id === data.destinationNodeId)?.title ??
-                "Проверка расшифровки"}
+                t("Проверка расшифровки")}
             </h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -309,18 +315,18 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
               <Button asChild variant="secondary">
                 <Link to="/dictations/$sessionId/diff" params={{ sessionId }}>
                   <GitCompareArrows className="size-4" aria-hidden="true" />
-                  Сравнить
+                  {t("Сравнить")}
                 </Link>
               </Button>
             ) : null}
             <Button
               type="button"
               className="lg:hidden"
-              aria-label="Вставить в рукопись"
+              aria-label={t("Вставить в рукопись")}
               onClick={() => setTransferOpen(true)}
             >
               <Send className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Вставить в рукопись</span>
+              <span className="hidden sm:inline">{t("Вставить в рукопись")}</span>
             </Button>
           </div>
         </header>
@@ -328,20 +334,24 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
           <Banner
             className="m-3 mb-0"
             variant="info"
-            title="Это живой черновик"
-            body="Можно редактировать уже сейчас. Финальная расшифровка появится как предложение и не заменит ваши правки."
+            title={t("Это живой черновик")}
+            body={t(
+              "Можно редактировать уже сейчас. Финальная расшифровка появится как предложение и не заменит ваши правки.",
+            )}
           />
         ) : null}
         {lateBatch ? (
           <Banner
             className="m-3 mb-0"
             variant="info"
-            title="Готова уточнённая расшифровка"
-            body="Ваши правки не заменены. Сравните варианты и примите только нужные изменения."
+            title={t("Готова уточнённая расшифровка")}
+            body={t(
+              "Ваши правки не заменены. Сравните варианты и примите только нужные изменения.",
+            )}
             action={
               <Button asChild variant="secondary" size="compact">
                 <Link to="/dictations/$sessionId/diff" params={{ sessionId }}>
-                  Сравнить
+                  {t("Сравнить")}
                 </Link>
               </Button>
             }
@@ -351,8 +361,10 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
           <Banner
             className="m-3 mb-0"
             variant="info"
-            title="Повторно расшифровываем со словарём"
-            body="Новый результат появится отдельным предложением. Редактируемый черновик и исходные артефакты не меняются."
+            title={t("Повторно расшифровываем со словарём")}
+            body={t(
+              "Новый результат появится отдельным предложением. Редактируемый черновик и исходные артефакты не меняются.",
+            )}
           />
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -363,17 +375,17 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
               onFocusMode={() => undefined}
               onFind={() => {
                 void requestInput({
-                  title: "Найти в расшифровке",
-                  description: "Поиск выполняется по редактируемому черновику.",
-                  label: "Текст для поиска",
+                  title: t("Найти в расшифровке"),
+                  description: t("Поиск выполняется по редактируемому черновику."),
+                  label: t("Текст для поиска"),
                   icon: Search,
-                  confirmLabel: "Найти",
+                  confirmLabel: t("Найти"),
                 }).then((query) => {
                   if (
                     query &&
                     !editor?.getText().toLocaleLowerCase().includes(query.toLocaleLowerCase())
                   ) {
-                    showToast({ title: "Ничего не найдено" });
+                    showToast({ title: t("Ничего не найдено") });
                   }
                 });
               }}
@@ -387,18 +399,18 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                 }
               }}
             >
-              <legend className="sr-only">Черновик с привязанными аудиодиапазонами</legend>
+              <legend className="sr-only">{t("Черновик с привязанными аудиодиапазонами")}</legend>
               <EditorContent editor={editor} className="editor-content" />
             </fieldset>
           </section>
           <aside className="max-h-[42vh] overflow-y-auto bg-[var(--surface-panel)] p-4 lg:max-h-none">
             <h2 className="text-xs font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Проверка
+              {t("Проверка")}
             </h2>
             <p className="mt-4 text-sm font-medium">
               {uncertain.length > 0
-                ? `${uncertain.length} мест для проверки`
-                : "Неуверенных мест не найдено"}
+                ? t("{0} мест для проверки", uncertain.length)
+                : t("Неуверенных мест не найдено")}
             </p>
             <div className="mt-3 grid gap-2">
               {uncertain.map((segment) => (
@@ -424,13 +436,13 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
               <Button asChild variant="secondary">
                 <Link to="/projects/$projectId/dictionary" params={{ projectId: data.projectId }}>
                   <ListPlus className="size-4" aria-hidden="true" />
-                  Добавить термин в словарь
+                  {t("Добавить термин в словарь")}
                 </Link>
               </Button>
               <Button asChild variant="ghost">
                 <Link to="/dictations/$sessionId/diff" params={{ sessionId }}>
                   <Search className="size-4" aria-hidden="true" />
-                  Сравнить с исходником
+                  {t("Сравнить с исходником")}
                 </Link>
               </Button>
               <Button
@@ -444,12 +456,12 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                   aria-hidden="true"
                 />
                 {retranscriptionBaseline !== null
-                  ? "Расшифровываем…"
-                  : "Повторить расшифровку со словарём"}
+                  ? t("Расшифровываем…")
+                  : t("Повторить расшифровку со словарём")}
               </Button>
             </div>
             <div className="mt-6 border-t border-[var(--border-subtle)] pt-5">
-              <h3 className="text-sm font-semibold">История черновика</h3>
+              <h3 className="text-sm font-semibold">{t("История черновика")}</h3>
               <ol className="mt-3 grid gap-2">
                 {data.draftRevisions?.slice(0, 5).map((revision) => (
                   <li
@@ -458,7 +470,8 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                   >
                     <p className="text-xs font-medium">{revision.source}</p>
                     <p className="mt-0.5 text-[11px] text-[var(--ink-tertiary)]">
-                      Редакция {revision.revision}
+                      {t("Редакция ")}
+                      {revision.revision}
                     </p>
                   </li>
                 ))}
@@ -480,30 +493,32 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                   <track kind="captions" />
                 </audio>
               ) : (
-                <p className="py-2 text-sm text-[var(--ink-tertiary)]">Загружаем аудио…</p>
+                <p className="py-2 text-sm text-[var(--ink-tertiary)]">{t("Загружаем аудио…")}</p>
               )}
             </div>
             <Button
               type="button"
               className="hidden shrink-0 lg:inline-flex"
-              aria-label="Вставить в рукопись"
+              aria-label={t("Вставить в рукопись")}
               onClick={() => setTransferOpen(true)}
             >
               <Send className="size-4" aria-hidden="true" />
-              Вставить в рукопись
+              {t("Вставить в рукопись")}
             </Button>
           </div>
         </div>
         <ModalDialog
           open={transferOpen}
           onOpenChange={setTransferOpen}
-          title="Вставить в рукопись"
-          description="Сначала проверьте место и результат операции. Исходная расшифровка останется неизменной."
+          title={t("Вставить в рукопись")}
+          description={t(
+            "Сначала проверьте место и результат операции. Исходная расшифровка останется неизменной.",
+          )}
           icon={Send}
           footer={
             <>
               <Button type="button" variant="secondary" onClick={() => setTransferOpen(false)}>
-                Отмена
+                {t("Отмена")}
               </Button>
               <Button
                 type="button"
@@ -511,15 +526,15 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                 onClick={() => transfer.mutate()}
               >
                 <Save className="size-4" aria-hidden="true" />
-                {transfer.isPending ? "Вставляем…" : "Подтвердить вставку"}
+                {transfer.isPending ? t("Вставляем…") : t("Подтвердить вставку")}
               </Button>
             </>
           }
         >
           <div className="grid gap-4">
-            <Field label="Документ">
+            <Field label={t("Документ")}>
               <Select value={destination} onChange={(event) => setDestination(event.target.value)}>
-                <option value="">Выберите документ</option>
+                <option value="">{t("Выберите документ")}</option>
                 {project.data?.nodes
                   .filter((node) => !node.trashedAt)
                   .map((node) => (
@@ -529,11 +544,11 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
                   ))}
               </Select>
             </Field>
-            <Field label="Способ вставки">
+            <Field label={t("Способ вставки")}>
               <Select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
-                <option value="append">В конец документа</option>
-                <option value="replace">Заменить пустой документ</option>
-                <option value="new_scene">Создать новую сцену</option>
+                <option value="append">{t("В конец документа")}</option>
+                <option value="replace">{t("Заменить пустой документ")}</option>
+                <option value="new_scene">{t("Создать новую сцену")}</option>
               </Select>
             </Field>
           </div>
@@ -541,7 +556,7 @@ export function ReviewPage({ sessionId }: { sessionId: string }) {
             <Banner
               className="mt-4"
               variant="danger"
-              title="Не удалось вставить"
+              title={t("Не удалось вставить")}
               body={transfer.error.message}
             />
           ) : null}

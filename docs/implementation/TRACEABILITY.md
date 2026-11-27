@@ -1,9 +1,8 @@
 # Requirements and verification traceability
 
-This public English index replaces private deployment-evidence inventories.
-Historical PASS labels are intentionally not presented as current execution
-results. Requirements remain in [WORKFLOWS](../specification/WORKFLOWS.md), with
-all original numbered AC identifiers retained.
+The [OpenSpec capabilities](../../openspec/README.md) describe current behavior.
+The historical identifiers below connect earlier release notes to their
+implementation and verification areas.
 
 | Requirements | Primary implementation and checks |
 | --- | --- |

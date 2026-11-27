@@ -67,7 +67,6 @@ import {
   useRef,
   useState,
 } from "react";
-
 import { createCanvas, importCanvas, listCanvases, restoreCanvas } from "~entities/canvas";
 import {
   createNode,
@@ -80,6 +79,7 @@ import {
   trashNode,
   updateNode,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn, maximumNodeTitleLength, normalizeNodeTitle } from "~shared/lib";
 import {
   Button,
@@ -176,22 +176,22 @@ function nodeIcon(structure: ProjectStructure, kind: string) {
 
 const documentStatus = {
   idea: {
-    label: "Идея",
+    label: t("Идея"),
     icon: Lightbulb,
     className: "bg-[var(--warning-soft)] text-[var(--warning)]",
   },
   draft: {
-    label: "Черновик",
+    label: t("Черновик"),
     icon: FilePenLine,
     className: "bg-[var(--surface-subtle)] text-[var(--ink-tertiary)]",
   },
   editing: {
-    label: "Редактура",
+    label: t("Редактура"),
     icon: ScanText,
     className: "bg-[var(--info-soft)] text-[var(--info)]",
   },
   ready: {
-    label: "Готово",
+    label: t("Готово"),
     icon: CircleCheckBig,
     className: "bg-[var(--success-soft)] text-[var(--success)]",
   },
@@ -203,7 +203,7 @@ const documentStatus = {
 function DocumentStatusMark({ status }: { status: DocumentNode["status"] }) {
   const config = documentStatus[status];
   const Icon = config.icon;
-  const label = `Статус: ${config.label}`;
+  const label = t("Статус: {0}", config.label);
   return (
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger asChild>
@@ -268,7 +268,7 @@ export function ProjectTree({
             <div className="flex min-h-14 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] px-4">
               <ListTree className="size-4 text-[var(--accent)]" aria-hidden="true" />
               <DialogPrimitive.Title className="text-sm font-semibold">
-                Документы проекта
+                {t("Документы проекта")}
               </DialogPrimitive.Title>
               <DialogPrimitive.Close asChild>
                 <Button
@@ -276,7 +276,7 @@ export function ProjectTree({
                   variant="ghost"
                   size="icon"
                   className="ml-auto shrink-0"
-                  aria-label="Закрыть список документов"
+                  aria-label={t("Закрыть список документов")}
                   tooltip={false}
                 >
                   <X className="size-4" aria-hidden="true" />
@@ -393,14 +393,14 @@ function ProjectTreeContent({
     mutationFn: (title: string) => createCanvas(projectId, title),
     onSuccess: async ({ canvas }) => {
       await invalidateCanvases();
-      showToast({ title: "Доска создана" });
+      showToast({ title: t("Доска создана") });
       void navigate({
         to: "/projects/$projectId/canvases/$canvasId",
         params: { projectId, canvasId: canvas.id },
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось создать доску", description: error.message }),
+      showToast({ title: t("Не удалось создать доску"), description: error.message }),
   });
   const restoreCanvasMutation = useMutation({
     mutationFn: restoreCanvas,
@@ -408,27 +408,31 @@ function ProjectTreeContent({
   });
   const importCanvasMutation = useMutation({
     mutationFn: (file: File) =>
-      importCanvas(projectId, file, file.name.replace(/\.canvas$/i, "") || "Импортированная доска"),
+      importCanvas(
+        projectId,
+        file,
+        file.name.replace(/\.canvas$/i, "") || t("Импортированная доска"),
+      ),
     onSuccess: async ({ canvas }) => {
       await invalidateCanvases();
-      showToast({ title: "Доска импортирована" });
+      showToast({ title: t("Доска импортирована") });
       void navigate({
         to: "/projects/$projectId/canvases/$canvasId",
         params: { projectId, canvasId: canvas.id },
       });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось импортировать доску", description: error.message }),
+      showToast({ title: t("Не удалось импортировать доску"), description: error.message }),
   });
 
   const requestCanvas = () => {
     void requestInput({
-      title: "Новая доска",
-      description: "Соберите заметки, документы и изображения в свободном пространстве.",
-      label: "Название",
-      defaultValue: "Новая доска",
+      title: t("Новая доска"),
+      description: t("Соберите заметки, документы и изображения в свободном пространстве."),
+      label: t("Название"),
+      defaultValue: t("Новая доска"),
       icon: LayoutDashboard,
-      confirmLabel: "Создать",
+      confirmLabel: t("Создать"),
     }).then((title) => {
       if (title?.trim()) createCanvasMutation.mutate(title.trim());
     });
@@ -440,7 +444,7 @@ function ProjectTreeContent({
     onSuccess: async ({ node }) => {
       await invalidate();
       showToast({
-        title: `Материал создан: ${nodeTypeLabel(structure, node.kind)}`,
+        title: t("Материал создан: {0}", nodeTypeLabel(structure, node.kind)),
       });
       if (structure.nodeTypes.find((item) => item.key === node.kind)?.contentBearing) {
         void navigate({
@@ -451,7 +455,7 @@ function ProjectTreeContent({
     },
     onError: (error) =>
       showToast({
-        title: "Не удалось создать материал",
+        title: t("Не удалось создать материал"),
         description: error.message,
       }),
   });
@@ -487,7 +491,7 @@ function ProjectTreeContent({
         invalidate(),
         queryClient.invalidateQueries({ queryKey: ["node", input.nodeId] }),
       ]);
-      showToast({ title: input.title ? "Название сохранено" : "Свойства сохранены" });
+      showToast({ title: input.title ? t("Название сохранено") : t("Свойства сохранены") });
     },
     onError: (error, input, context) => {
       if (context?.previousProject) {
@@ -497,7 +501,7 @@ function ProjectTreeContent({
         queryClient.setQueryData(["node", input.nodeId], context.previousNode);
       }
       setRenamingNodeId(undefined);
-      showToast({ title: "Не удалось переименовать", description: error.message });
+      showToast({ title: t("Не удалось переименовать"), description: error.message });
     },
   });
   const duplicateMutation = useMutation({
@@ -505,7 +509,7 @@ function ProjectTreeContent({
     onSuccess: async () => {
       setActionsOpen(false);
       await invalidate();
-      showToast({ title: "Создана копия" });
+      showToast({ title: t("Создана копия") });
     },
   });
   const moveMutation = useMutation({
@@ -544,8 +548,8 @@ function ProjectTreeContent({
       setDropTargetId(undefined);
       await invalidate();
       showToast({
-        title: "Материал перемещён",
-        actionLabel: "Отменить",
+        title: t("Материал перемещён"),
+        actionLabel: t("Отменить"),
         onAction: () => {
           void moveNode(input.nodeId, {
             parentId: input.previousParentId,
@@ -561,7 +565,7 @@ function ProjectTreeContent({
       setDraggedNodeId(undefined);
       setDropTargetId(undefined);
       showToast({
-        title: "Не удалось переместить",
+        title: t("Не удалось переместить"),
         description: error.message,
       });
     },
@@ -572,8 +576,8 @@ function ProjectTreeContent({
       setActionsOpen(false);
       await invalidate();
       showToast({
-        title: "Материал в корзине",
-        actionLabel: "Отменить",
+        title: t("Материал в корзине"),
+        actionLabel: t("Отменить"),
         onAction: () => void restoreNode(activeNodeId).then(invalidate),
       });
     },
@@ -586,16 +590,16 @@ function ProjectTreeContent({
   const addNode = (kind: string, parentId?: string) => {
     const type = structure.nodeTypes.find((item) => item.key === kind);
     if (!type) return;
-    const defaultTitle = `${type.label} без названия`;
+    const defaultTitle = t("{0} без названия", type.label);
     void requestInput({
-      title: `Создать: ${type.label.toLocaleLowerCase()}`,
+      title: t("Создать: {0}", type.label.toLocaleLowerCase()),
       description: parentId
-        ? "Материал появится внутри выбранного раздела."
-        : `Материал появится на верхнем уровне «${structure.rootLabel}».`,
-      label: "Название",
+        ? t("Материал появится внутри выбранного раздела.")
+        : t("Материал появится на верхнем уровне «{0}».", structure.rootLabel),
+      label: t("Название"),
       defaultValue: defaultTitle,
       icon: nodeIcon(structure, kind),
-      confirmLabel: "Создать",
+      confirmLabel: t("Создать"),
     }).then((title) => {
       if (title?.trim()) {
         createMutation.mutate({ kind, title: title.trim(), parentId });
@@ -613,16 +617,18 @@ function ProjectTreeContent({
         : type.canBeRoot,
     );
     if (allowed.length === 0) {
-      showToast({ title: "В этот раздел нельзя добавить вложенный материал" });
+      showToast({ title: t("В этот раздел нельзя добавить вложенный материал") });
       return;
     }
     void requestSelect({
-      title: parent ? `Добавить в «${parent.title}»` : `Добавить в «${structure.rootLabel}»`,
-      description: "Типы и допустимая вложенность определяются структурой этого проекта.",
-      label: "Тип материала",
+      title: parent
+        ? t("Добавить в «{0}»", parent.title)
+        : t("Добавить в «{0}»", structure.rootLabel),
+      description: t("Типы и допустимая вложенность определяются структурой этого проекта."),
+      label: t("Тип материала"),
       defaultValue: allowed[0]?.key ?? "",
       icon: Plus,
-      confirmLabel: "Продолжить",
+      confirmLabel: t("Продолжить"),
       options: allowed.map((type) => ({ value: type.key, label: type.label })),
     }).then((kind) => {
       if (kind) addNode(kind, parentId);
@@ -739,8 +745,8 @@ function ProjectTreeContent({
             <UiTooltip
               content={
                 collapsedNodeIds.has(node.id)
-                  ? `Развернуть «${node.title}»`
-                  : `Свернуть «${node.title}»`
+                  ? t("Развернуть «{0}»", node.title)
+                  : t("Свернуть «{0}»", node.title)
               }
               side="right"
             >
@@ -749,8 +755,8 @@ function ProjectTreeContent({
                 className="grid size-6 shrink-0 place-items-center rounded hover:bg-[var(--surface-subtle)]"
                 aria-label={
                   collapsedNodeIds.has(node.id)
-                    ? `Развернуть «${node.title}»`
-                    : `Свернуть «${node.title}»`
+                    ? t("Развернуть «{0}»", node.title)
+                    : t("Свернуть «{0}»", node.title)
                 }
                 aria-expanded={!collapsedNodeIds.has(node.id)}
                 onClick={() =>
@@ -779,7 +785,7 @@ function ProjectTreeContent({
                 ref={renameInputRef}
                 value={renameDraft}
                 maxLength={maximumNodeTitleLength}
-                aria-label={`Новое название для «${node.title}»`}
+                aria-label={t("Новое название для «{0}»", node.title)}
                 className="h-7 min-w-0 flex-1 rounded border border-[var(--focus)] bg-[var(--surface-paper)] px-1.5 text-[13px] outline-none"
                 onFocus={(event) => event.currentTarget.select()}
                 onChange={(event) => setRenameDraft(event.target.value)}
@@ -820,11 +826,11 @@ function ProjectTreeContent({
             </Link>
           )}
           {(nodeType?.allowedChildren?.length ?? 0) > 0 ? (
-            <UiTooltip content={`Добавить внутрь «${node.title}»`} side="right">
+            <UiTooltip content={t("Добавить внутрь «{0}»", node.title)} side="right">
               <button
                 type="button"
                 className="mr-1 grid size-7 shrink-0 place-items-center rounded opacity-0 hover:bg-[var(--surface-subtle)] group-hover/tree-row:opacity-100 focus:opacity-100"
-                aria-label={`Добавить внутрь «${node.title}»`}
+                aria-label={t("Добавить внутрь «{0}»", node.title)}
                 onClick={() => chooseNodeType(node.id)}
               >
                 <Plus className="size-3.5" aria-hidden="true" />
@@ -843,7 +849,7 @@ function ProjectTreeContent({
                     ? "opacity-100"
                     : "opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100",
                 )}
-                aria-label={`Действия с «${node.title}»`}
+                aria-label={t("Действия с «{0}»", node.title)}
               >
                 <MoreHorizontal className="size-3.5" aria-hidden="true" />
               </button>
@@ -868,7 +874,7 @@ function ProjectTreeContent({
                 }}
               >
                 <Pencil className="size-4" aria-hidden="true" />
-                Переименовать
+                {t("Переименовать")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -885,7 +891,7 @@ function ProjectTreeContent({
           "project-sidebar hidden min-w-0 w-16 shrink-0 flex-col items-center overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface-panel)] lg:flex",
           !integratedWorkspace && "py-1",
         )}
-        aria-label="Структура проекта свёрнута"
+        aria-label={t("Структура проекта свёрнута")}
       >
         {integratedWorkspace ? (
           <div
@@ -895,14 +901,19 @@ function ProjectTreeContent({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Развернуть структуру"
+              aria-label={t("Развернуть структуру")}
               onClick={onToggle}
             >
               <PanelLeftOpen className="size-4" aria-hidden="true" />
             </Button>
           </div>
         ) : (
-          <Button variant="ghost" size="icon" aria-label="Развернуть структуру" onClick={onToggle}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("Развернуть структуру")}
+            onClick={onToggle}
+          >
             <PanelLeftOpen className="size-4" aria-hidden="true" />
           </Button>
         )}
@@ -913,12 +924,12 @@ function ProjectTreeContent({
           label={structure.rootLabel}
         />
         {activeCanvases[0] ? (
-          <Button asChild variant="ghost" size="icon" className="size-10" tooltip="Доски">
+          <Button asChild variant="ghost" size="icon" className="size-10" tooltip={t("Доски")}>
             <Link
               to="/projects/$projectId/canvases/$canvasId"
               params={{ projectId, canvasId: activeCanvasId ?? activeCanvases[0].id }}
-              aria-label="Доски"
-              title="Доски"
+              aria-label={t("Доски")}
+              title={t("Доски")}
             >
               <LayoutDashboard className="size-4" aria-hidden="true" />
             </Link>
@@ -940,7 +951,7 @@ function ProjectTreeContent({
             ? "flex w-full flex-1 [&_a]:min-h-11"
             : "hidden w-[280px] shrink-0 border-r border-[var(--border-subtle)] lg:flex",
         )}
-        aria-label="Структура проекта"
+        aria-label={t("Структура проекта")}
       >
         <div
           data-testid="project-tree-header"
@@ -950,14 +961,14 @@ function ProjectTreeContent({
           )}
         >
           <span className="text-[11px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-            Структура
+            {t("Структура")}
           </span>
           <div className="ml-auto flex">
             {!mobile ? (
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Свернуть структуру"
+                aria-label={t("Свернуть структуру")}
                 onClick={onToggle}
               >
                 <PanelLeftClose className="size-4" aria-hidden="true" />
@@ -966,7 +977,7 @@ function ProjectTreeContent({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Добавить материал"
+              aria-label={t("Добавить материал")}
               onClick={() => chooseNodeType()}
             >
               <Plus className="size-4" aria-hidden="true" />
@@ -976,7 +987,7 @@ function ProjectTreeContent({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Действия с материалом"
+                  aria-label={t("Действия с материалом")}
                   disabled={!activeNode}
                 >
                   <MoreHorizontal className="size-4" aria-hidden="true" />
@@ -986,15 +997,15 @@ function ProjectTreeContent({
                 <DropdownMenuContent align="end" className={mobile ? "z-[90]" : undefined}>
                   <TreeAction
                     icon={Pencil}
-                    label="Переименовать"
+                    label={t("Переименовать")}
                     onClick={() =>
                       void requestInput({
-                        title: `Переименовать «${activeNode.title}»`,
-                        description: "Содержимое и история не изменятся.",
-                        label: "Новое название",
+                        title: t("Переименовать «{0}»", activeNode.title),
+                        description: t("Содержимое и история не изменятся."),
+                        label: t("Новое название"),
                         defaultValue: activeNode.title,
                         icon: Pencil,
-                        confirmLabel: "Сохранить",
+                        confirmLabel: t("Сохранить"),
                       }).then((title) => {
                         if (title?.trim())
                           updateMutation.mutate({ nodeId: activeNode.id, title: title.trim() });
@@ -1003,20 +1014,20 @@ function ProjectTreeContent({
                   />
                   <TreeAction
                     icon={RotateCcw}
-                    label="Изменить статус"
+                    label={t("Изменить статус")}
                     onClick={() =>
                       void requestSelect({
-                        title: "Изменить статус",
-                        description: "Статус помогает ориентироваться и не меняет содержимое.",
-                        label: "Статус",
+                        title: t("Изменить статус"),
+                        description: t("Статус помогает ориентироваться и не меняет содержимое."),
+                        label: t("Статус"),
                         defaultValue: activeNode.status,
                         icon: RotateCcw,
-                        confirmLabel: "Сохранить",
+                        confirmLabel: t("Сохранить"),
                         options: [
-                          { value: "idea", label: "Идея" },
-                          { value: "draft", label: "Черновик" },
-                          { value: "editing", label: "Редактура" },
-                          { value: "ready", label: "Готово" },
+                          { value: "idea", label: t("Идея") },
+                          { value: "draft", label: t("Черновик") },
+                          { value: "editing", label: t("Редактура") },
+                          { value: "ready", label: t("Готово") },
                         ],
                       }).then((status) => {
                         if (status)
@@ -1029,15 +1040,15 @@ function ProjectTreeContent({
                   />
                   <TreeAction
                     icon={Move}
-                    label="Переместить"
+                    label={t("Переместить")}
                     onClick={() =>
                       void requestSelect({
-                        title: `Переместить «${activeNode.title}»`,
-                        description: "Показываются только допустимые родители по схеме проекта.",
-                        label: "Новое расположение",
+                        title: t("Переместить «{0}»", activeNode.title),
+                        description: t("Показываются только допустимые родители по схеме проекта."),
+                        label: t("Новое расположение"),
                         defaultValue: activeNode.parentId ?? "",
                         icon: Move,
-                        confirmLabel: "Переместить",
+                        confirmLabel: t("Переместить"),
                         options: [
                           { value: "", label: structure.rootLabel },
                           ...getValidParentNodes(contentNodes, activeNode.id, structure).map(
@@ -1055,12 +1066,12 @@ function ProjectTreeContent({
                   />
                   <TreeAction
                     icon={Copy}
-                    label="Дублировать"
+                    label={t("Дублировать")}
                     onClick={() => duplicateMutation.mutate()}
                   />
                   <TreeAction
                     icon={Trash2}
-                    label="В корзину"
+                    label={t("В корзину")}
                     destructive
                     onClick={() => trashMutation.mutate()}
                   />
@@ -1073,13 +1084,13 @@ function ProjectTreeContent({
           <div className="mb-2 border-b border-[var(--border-subtle)] pb-2">
             <div className="flex min-h-9 items-center gap-2 pr-2 pl-[26px] text-xs font-medium text-[var(--ink-secondary)]">
               <GalleryVerticalEnd className="size-4" aria-hidden="true" />
-              <span>Доски</span>
+              <span>{t("Доски")}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="ml-auto size-7"
-                aria-label="Создать доску"
+                aria-label={t("Создать доску")}
                 onClick={requestCanvas}
               >
                 <Plus className="size-3.5" aria-hidden="true" />
@@ -1089,8 +1100,8 @@ function ProjectTreeContent({
                 variant="ghost"
                 size="icon"
                 className="size-7"
-                aria-label="Импортировать JSON Canvas"
-                title="Импортировать .canvas"
+                aria-label={t("Импортировать JSON Canvas")}
+                title={t("Импортировать .canvas")}
                 disabled={importCanvasMutation.isPending}
                 onClick={() => canvasImportInput.current?.click()}
               >
@@ -1119,7 +1130,7 @@ function ProjectTreeContent({
                 className="min-h-9 w-full rounded-[var(--radius-sm)] pr-2 pl-[26px] text-left text-xs text-[var(--ink-tertiary)] hover:bg-[var(--surface-subtle)]"
                 onClick={requestCanvas}
               >
-                Создать первую доску
+                {t("Создать первую доску")}
               </button>
             )}
           </div>
@@ -1138,7 +1149,8 @@ function ProjectTreeContent({
             <ListTree className="size-4" aria-hidden="true" />
             <span>{structure.rootLabel}</span>
             <span className="ml-auto text-[10px] font-normal text-[var(--ink-tertiary)]">
-              схема r{structure.schemaVersion}
+              {t("схема r")}
+              {structure.schemaVersion}
             </span>
           </div>
           <DndContext
@@ -1153,8 +1165,9 @@ function ProjectTreeContent({
             onDragEnd={handleDragEnd}
             accessibility={{
               screenReaderInstructions: {
-                draggable:
+                draggable: t(
                   "Нажмите пробел или Enter, затем используйте стрелки для перемещения материала.",
+                ),
               },
             }}
           >
@@ -1187,19 +1200,20 @@ function ProjectTreeContent({
             className="mt-3 flex min-h-9 items-center gap-2 border-t border-[var(--border-subtle)] px-3 pt-3 text-[13px] text-[var(--ink-secondary)]"
           >
             <FileAudio className="size-4" aria-hidden="true" />
-            Голосовые сессии
+            {t("Голосовые сессии")}
           </Link>
           {trashedNodes.length > 0 || trashedCanvases.length > 0 ? (
             <details className="mt-3 border-t border-[var(--border-subtle)] pt-2">
               <summary className="min-h-9 cursor-pointer px-3 py-2 text-xs text-[var(--ink-tertiary)]">
-                Корзина · {trashedNodes.length + trashedCanvases.length}
+                {t("Корзина · ")}
+                {trashedNodes.length + trashedCanvases.length}
               </summary>
               {trashedCanvases.map((canvas) => (
                 <div key={canvas.id} className="flex min-h-9 items-center gap-2 px-3 text-xs">
                   <LayoutDashboard className="size-3.5" aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate">{canvas.title}</span>
                   <button type="button" onClick={() => restoreCanvasMutation.mutate(canvas.id)}>
-                    Вернуть
+                    {t("Вернуть")}
                   </button>
                 </div>
               ))}
@@ -1207,7 +1221,7 @@ function ProjectTreeContent({
                 <div key={node.id} className="flex min-h-9 items-center gap-2 px-3 text-xs">
                   <span className="min-w-0 flex-1 truncate">{node.title}</span>
                   <button type="button" onClick={() => restoreMutation.mutate(node.id)}>
-                    Вернуть
+                    {t("Вернуть")}
                   </button>
                 </div>
               ))}
@@ -1288,8 +1302,8 @@ function SortableTreeRow({
             : "group-hover/tree-row:bg-[var(--surface-panel)]",
         )}
         style={{ left: `${paddingLeft + 20}px` }}
-        aria-label={`Переместить «${title}»`}
-        title={`Переместить «${title}»`}
+        aria-label={t("Переместить «{0}»", title)}
+        title={t("Переместить «{0}»", title)}
         {...attributes}
         {...listeners}
       >
@@ -1318,31 +1332,31 @@ function UtilityLinks({
 }) {
   const links = [
     {
-      label: "Версии",
+      label: t("Версии"),
       icon: History,
       to: "/nodes/$nodeId/versions" as const,
       params: { nodeId },
     },
     {
-      label: "Словарь",
+      label: t("Словарь"),
       icon: SpellCheck2,
       to: "/projects/$projectId/dictionary" as const,
       params: { projectId },
     },
     {
-      label: "Правки в тексте",
+      label: t("Правки в тексте"),
       icon: MessagesSquare,
       to: "/projects/$projectId/annotations" as const,
       params: { projectId },
     },
     {
-      label: "Контекст ассистента",
+      label: t("Контекст ассистента"),
       icon: Brain,
       to: "/projects/$projectId/assistant-context" as const,
       params: { projectId },
     },
     {
-      label: "Восстановление",
+      label: t("Восстановление"),
       icon: LifeBuoy,
       to: "/recovery" as const,
       params: undefined,

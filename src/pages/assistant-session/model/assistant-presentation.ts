@@ -1,4 +1,5 @@
 import type { AssistantEvent } from "~entities/assistant";
+import { t } from "~shared/i18n";
 
 export interface AssistantActivityItem {
   id: string;
@@ -33,73 +34,89 @@ export function assistantFailureMessage(errorCode?: string): string {
   switch (errorCode) {
     case "tool_limit_exceeded":
     case "provider_step_limit":
-      return "Ассистент исчерпал безопасный лимит шагов. Уже подготовленные изменения не применены; повторите поручение или разделите его на части.";
+      return t(
+        "Ассистент исчерпал безопасный лимит шагов. Уже подготовленные изменения не применены; повторите поручение или разделите его на части.",
+      );
     case "repeated_tool_failure":
-      return "Одна из операций проекта несколько раз завершилась ошибкой. Ничего не применено; уточните проблемную часть поручения и повторите её.";
+      return t(
+        "Одна из операций проекта несколько раз завершилась ошибкой. Ничего не применено; уточните проблемную часть поручения и повторите её.",
+      );
     case "mutation_not_staged":
-      return "Ассистент завершил ответ, но не подготовил проверяемых изменений. Проект не изменён; отправьте поручение ещё раз.";
+      return t(
+        "Ассистент завершил ответ, но не подготовил проверяемых изменений. Проект не изменён; отправьте поручение ещё раз.",
+      );
     case "provider_request_failed":
     case "provider_dialect_failed":
     case "provider_unavailable":
-      return "Модель не смогла завершить ответ. Проект не изменён; можно повторить то же поручение.";
+      return t(
+        "Модель не смогла завершить ответ. Проект не изменён; можно повторить то же поручение.",
+      );
     case "provider_timeout":
-      return "Модели не хватило времени на отдельный ответ. Проект не изменён; повторите поручение — большой текст будет подготовлен по частям.";
+      return t(
+        "Модели не хватило времени на отдельный ответ. Проект не изменён; повторите поручение — большой текст будет подготовлен по частям.",
+      );
     case "long_form_incomplete":
-      return "Модель подготовила только часть большого текста. Ничего не применено; проверьте сохранённый частичный результат.";
+      return t(
+        "Модель подготовила только часть большого текста. Ничего не применено; проверьте сохранённый частичный результат.",
+      );
     case "context_unavailable":
     case "mcp_unavailable":
     case "change_set_failed":
-      return "Не удалось подготовить безопасный набор изменений проекта. Ничего не применено; повторите поручение.";
+      return t(
+        "Не удалось подготовить безопасный набор изменений проекта. Ничего не применено; повторите поручение.",
+      );
     case "execution_interrupted":
-      return "Выполнение прервалось из-за перезапуска приложения. Проект не изменён; это поручение можно отправить повторно.";
+      return t(
+        "Выполнение прервалось из-за перезапуска приложения. Проект не изменён; это поручение можно отправить повторно.",
+      );
     default:
-      return "Проект не изменён. Можно уточнить поручение и отправить его ещё раз.";
+      return t("Проект не изменён. Можно уточнить поручение и отправить его ещё раз.");
   }
 }
 
 export function assistantToolLabel(toolName: string): string {
   const exact: Record<string, string> = {
-    "assistant.begin_turn": "Понимает поручение",
-    "assistant.get_recent_change_set": "Сверяет предыдущее предложение",
-    "project.get_overview": "Изучает проект",
-    "project.get_structure": "Сверяет структуру и вложенность",
-    "project.search": "Ищет точное место в материалах",
-    "tree.list": "Просматривает дерево проекта",
-    "tree.create_nodes_batch": "Готовит разделы вместе с содержимым",
-    "document.get": "Читает текущий документ",
-    "document.find_exact": "Находит точный фрагмент без ручного подсчёта",
-    "document.find_exact_batch": "Находит точные фрагменты одним проходом",
-    "document.get_range": "Проверяет точный фрагмент",
-    "document.replace_range": "Готовит точную правку текста",
-    "annotation.list": "Собирает заметки по проекту",
-    "annotation.get": "Проверяет заметку и её историю",
-    "annotation.propose_fixes": "Готовит исправления по заметкам",
-    "document.append_chunk": "Пишет следующий фрагмент черновика",
-    "document.prepare_replace_all": "Готовит связанную правку по проекту",
-    "dictionary.add_batch": "Готовит пакетное обновление словаря",
-    "project_memory.add_batch": "Готовит пакетное обновление памяти проекта",
-    "tree.prepare_archive": "Передаёт архивацию в проект",
-    "version.prepare_restore": "Передаёт восстановление в историю версий",
-    "transcript.prepare_retranscribe": "Передаёт повторную обработку стенограммы",
-    "export.prepare": "Передаёт создание файла в экспорт",
-    "assistant_guide.get": "Сверяется с ASSISTANT.md",
-    "assistant.get_capabilities": "Проверяет возможности рабочего пространства",
+    "assistant.begin_turn": t("Понимает поручение"),
+    "assistant.get_recent_change_set": t("Сверяет предыдущее предложение"),
+    "project.get_overview": t("Изучает проект"),
+    "project.get_structure": t("Сверяет структуру и вложенность"),
+    "project.search": t("Ищет точное место в материалах"),
+    "tree.list": t("Просматривает дерево проекта"),
+    "tree.create_nodes_batch": t("Готовит разделы вместе с содержимым"),
+    "document.get": t("Читает текущий документ"),
+    "document.find_exact": t("Находит точный фрагмент без ручного подсчёта"),
+    "document.find_exact_batch": t("Находит точные фрагменты одним проходом"),
+    "document.get_range": t("Проверяет точный фрагмент"),
+    "document.replace_range": t("Готовит точную правку текста"),
+    "annotation.list": t("Собирает заметки по проекту"),
+    "annotation.get": t("Проверяет заметку и её историю"),
+    "annotation.propose_fixes": t("Готовит исправления по заметкам"),
+    "document.append_chunk": t("Пишет следующий фрагмент черновика"),
+    "document.prepare_replace_all": t("Готовит связанную правку по проекту"),
+    "dictionary.add_batch": t("Готовит пакетное обновление словаря"),
+    "project_memory.add_batch": t("Готовит пакетное обновление памяти проекта"),
+    "tree.prepare_archive": t("Передаёт архивацию в проект"),
+    "version.prepare_restore": t("Передаёт восстановление в историю версий"),
+    "transcript.prepare_retranscribe": t("Передаёт повторную обработку стенограммы"),
+    "export.prepare": t("Передаёт создание файла в экспорт"),
+    "assistant_guide.get": t("Сверяется с ASSISTANT.md"),
+    "assistant.get_capabilities": t("Проверяет возможности рабочего пространства"),
   };
   if (exact[toolName]) return exact[toolName];
   if (toolName.startsWith("document.") || toolName.startsWith("note.")) {
-    return "Готовит изменение документа";
+    return t("Готовит изменение документа");
   }
-  if (toolName.startsWith("annotation.")) return "Работает с заметками в рукописи";
-  if (toolName.startsWith("dictionary.")) return "Работает со словарём";
-  if (toolName.startsWith("project_memory.")) return "Работает с памятью проекта";
-  if (toolName.startsWith("assistant_guide.")) return "Готовит изменение ASSISTANT.md";
-  if (toolName.startsWith("tree.")) return "Работает со структурой проекта";
-  if (toolName.startsWith("version.")) return "Проверяет историю версий";
+  if (toolName.startsWith("annotation.")) return t("Работает с заметками в рукописи");
+  if (toolName.startsWith("dictionary.")) return t("Работает со словарём");
+  if (toolName.startsWith("project_memory.")) return t("Работает с памятью проекта");
+  if (toolName.startsWith("assistant_guide.")) return t("Готовит изменение ASSISTANT.md");
+  if (toolName.startsWith("tree.")) return t("Работает со структурой проекта");
+  if (toolName.startsWith("version.")) return t("Проверяет историю версий");
   if (toolName.startsWith("transcript.") || toolName.startsWith("dictation.")) {
-    return "Сверяет стенограмму";
+    return t("Сверяет стенограмму");
   }
-  if (toolName.startsWith("export.")) return "Готовит экспорт";
-  return "Выполняет безопасный шаг";
+  if (toolName.startsWith("export.")) return t("Готовит экспорт");
+  return t("Выполняет безопасный шаг");
 }
 
 export function buildAssistantNativeActions(events: AssistantEvent[]): AssistantNativeAction[] {

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 GlobalRegistrator.register();
+Object.defineProperty(navigator, "languages", { configurable: true, value: ["ru-RU"] });
 
 const aliases: Record<string, string> = {
   app: "app",

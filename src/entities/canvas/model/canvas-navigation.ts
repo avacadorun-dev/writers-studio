@@ -1,4 +1,5 @@
 import type { ProjectMedia } from "~entities/project";
+import { t } from "~shared/i18n";
 
 import type { CanvasDocument, CanvasDocumentPreview, CanvasGroupNode, CanvasNode } from "./types";
 
@@ -57,7 +58,7 @@ function objectListItem(
   media: Map<string, ProjectMedia>,
 ): CanvasObjectListItem {
   if (node.type === "text") {
-    const title = firstContentLine(node.text) || "Пустая заметка";
+    const title = firstContentLine(node.text) || t("Пустая заметка");
     return item(node, "text", title, node.text);
   }
   if (node.type === "link") {
@@ -73,12 +74,12 @@ function objectListItem(
   if (node.type === "file") {
     const resource = node["x-writers-studio"]?.resource;
     if (!resource) {
-      const title = node.file.split("/").at(-1) || node.file || "Файл";
+      const title = node.file.split("/").at(-1) || node.file || t("Файл");
       return item(node, "file", title, `${title} ${node.file}`);
     }
     if (resource.kind === "document") {
       const document = documents.get(resource.id);
-      const title = document?.title || "Недоступный документ";
+      const title = document?.title || t("Недоступный документ");
       return item(
         node,
         "file",
@@ -88,25 +89,30 @@ function objectListItem(
     }
     if (resource.kind === "media") {
       const asset = media.get(resource.id);
-      const title = asset?.originalName || "Медиа";
+      const title = asset?.originalName || t("Медиа");
       return item(node, "file", title, `${title} ${asset?.mediaType ?? ""}`);
     }
-    const title = node.file.split("/").at(-1) || "Вложенная доска";
+    const title = node.file.split("/").at(-1) || t("Вложенная доска");
     return item(node, "file", title, `${title} canvas`);
   }
   const element = node["x-writers-studio"]?.element;
   if (element?.kind === "stroke") {
-    return item(node, "stroke", element.brush === "pen" ? "Штрих пера" : "Маркер", element.brush);
+    return item(
+      node,
+      "stroke",
+      element.brush === "pen" ? t("Штрих пера") : t("Маркер"),
+      element.brush,
+    );
   }
   if (element?.kind === "shape") {
     const title = element.label || shapeLabel(element.shape);
     return item(node, "shape", title, `${title} ${element.shape}`);
   }
   if (element?.kind === "frame") {
-    const title = element.label || node.label || `Фрейм ${element.order}`;
+    const title = element.label || node.label || t("Фрейм {0}", element.order);
     return item(node, "frame", title, `${title} frame ${element.order}`);
   }
-  const title = node.label || "Группа";
+  const title = node.label || t("Группа");
   return item(node, "group", title, title);
 }
 
@@ -140,13 +146,13 @@ function shapeLabel(shape: string): string {
   return (
     (
       {
-        rectangle: "Прямоугольник",
-        ellipse: "Эллипс",
-        diamond: "Ромб",
-        line: "Линия",
-        arrow: "Стрелка",
+        rectangle: t("Прямоугольник"),
+        ellipse: t("Эллипс"),
+        diamond: t("Ромб"),
+        line: t("Линия"),
+        arrow: t("Стрелка"),
       } as Record<string, string>
-    )[shape] ?? "Фигура"
+    )[shape] ?? t("Фигура")
   );
 }
 

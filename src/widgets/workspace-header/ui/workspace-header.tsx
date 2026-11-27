@@ -1,16 +1,16 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { BookOpen, LifeBuoy, LogOut, Settings } from "lucide-react";
-
 import { useSession } from "~entities/session";
 import { useLogout } from "~features/auth";
+import { t } from "~shared/i18n";
 import { BrandMark, Button, UiTooltip } from "~shared/ui";
 
 export function WorkspaceHeader() {
   const session = useSession();
   const logout = useLogout();
   const navigate = useNavigate();
-  const initials = (session.data?.user.displayName || "Автор")
+  const initials = (session.data?.user.displayName || t("Автор"))
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
@@ -21,36 +21,38 @@ export function WorkspaceHeader() {
     <header className="workspace-chrome flex h-[72px] items-center justify-between border-b border-[var(--border-subtle)] px-4 sm:px-8 xl:px-12">
       <Link
         to="/projects"
-        aria-label="Студия автора — проекты"
+        aria-label={t("Студия автора — проекты")}
         className="flex min-h-11 items-center gap-3 rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
       >
         <BrandMark className="size-10 shrink-0" aria-hidden="true" />
-        <span className="font-display hidden text-[20px] leading-6 sm:inline">Студия автора</span>
+        <span className="font-display hidden text-[20px] leading-6 sm:inline">
+          {t("Студия автора")}
+        </span>
       </Link>
 
       <div className="flex items-center gap-0.5 sm:gap-1">
-        <Button asChild variant="ghost" size="icon" tooltip="Открыть документацию">
-          <a href="/docs" aria-label="Открыть документацию">
+        <Button asChild variant="ghost" size="icon" tooltip={t("Открыть документацию")}>
+          <a href="/docs" aria-label={t("Открыть документацию")}>
             <BookOpen className="size-4" aria-hidden="true" />
           </a>
         </Button>
-        <Button asChild variant="ghost" size="icon" tooltip="Открыть центр восстановления">
-          <Link to="/recovery" aria-label="Открыть центр восстановления">
+        <Button asChild variant="ghost" size="icon" tooltip={t("Открыть центр восстановления")}>
+          <Link to="/recovery" aria-label={t("Открыть центр восстановления")}>
             <LifeBuoy className="size-4" aria-hidden="true" />
           </Link>
         </Button>
-        <Button asChild variant="ghost" size="icon" tooltip="Открыть настройки">
-          <Link to="/settings" aria-label="Открыть настройки">
+        <Button asChild variant="ghost" size="icon" tooltip={t("Открыть настройки")}>
+          <Link to="/settings" aria-label={t("Открыть настройки")}>
             <Settings className="size-4" aria-hidden="true" />
           </Link>
         </Button>
         <DropdownMenu.Root>
-          <UiTooltip content="Меню профиля">
+          <UiTooltip content={t("Меню профиля")}>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
                 className="ml-1 grid size-11 place-items-center rounded-full bg-[var(--surface-selected)] text-xs font-semibold text-[var(--accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
-                aria-label="Меню профиля"
+                aria-label={t("Меню профиля")}
               >
                 {initials}
               </button>
@@ -75,7 +77,7 @@ export function WorkspaceHeader() {
                 }
               >
                 <LogOut className="size-4" aria-hidden="true" />
-                Выйти
+                {t("Выйти")}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

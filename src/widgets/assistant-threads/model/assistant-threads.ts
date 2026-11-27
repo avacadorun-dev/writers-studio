@@ -1,4 +1,5 @@
 import type { AssistantRun } from "~entities/assistant";
+import { interfaceLanguage, t } from "~shared/i18n";
 
 export type AssistantThreadBucket = "attention" | "working" | "recent";
 
@@ -7,8 +8,8 @@ export function assistantThreadTitle(run: AssistantRun): string {
   if (explicit && explicit !== "Новый чат") return explicit;
   const instruction = run.latestTurn?.instruction?.trim();
   if (instruction) return compactThreadTitle(instruction);
-  if (run.inputMode === "mcp") return `Внешний агент · ${run.agent?.clientName ?? "MCP"}`;
-  return run.inputMode === "voice" ? "Голосовое поручение" : "Новый чат";
+  if (run.inputMode === "mcp") return t("Внешний агент · {0}", run.agent?.clientName ?? "MCP");
+  return run.inputMode === "voice" ? t("Голосовое поручение") : t("Новый чат");
 }
 
 export function compactThreadTitle(value: string, maxLength = 58): string {
@@ -38,37 +39,35 @@ export function assistantThreadStatus(run: AssistantRun): string {
     (run.latestChangeSet?.state === "stale" && run.latestChangeSet.turnId === run.latestTurn?.id) ||
     (run.errorCode === "stale_change_set" && run.latestTurn?.errorCode === "stale_change_set")
   ) {
-    return "ОБНОВИТЬ";
+    return t("ОБНОВИТЬ");
   }
-  if (run.status === "awaiting_review") return "ПРОВЕРИТЬ";
-  if (run.status === "working") return "В РАБОТЕ";
-  if (run.status === "failed") return "ОШИБКА";
-  if (run.status === "cancelled") return "ОСТАНОВЛЕН";
-  if (run.status === "completed") return "ГОТОВО";
-  return "ОТКРЫТ";
+  if (run.status === "awaiting_review") return t("ПРОВЕРИТЬ");
+  if (run.status === "working") return t("В РАБОТЕ");
+  if (run.status === "failed") return t("ОШИБКА");
+  if (run.status === "cancelled") return t("ОСТАНОВЛЕН");
+  if (run.status === "completed") return t("ГОТОВО");
+  return t("ОТКРЫТ");
 }
 
 export function assistantThreadUpdatedLabel(updatedAt: string, now = Date.now()): string {
   const timestamp = Date.parse(updatedAt);
-  if (!Number.isFinite(timestamp)) return "недавно";
+  if (!Number.isFinite(timestamp)) return t("недавно");
   const elapsed = Math.max(0, now - timestamp);
-  if (elapsed < 60_000) return "только что";
+  if (elapsed < 60_000) return t("только что");
   const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 60) return `${minutes} мин`;
+  if (minutes < 60) return t("{0} мин", minutes);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч`;
+  if (hours < 24) return t("{0} ч", hours);
   const days = Math.floor(hours / 24);
-  return `${days} дн`;
+  return t("{0} дн", days);
 }
 
 export function assistantThreadCountLabel(count: number): string {
-  const absolute = Math.abs(count);
-  const lastTwo = absolute % 100;
-  const last = absolute % 10;
-  if (lastTwo >= 11 && lastTwo <= 14) return `${count} чатов`;
-  if (last === 1) return `${count} чат`;
-  if (last >= 2 && last <= 4) return `${count} чата`;
-  return `${count} чатов`;
+  const formattedCount = new Intl.NumberFormat(interfaceLanguage).format(count);
+  const plural = new Intl.PluralRules(interfaceLanguage).select(count);
+  if (plural === "one") return t("{0} чат", formattedCount);
+  if (plural === "few") return t("{0} чата", formattedCount);
+  return t("{0} чатов", formattedCount);
 }
 
 export function groupAssistantThreads(

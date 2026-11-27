@@ -1,6 +1,7 @@
 // biome-ignore-all lint/a11y/noNoninteractiveTabindex: overflow code regions must be keyboard-scrollable
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { t } from "~shared/i18n";
 
 import { cn } from "~shared/lib";
 
@@ -62,7 +63,7 @@ const components: Components = {
   pre: ({ children }) => (
     <section
       tabIndex={0}
-      aria-label="Блок кода"
+      aria-label={t("Блок кода")}
       className="my-4 max-h-80 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4 text-[12px] leading-5 [scrollbar-gutter:stable]"
     >
       <pre>{children}</pre>

@@ -1,13 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-
 import {
   type Project,
   type ProjectWorkspace,
   type UpdateProjectInput,
   updateProject,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 import { Button, Field, Input, ModalDialog, Select, useToast } from "~shared/ui";
 
 interface EditProjectDialogProps {
@@ -53,10 +53,10 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
       void queryClient.invalidateQueries({ queryKey: ["project", project.id] });
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
-      showToast({ title: "Проект обновлён" });
+      showToast({ title: t("Проект обновлён") });
     },
     onError: (error) =>
-      showToast({ title: "Не удалось обновить проект", description: error.message }),
+      showToast({ title: t("Не удалось обновить проект"), description: error.message }),
   });
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -80,12 +80,14 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
       onOpenChange={(nextOpen) => {
         if (!mutation.isPending) onOpenChange(nextOpen);
       }}
-      title="Настройки проекта"
-      description="Название и замысел обновятся во всём рабочем пространстве. Тип и структура проекта не изменятся."
+      title={t("Настройки проекта")}
+      description={t(
+        "Название и замысел обновятся во всём рабочем пространстве. Тип и структура проекта не изменятся.",
+      )}
       icon={Settings2}
     >
       <form onSubmit={handleSubmit} className="grid gap-4">
-        <Field label="Название проекта" htmlFor="edit-project-title">
+        <Field label={t("Название проекта")} htmlFor="edit-project-title">
           <Input
             id="edit-project-title"
             autoFocus
@@ -96,12 +98,12 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
             onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
           />
         </Field>
-        <Field label="Коротко о замысле" htmlFor="edit-project-synopsis">
+        <Field label={t("Коротко о замысле")} htmlFor="edit-project-synopsis">
           <textarea
             id="edit-project-synopsis"
             rows={4}
             value={form.synopsis}
-            placeholder="О чём эта история"
+            placeholder={t("О чём эта история")}
             onChange={(event) =>
               setForm((current) => ({ ...current, synopsis: event.target.value }))
             }
@@ -109,7 +111,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Язык диктовки" htmlFor="edit-project-language">
+          <Field label={t("Язык диктовки")} htmlFor="edit-project-language">
             <Select
               id="edit-project-language"
               value={form.language}
@@ -120,14 +122,14 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                 }))
               }
             >
-              <option value="ru">Русский</option>
+              <option value="ru">{t("Русский")}</option>
               <option value="en">English</option>
             </Select>
           </Field>
           <Field
-            label="Цель по словам"
+            label={t("Цель по словам")}
             htmlFor="edit-project-word-goal"
-            hint="Оставьте поле пустым, чтобы убрать цель."
+            hint={t("Оставьте поле пустым, чтобы убрать цель.")}
           >
             <Input
               id="edit-project-word-goal"
@@ -136,7 +138,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
               min={1}
               max={10_000_000}
               value={form.wordGoal ?? ""}
-              placeholder="Например, 80 000"
+              placeholder={t("Например, 80 000")}
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
@@ -153,10 +155,10 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
             disabled={mutation.isPending}
             onClick={() => onOpenChange(false)}
           >
-            Отмена
+            {t("Отмена")}
           </Button>
           <Button type="submit" disabled={mutation.isPending || unchanged || !form.title.trim()}>
-            {mutation.isPending ? "Сохраняем…" : "Сохранить изменения"}
+            {mutation.isPending ? t("Сохраняем…") : t("Сохранить изменения")}
           </Button>
         </div>
       </form>

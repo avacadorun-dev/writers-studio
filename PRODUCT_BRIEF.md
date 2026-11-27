@@ -95,4 +95,4 @@ ongoing dependency maintenance and tested backups, which this frozen repository
 does not guarantee on behalf of operators.
 
 See the [architecture](docs/architecture/ARC42.md) and
-[workflow reference](docs/specification/WORKFLOWS.md) for detailed contracts.
+[workflow reference](openspec/README.md) for detailed contracts.

@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-
 import {
   type AssistantInputMode,
   type AssistantSelectionAttachment,
@@ -25,6 +24,7 @@ import {
   listAssistantProviders,
 } from "~entities/assistant";
 import type { DocumentNode, Project } from "~entities/project";
+import { t } from "~shared/i18n";
 import { cn, loadWriterPreferences } from "~shared/lib";
 import { Banner, Button, Select } from "~shared/ui";
 
@@ -112,7 +112,7 @@ export function AssistantNewChatPanel({
   const createThread = useMutation({
     mutationFn: () =>
       createAssistantRun(project.id, {
-        title: inputMode === "chat" ? message.trim() : "Голосовое поручение",
+        title: inputMode === "chat" ? message.trim() : t("Голосовое поручение"),
         targetKind,
         targetNodeId: targetKind === "node" ? node?.id : undefined,
         targetCanvasId: targetKind === "canvas" ? canvas?.id : undefined,
@@ -141,7 +141,7 @@ export function AssistantNewChatPanel({
 
   return (
     <aside
-      aria-label="Новый чат ассистента"
+      aria-label={t("Новый чат ассистента")}
       data-testid="assistant-new-chat-panel"
       className="flex h-full min-h-0 w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-panel)]"
     >
@@ -152,7 +152,7 @@ export function AssistantNewChatPanel({
             variant="ghost"
             size="icon"
             onClick={onBack}
-            aria-label="Вернуться к чатам"
+            aria-label={t("Вернуться к чатам")}
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Button>
@@ -163,16 +163,16 @@ export function AssistantNewChatPanel({
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase">
-            Ассистент · новый чат
+            {t("Ассистент · новый чат")}
           </p>
-          <p className="truncate text-sm font-semibold">Новое поручение</p>
+          <p className="truncate text-sm font-semibold">{t("Новое поручение")}</p>
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon"
           onClick={onClose}
-          aria-label="Скрыть панель"
+          aria-label={t("Скрыть панель")}
         >
           <X className="size-4" aria-hidden="true" />
         </Button>
@@ -180,10 +180,11 @@ export function AssistantNewChatPanel({
 
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <h2 className="font-[var(--font-display)] text-xl font-semibold">Что поручить?</h2>
+          <h2 className="font-[var(--font-display)] text-xl font-semibold">{t("Что поручить?")}</h2>
           <p className="mt-1 text-[12px] leading-5 text-[var(--ink-secondary)]">
-            Новый чат работает независимо. {canvas ? "Доска" : "Рукопись"}, проект и руководство
-            остаются перед глазами.
+            {t("Новый чат работает независимо. ")}
+            {canvas ? t("Доска") : t("Рукопись")}
+            {t(", проект и руководство остаются перед глазами.")}
           </p>
 
           {selectionAttachment ? (
@@ -193,7 +194,7 @@ export function AssistantNewChatPanel({
                 aria-hidden="true"
               />
               <div className="min-w-0">
-                <p className="font-semibold text-[var(--accent-ink)]">Фрагмент прикреплён</p>
+                <p className="font-semibold text-[var(--accent-ink)]">{t("Фрагмент прикреплён")}</p>
                 <p className="mt-0.5 line-clamp-2 text-[var(--ink-secondary)]">
                   {selectionAttachment.quote}
                 </p>
@@ -203,7 +204,7 @@ export function AssistantNewChatPanel({
 
           <fieldset className="mt-5">
             <legend className="text-[10px] font-semibold tracking-[0.1em] text-[var(--ink-tertiary)] uppercase">
-              Область работы
+              {t("Область работы")}
             </legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {canvas ? (
@@ -224,7 +225,7 @@ export function AssistantNewChatPanel({
               <ScopeButton
                 active={targetKind === "project"}
                 icon={Globe2}
-                label="Весь проект"
+                label={t("Весь проект")}
                 onClick={() => setTargetKind("project")}
               />
             </div>
@@ -232,19 +233,19 @@ export function AssistantNewChatPanel({
 
           <fieldset className="mt-5">
             <legend className="text-[10px] font-semibold tracking-[0.1em] text-[var(--ink-tertiary)] uppercase">
-              Способ общения
+              {t("Способ общения")}
             </legend>
             <div className="mt-2 grid grid-cols-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-1">
               <ModeButton
                 active={inputMode === "chat"}
                 icon={MessageCircle}
-                label="Чат"
+                label={t("Чат")}
                 onClick={() => setInputMode("chat")}
               />
               <ModeButton
                 active={inputMode === "voice"}
                 icon={Mic2}
-                label="Голосом"
+                label={t("Голосом")}
                 disabled={!capabilities.data?.voiceAvailable}
                 onClick={() => setInputMode("voice")}
               />
@@ -254,7 +255,7 @@ export function AssistantNewChatPanel({
           {inputMode === "chat" ? (
             <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-paper)] p-3 focus-within:border-[var(--focus)]">
               <label htmlFor="assistant-new-thread-message" className="sr-only">
-                Первое поручение
+                {t("Первое поручение")}
               </label>
               <textarea
                 id="assistant-new-thread-message"
@@ -264,8 +265,8 @@ export function AssistantNewChatPanel({
                 maxLength={32_000}
                 placeholder={
                   canvas
-                    ? "Например: сгруппируй выбранные идеи и предложи недостающие связи…"
-                    : "Например: сделай первый абзац загадочнее, но не меняй последнюю реплику…"
+                    ? t("Например: сгруппируй выбранные идеи и предложи недостающие связи…")
+                    : t("Например: сделай первый абзац загадочнее, но не меняй последнюю реплику…")
                 }
                 className="w-full resize-none bg-transparent text-sm leading-6 outline-none placeholder:text-[var(--ink-tertiary)]"
                 onKeyDown={(event) => {
@@ -279,20 +280,21 @@ export function AssistantNewChatPanel({
             </div>
           ) : (
             <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] p-4 text-[12px] leading-5 text-[var(--ink-secondary)]">
-              Чат останется рядом с {canvas ? "доской" : "рукописью"}. Запись начнётся только после
-              явного нажатия кнопки микрофона.
+              {t("Чат останется рядом с ")}
+              {canvas ? t("доской") : t("рукописью")}
+              {t(". Запись начнётся только после явного нажатия кнопки микрофона.")}
             </div>
           )}
 
           <details className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-paper)] px-3 py-2">
             <summary className="cursor-pointer text-[11px] font-semibold text-[var(--ink-secondary)]">
-              Модель и контекст
+              {t("Модель и контекст")}
             </summary>
             <label
               htmlFor="assistant-new-thread-provider"
               className="mt-3 block text-[10px] font-semibold tracking-[0.1em] text-[var(--ink-tertiary)] uppercase"
             >
-              Модель
+              {t("Модель")}
             </label>
             <Select
               id="assistant-new-thread-provider"
@@ -302,11 +304,12 @@ export function AssistantNewChatPanel({
               disabled={providers.isPending || capabilities.isPending}
             >
               <option value="" disabled>
-                Нет совместимой модели
+                {t("Нет совместимой модели")}
               </option>
               {capabilities.data?.systemProviderConfigured ? (
                 <option value="system" disabled={!capabilities.data.systemProviderAvailable}>
-                  Системная · {capabilities.data.systemProvider?.model ?? "модель"}
+                  {t("Системная · ")}
+                  {capabilities.data.systemProvider?.model ?? t("модель")}
                 </option>
               ) : null}
               {compatibleConnections.map((connection) => (
@@ -318,28 +321,36 @@ export function AssistantNewChatPanel({
             <Button asChild variant="ghost" size="compact" className="mt-2 w-full">
               <Link to="/settings/assistant-providers">
                 <Settings2 className="size-3.5" aria-hidden="true" />
-                Настроить модели
+                {t("Настроить модели")}
               </Link>
             </Button>
           </details>
 
           {createThread.isError ? (
             <div className="mt-4">
-              <Banner variant="danger" title="Чат не создан" body={createThread.error.message} />
+              <Banner
+                variant="danger"
+                title={t("Чат не создан")}
+                body={createThread.error.message}
+              />
             </div>
           ) : null}
           {backgroundWorkingCount > 0 ? (
             <p className="mt-4 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] px-3 py-2 text-[10px] leading-4 text-[var(--ink-secondary)]">
               {backgroundWorkingCount}{" "}
-              {backgroundWorkingCount === 1 ? "другой чат продолжает" : "других чата продолжают"}{" "}
-              работу в фоне.
+              {backgroundWorkingCount === 1
+                ? t("другой чат продолжает")
+                : t("других чата продолжают")}{" "}
+              {t("работу в фоне.")}
             </p>
           ) : null}
         </div>
 
         <footer className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3">
           {!providerAvailable && !capabilities.isPending && !providers.isPending ? (
-            <p className="mb-2 text-[11px] text-[var(--warning)]">Выберите совместимую модель.</p>
+            <p className="mb-2 text-[11px] text-[var(--warning)]">
+              {t("Выберите совместимую модель.")}
+            </p>
           ) : null}
           <Button
             type="submit"
@@ -358,10 +369,10 @@ export function AssistantNewChatPanel({
               <Mic2 className="size-4" aria-hidden="true" />
             )}
             {createThread.isPending
-              ? "Запускаем…"
+              ? t("Запускаем…")
               : inputMode === "chat"
-                ? "Начать чат"
-                : "Открыть голосовой чат"}
+                ? t("Начать чат")
+                : t("Открыть голосовой чат")}
           </Button>
         </footer>
       </form>

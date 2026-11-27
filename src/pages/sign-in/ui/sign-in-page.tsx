@@ -1,10 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { type FormEvent, useState } from "react";
-
 import { useLogin, useRegister } from "~features/auth";
 import { APIError } from "~shared/api";
-import { BrandMark, Button, Field, Input } from "~shared/ui";
+import { t } from "~shared/i18n";
+import { BrandMark, Button, Field, Input, InterfaceLanguagePicker } from "~shared/ui";
 
 import "./sign-in.css";
 
@@ -37,14 +37,14 @@ export function SignInPage() {
       <section className="auth-hero relative hidden min-h-full overflow-hidden px-12 py-10 text-[var(--ink-on-inverse)] lg:flex lg:flex-col xl:px-16 xl:py-12">
         <div className="flex items-center gap-3">
           <BrandMark className="size-10 shrink-0" aria-hidden="true" />
-          <span className="font-display text-[19px] leading-6">Студия автора</span>
+          <span className="font-display text-[19px] leading-6">{t("Студия автора")}</span>
         </div>
         <div className="auth-manuscript-scene" aria-hidden="true">
           <div className="auth-manuscript-sheet auth-manuscript-sheet-back" />
           <div className="auth-manuscript-sheet auth-manuscript-sheet-middle" />
           <div className="auth-manuscript-sheet auth-manuscript-sheet-front">
-            <span className="auth-manuscript-chapter">Глава первая</span>
-            <span className="auth-manuscript-title">Начало истории</span>
+            <span className="auth-manuscript-chapter">{t("Глава первая")}</span>
+            <span className="auth-manuscript-title">{t("Начало истории")}</span>
             <span className="auth-manuscript-rule" />
             <div className="auth-manuscript-lines">
               <span />
@@ -61,12 +61,12 @@ export function SignInPage() {
         </div>
         <div className="relative mt-auto max-w-[520px]">
           <blockquote className="font-display text-[34px] leading-[1.3] xl:text-[40px]">
-            Место, где мысль становится текстом — и остаётся вашей.
+            {t("Место, где мысль становится текстом — и остаётся вашей.")}
           </blockquote>
           <p className="mt-5 max-w-[400px] text-[13px] leading-[1.8] text-[var(--ink-on-inverse-muted)]">
-            От первого наброска до последней правки.
+            {t("От первого наброска до последней правки.")}
             <br />
-            Ваши истории, заметки и идеи в одном месте.
+            {t("Ваши истории, заметки и идеи в одном месте.")}
           </p>
         </div>
       </section>
@@ -75,22 +75,22 @@ export function SignInPage() {
         <form onSubmit={handleSubmit} className="relative w-full max-w-[400px]">
           <div className="mb-12 flex items-center gap-3 lg:hidden">
             <BrandMark className="size-10 shrink-0" aria-hidden="true" />
-            <span className="font-display text-[19px]">Студия автора</span>
+            <span className="font-display text-[19px]">{t("Студия автора")}</span>
           </div>
           <p className="text-[10px] font-semibold tracking-[0.18em] text-[var(--accent)] uppercase">
-            Добро пожаловать
+            {t("Добро пожаловать")}
           </p>
           <h1 className="font-display mt-4 text-[32px] leading-[1.25] sm:text-[36px]">
-            {mode === "login" ? "Вернуться к рукописи" : "Создать пространство"}
+            {mode === "login" ? t("Вернуться к рукописи") : t("Создать пространство")}
           </h1>
           <p className="mt-4 max-w-[390px] text-[13px] leading-[1.8] text-[var(--ink-secondary)]">
             {mode === "login"
-              ? "Войдите, чтобы открыть проекты и синхронизировать сохранённую работу."
-              : "Начните с почты и пароля. Ваши неопубликованные тексты остаются приватными."}
+              ? t("Войдите, чтобы открыть проекты и синхронизировать сохранённую работу.")
+              : t("Начните с почты и пароля. Ваши неопубликованные тексты остаются приватными.")}
           </p>
 
           <div className="mt-8 grid gap-5">
-            <Field label="Почта" htmlFor="auth-email">
+            <Field label={t("Почта")} htmlFor="auth-email">
               <div className="relative">
                 <Mail
                   className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ink-tertiary)]"
@@ -107,7 +107,7 @@ export function SignInPage() {
                 />
               </div>
             </Field>
-            <Field label="Пароль" error={errorMessage} htmlFor="auth-password">
+            <Field label={t("Пароль")} error={errorMessage} htmlFor="auth-password">
               <div className="relative">
                 <LockKeyhole
                   className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ink-tertiary)]"
@@ -129,7 +129,11 @@ export function SignInPage() {
           </div>
 
           <Button className="mt-6 w-full" disabled={mutation.isPending} type="submit">
-            {mutation.isPending ? "Проверяем…" : mode === "login" ? "Войти" : "Создать аккаунт"}
+            {mutation.isPending
+              ? t("Проверяем…")
+              : mode === "login"
+                ? t("Войти")
+                : t("Создать аккаунт")}
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
           <Button
@@ -141,14 +145,18 @@ export function SignInPage() {
               setMode((current) => (current === "login" ? "register" : "login"));
             }}
           >
-            {mode === "login" ? "Создать аккаунт" : "У меня уже есть аккаунт"}
+            {mode === "login" ? t("Создать аккаунт") : t("У меня уже есть аккаунт")}
           </Button>
 
           <p className="mt-8 flex items-start gap-2 border-t border-[var(--border-subtle)] pt-5 text-[11px] leading-[1.7] text-[var(--ink-tertiary)]">
             <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Неопубликованные тексты считаются чувствительными данными и не используются для
-            обучения.
+            {t(
+              "Неопубликованные тексты считаются чувствительными данными и не используются для обучения.",
+            )}
           </p>
+          <div className="mt-6">
+            <InterfaceLanguagePicker />
+          </div>
         </form>
       </section>
     </main>

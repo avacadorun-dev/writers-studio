@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, SpellCheck2, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-
 import {
   createDictionaryTerm,
   type DictionaryTerm,
@@ -10,6 +9,7 @@ import {
   listDictionary,
   updateDictionaryTerm,
 } from "~entities/project";
+import { localizeMessage, t } from "~shared/i18n";
 import {
   Banner,
   Button,
@@ -63,7 +63,7 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
       setForm(emptyForm);
       setVariants("");
       void queryClient.invalidateQueries({ queryKey: ["dictionary", projectId] });
-      showToast({ title: "Термин добавлен", description: response.notice });
+      showToast({ title: t("Термин добавлен"), description: localizeMessage(response.notice) });
     },
   });
   const toggle = useMutation({
@@ -85,9 +85,9 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
     onSuccess: (term) => {
       void queryClient.invalidateQueries({ queryKey: ["dictionary", projectId] });
       showToast({
-        title: "Термин удалён",
-        description: "Уже написанный текст и исходные расшифровки не изменены.",
-        actionLabel: "Отменить",
+        title: t("Термин удалён"),
+        description: t("Уже написанный текст и исходные расшифровки не изменены."),
+        actionLabel: t("Отменить"),
         onAction: () => {
           void createDictionaryTerm(projectId, {
             canonical: term.canonical,
@@ -101,7 +101,7 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
   });
 
   if (project.isPending || !project.data) {
-    return <Spinner label="Открываем словарь…" />;
+    return <Spinner label={t("Открываем словарь…")} />;
   }
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -125,16 +125,18 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold tracking-[0.14em] text-[var(--ink-tertiary)] uppercase">
-              Проект · русский и английский
+              {t("Проект · русский и английский")}
             </p>
-            <h1 className="font-display mt-2 text-[34px] leading-tight">Словарь имён и терминов</h1>
+            <h1 className="font-display mt-2 text-[34px] leading-tight">
+              {t("Словарь имён и терминов")}
+            </h1>
             <p className="mt-2 text-sm text-[var(--ink-secondary)]">
-              Словарь помогает будущим расшифровкам. Уже написанный текст не изменится.
+              {t("Словарь помогает будущим расшифровкам. Уже написанный текст не изменится.")}
             </p>
           </div>
           <Button type="button" onClick={() => setEditing(true)}>
             <Plus className="size-4" aria-hidden="true" />
-            Добавить термин
+            {t("Добавить термин")}
           </Button>
         </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
@@ -147,8 +149,8 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
               className="pl-10"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Найти имя, вариант или термин"
-              aria-label="Поиск по словарю"
+              placeholder={t("Найти имя, вариант или термин")}
+              aria-label={t("Поиск по словарю")}
             />
           </div>
           <Select
@@ -156,13 +158,13 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
             onChange={(event) =>
               setKindFilter(event.target.value as DictionaryTerm["kind"] | "all")
             }
-            aria-label="Фильтр по типу термина"
+            aria-label={t("Фильтр по типу термина")}
           >
-            <option value="all">Все типы</option>
-            <option value="character">Персонажи</option>
-            <option value="place">Места</option>
-            <option value="term">Термины</option>
-            <option value="other">Другое</option>
+            <option value="all">{t("Все типы")}</option>
+            <option value="character">{t("Персонажи")}</option>
+            <option value="place">{t("Места")}</option>
+            <option value="term">{t("Термины")}</option>
+            <option value="other">{t("Другое")}</option>
           </Select>
         </div>
         {editing ? (
@@ -173,7 +175,7 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
               add.mutate();
             }}
           >
-            <Field label="Правильное написание">
+            <Field label={t("Правильное написание")}>
               <Input
                 autoFocus
                 required
@@ -184,10 +186,10 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                 }
               />
             </Field>
-            <Field label="Варианты через запятую" hint="Например: Аня, Анна Сергеевна">
+            <Field label={t("Варианты через запятую")} hint={t("Например: Аня, Анна Сергеевна")}>
               <Input value={variants} onChange={(event) => setVariants(event.target.value)} />
             </Field>
-            <Field label="Тип">
+            <Field label={t("Тип")}>
               <Select
                 value={form.kind}
                 onChange={(event) =>
@@ -197,13 +199,13 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                   }))
                 }
               >
-                <option value="character">Персонаж</option>
-                <option value="place">Место</option>
-                <option value="term">Термин</option>
-                <option value="other">Другое</option>
+                <option value="character">{t("Персонаж")}</option>
+                <option value="place">{t("Место")}</option>
+                <option value="term">{t("Термин")}</option>
+                <option value="other">{t("Другое")}</option>
               </Select>
             </Field>
-            <Field label="Язык">
+            <Field label={t("Язык")}>
               <Select
                 value={form.language}
                 onChange={(event) =>
@@ -213,7 +215,7 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                   }))
                 }
               >
-                <option value="ru">Русский</option>
+                <option value="ru">{t("Русский")}</option>
                 <option value="en">English</option>
               </Select>
             </Field>
@@ -221,22 +223,22 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
               <Banner
                 className="sm:col-span-2"
                 variant="danger"
-                title="Не удалось добавить"
+                title={t("Не удалось добавить")}
                 body={add.error.message}
               />
             ) : null}
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-                Отмена
+                {t("Отмена")}
               </Button>
               <Button type="submit" disabled={add.isPending || !form.canonical.trim()}>
-                Сохранить термин
+                {t("Сохранить термин")}
               </Button>
             </div>
           </form>
         ) : null}
         {dictionary.isPending ? (
-          <Spinner label="Загружаем словарь…" />
+          <Spinner label={t("Загружаем словарь…")} />
         ) : (
           <div className="mt-6 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-paper)]">
             {terms.map((term) => (
@@ -248,7 +250,7 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                 <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-medium">{term.canonical}</h2>
                   <p className="truncate text-xs text-[var(--ink-tertiary)]">
-                    {term.variants.length ? term.variants.join(", ") : "Без вариантов"} ·{" "}
+                    {term.variants.length ? term.variants.join(", ") : t("Без вариантов")} ·{" "}
                     {kindLabel(term.kind)}
                   </p>
                 </div>
@@ -262,21 +264,22 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                     disabled={toggle.isPending}
                     onCheckedChange={() => toggle.mutate(term)}
                   />
-                  Активен
+                  {t("Активен")}
                 </label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Удалить ${term.canonical}`}
+                  aria-label={t("Удалить {0}", term.canonical)}
                   onClick={() => {
                     void requestConfirmation({
-                      title: `Удалить термин «${term.canonical}»?`,
-                      description:
+                      title: t("Удалить термин «{0}»?", term.canonical),
+                      description: t(
                         "Уже написанный текст и исходные расшифровки останутся неизменными. Удаление можно отменить через уведомление.",
+                      ),
                       icon: Trash2,
                       tone: "danger",
-                      confirmLabel: "Удалить термин",
+                      confirmLabel: t("Удалить термин"),
                     }).then((confirmed) => {
                       if (confirmed) remove.mutate(term);
                     });
@@ -293,12 +296,12 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
                   aria-hidden="true"
                 />
                 <p className="font-display mt-3 text-2xl">
-                  {dictionary.data?.terms.length ? "Ничего не найдено" : "Словарь пока пуст"}
+                  {dictionary.data?.terms.length ? t("Ничего не найдено") : t("Словарь пока пуст")}
                 </p>
                 <p className="mt-1 text-sm text-[var(--ink-tertiary)]">
                   {dictionary.data?.terms.length
-                    ? "Измените запрос или фильтр."
-                    : "Добавьте имена и термины перед следующей записью."}
+                    ? t("Измените запрос или фильтр.")
+                    : t("Добавьте имена и термины перед следующей записью.")}
                 </p>
               </div>
             ) : null}
@@ -311,9 +314,9 @@ export function DictionaryPage({ projectId }: { projectId: string }) {
 
 function kindLabel(kind: DictionaryTerm["kind"]): string {
   return {
-    character: "персонаж",
-    place: "место",
-    term: "термин",
-    other: "другое",
+    character: t("персонаж"),
+    place: t("место"),
+    term: t("термин"),
+    other: t("другое"),
   }[kind];
 }

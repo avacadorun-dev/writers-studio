@@ -2,12 +2,12 @@ import { type Editor, Extension } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-
 import type {
   AnnotationAnchor,
   AnnotationAnchorUpdate,
   DocumentAnnotation,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 
 interface MappedAnnotation {
   annotation: DocumentAnnotation;
@@ -207,8 +207,11 @@ function annotationClass(annotation: DocumentAnnotation): string {
 }
 
 function annotationLabel(annotation: DocumentAnnotation): string {
-  if (annotation.kind === "note") return `Заметка: ${annotation.note ?? ""}`;
+  if (annotation.kind === "note") return t("Заметка: {0}", annotation.note ?? "");
   return annotation.dictionaryTerm?.id
-    ? `Термин словаря: ${annotation.dictionaryTerm.canonical}`
-    : `Удалённый термин: ${annotation.dictionaryTerm?.canonical ?? annotation.anchor.exactText}`;
+    ? t("Термин словаря: {0}", annotation.dictionaryTerm.canonical)
+    : t(
+        "Удалённый термин: {0}",
+        annotation.dictionaryTerm?.canonical ?? annotation.anchor.exactText,
+      );
 }

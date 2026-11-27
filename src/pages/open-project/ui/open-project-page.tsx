@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect } from "react";
-
 import {
   createNode,
   type DocumentNode,
@@ -9,6 +8,7 @@ import {
   type ProjectWorkspace,
   restoreNode,
 } from "~entities/project";
+import { t } from "~shared/i18n";
 import { Banner, Button, Spinner } from "~shared/ui";
 import { RequireSession } from "~widgets/require-session";
 
@@ -63,7 +63,7 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
       if (!project.data) throw new Error("project is unavailable");
       const kind = selectProjectRootKind(project.data);
       if (!kind) throw new Error("project has no root node type");
-      return createNode(projectId, { kind, title: "Новый материал" });
+      return createNode(projectId, { kind, title: t("Новый материал") });
     },
     onSuccess: ({ node }) => {
       queryClient.setQueryData<ProjectWorkspace>(["project", projectId], (current) =>
@@ -87,16 +87,16 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
         <main className="mx-auto grid min-h-full max-w-xl content-center gap-4 p-6">
           <Banner
             variant="danger"
-            title="Не удалось открыть проект"
-            body="Проект недоступен или был удалён. Вернитесь к списку либо повторите запрос."
+            title={t("Не удалось открыть проект")}
+            body={t("Проект недоступен или был удалён. Вернитесь к списку либо повторите запрос.")}
             action={
               <Button size="compact" variant="secondary" onClick={() => void project.refetch()}>
-                Повторить
+                {t("Повторить")}
               </Button>
             }
           />
           <Button asChild variant="ghost">
-            <Link to="/projects">К проектам</Link>
+            <Link to="/projects">{t("К проектам")}</Link>
           </Button>
         </main>
       </RequireSession>
@@ -111,18 +111,18 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
         <main className="mx-auto grid min-h-full max-w-xl content-center gap-5 p-6 text-center">
           <div>
             <p className="text-xs font-semibold tracking-[0.12em] text-[var(--ink-tertiary)] uppercase">
-              Проект
+              {t("Проект")}
             </p>
             <h1 className="font-display mt-2 text-3xl">{project.data.project.title}</h1>
             <p className="mt-3 text-sm text-[var(--ink-secondary)]">
-              В рукописи пока нет активных материалов.
+              {t("В рукописи пока нет активных материалов.")}
             </p>
           </div>
           {recoverable ? (
             <Banner
               variant="warning"
-              title="Материалы находятся в корзине"
-              body={`Можно восстановить «${recoverable.title}» и сразу продолжить работу.`}
+              title={t("Материалы находятся в корзине")}
+              body={t("Можно восстановить «{0}» и сразу продолжить работу.", recoverable.title)}
               action={
                 <Button
                   size="compact"
@@ -130,14 +130,14 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
                   disabled={restoreFirst.isPending}
                   onClick={() => restoreFirst.mutate(recoverable.id)}
                 >
-                  {restoreFirst.isPending ? "Возвращаем…" : "Восстановить"}
+                  {restoreFirst.isPending ? t("Возвращаем…") : t("Восстановить")}
                 </Button>
               }
             />
           ) : null}
           {restoreFirst.isError || createFirst.isError ? (
             <p role="alert" className="text-sm text-[var(--danger)]">
-              Не удалось подготовить материал. Повторите действие.
+              {t("Не удалось подготовить материал. Повторите действие.")}
             </p>
           ) : null}
           <div className="flex flex-wrap justify-center gap-3">
@@ -145,10 +145,10 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
               disabled={!canCreate || createFirst.isPending}
               onClick={() => createFirst.mutate()}
             >
-              {createFirst.isPending ? "Создаём…" : "Создать материал"}
+              {createFirst.isPending ? t("Создаём…") : t("Создать материал")}
             </Button>
             <Button asChild variant="ghost">
-              <Link to="/projects">К проектам</Link>
+              <Link to="/projects">{t("К проектам")}</Link>
             </Button>
           </div>
         </main>
@@ -159,7 +159,7 @@ export function OpenProjectPage({ projectId }: { projectId: string }) {
   return (
     <RequireSession>
       <main className="min-h-full">
-        <Spinner label="Открываем рукопись…" />
+        <Spinner label={t("Открываем рукопись…")} />
       </main>
     </RequireSession>
   );

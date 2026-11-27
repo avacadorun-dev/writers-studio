@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 /// <reference lib="webworker" />
 
 import ELK from "elkjs/lib/elk.bundled.js";
@@ -11,6 +13,6 @@ self.addEventListener("message", (event: MessageEvent<CanvasLayoutGraph>) => {
     .layout(event.data)
     .then((result) => self.postMessage({ result }))
     .catch((error: unknown) =>
-      self.postMessage({ error: error instanceof Error ? error.message : "Ошибка раскладки" }),
+      self.postMessage({ error: error instanceof Error ? error.message : t("Ошибка раскладки") }),
     );
 });

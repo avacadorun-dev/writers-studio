@@ -1,5 +1,6 @@
 import type { ProjectMemoryRecord } from "~entities/assistant";
 import type { DocumentNode } from "~entities/project";
+import { t } from "~shared/i18n";
 
 export type MemoryStatusFilter = "all" | "active" | "inactive" | "always";
 export type MemoryKindFilter = "all" | ProjectMemoryRecord["kind"];
@@ -123,18 +124,18 @@ export function memoryNodeTitle(nodes: DocumentNode[], nodeId?: string): string 
 
 export function memoryKindLabel(kind: ProjectMemoryRecord["kind"]): string {
   const labels: Record<ProjectMemoryRecord["kind"], string> = {
-    fact: "Факт",
-    character: "Персонаж",
-    world_rule: "Правило мира",
-    plot: "Сюжет",
-    style: "Стиль",
-    constraint: "Ограничение",
-    decision: "Решение",
-    other: "Другое",
+    fact: t("Факт"),
+    character: t("Персонаж"),
+    world_rule: t("Правило мира"),
+    plot: t("Сюжет"),
+    style: t("Стиль"),
+    constraint: t("Ограничение"),
+    decision: t("Решение"),
+    other: t("Другое"),
   };
   return labels[kind];
 }
 
 export function memorySourceLabel(source: string): string {
-  return source === "assistant" ? "предложено ассистентом" : "добавлено вручную";
+  return source === "assistant" ? t("предложено ассистентом") : t("добавлено вручную");
 }

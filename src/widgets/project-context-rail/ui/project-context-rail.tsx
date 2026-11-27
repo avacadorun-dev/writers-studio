@@ -7,6 +7,7 @@ import {
   MessageSquareText,
   PanelRight,
 } from "lucide-react";
+import { t } from "~shared/i18n";
 
 import { Button } from "~shared/ui";
 
@@ -22,13 +23,13 @@ export function ProjectContextRail({
   return (
     <aside
       className="hidden w-14 shrink-0 flex-col items-center border-l border-[var(--border-subtle)] bg-[var(--surface-panel)] py-4 lg:flex"
-      aria-label="Контекст документа"
+      aria-label={t("Контекст документа")}
     >
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Обзор документа"
+        aria-label={t("Обзор документа")}
         onClick={() => window.dispatchEvent(new CustomEvent("writers-studio-overview"))}
       >
         <PanelRight className="size-4" aria-hidden="true" />
@@ -38,7 +39,7 @@ export function ProjectContextRail({
         variant="ghost"
         size="icon"
         className="relative"
-        aria-label={`Заметки на полях${annotationCount ? `: ${annotationCount}` : ""}`}
+        aria-label={t("Заметки на полях{0}", annotationCount ? `: ${annotationCount}` : "")}
         onClick={onAnnotations}
       >
         <MessageSquareText className="size-4" aria-hidden="true" />
@@ -52,13 +53,13 @@ export function ProjectContextRail({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Прослушать источник"
+        aria-label={t("Прослушать источник")}
         onClick={() => window.dispatchEvent(new CustomEvent("writers-studio-play-source"))}
       >
         <AudioLines className="size-4" aria-hidden="true" />
       </Button>
-      <Button asChild variant="ghost" size="icon" tooltip="История версий" tooltipSide="left">
-        <Link to="/nodes/$nodeId/versions" params={{ nodeId }} aria-label="История версий">
+      <Button asChild variant="ghost" size="icon" tooltip={t("История версий")} tooltipSide="left">
+        <Link to="/nodes/$nodeId/versions" params={{ nodeId }} aria-label={t("История версий")}>
           <History className="size-4" aria-hidden="true" />
         </Link>
       </Button>
@@ -66,7 +67,7 @@ export function ProjectContextRail({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Статистика документа"
+        aria-label={t("Статистика документа")}
         onClick={() => window.dispatchEvent(new CustomEvent("writers-studio-stats"))}
       >
         <BarChart3 className="size-4" aria-hidden="true" />
@@ -76,7 +77,7 @@ export function ProjectContextRail({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Режим фокуса"
+        aria-label={t("Режим фокуса")}
         onClick={() => window.dispatchEvent(new CustomEvent("writers-studio-focus"))}
       >
         <Maximize2 className="size-4" aria-hidden="true" />

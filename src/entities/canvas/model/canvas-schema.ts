@@ -1,3 +1,5 @@
+import { t } from "~shared/i18n";
+
 import type {
   CanvasDocument,
   CanvasFieldDefinition,
@@ -6,61 +8,61 @@ import type {
   CanvasTypeSchema,
 } from "./types";
 
-const summaryField: CanvasFieldDefinition = { id: "summary", name: "Кратко", type: "markdown" };
+const summaryField: CanvasFieldDefinition = { id: "summary", name: t("Кратко"), type: "markdown" };
 
 export const builtInCanvasCardTypes: CanvasTypeDefinition[] = [
-  card("idea", "Идея", "general", "Lightbulb", "3", [summaryField]),
-  card("question", "Вопрос", "general", "CircleHelp", "2", [summaryField]),
-  card("source", "Источник", "general", "Library", "5", [
+  card("idea", t("Идея"), "general", "Lightbulb", "3", [summaryField]),
+  card("question", t("Вопрос"), "general", "CircleHelp", "2", [summaryField]),
+  card("source", t("Источник"), "general", "Library", "5", [
     summaryField,
     { id: "url", name: "URL", type: "short-text" },
   ]),
-  card("character", "Персонаж", "narrative", "UserRound", "6", [
+  card("character", t("Персонаж"), "narrative", "UserRound", "6", [
     summaryField,
-    { id: "goal", name: "Цель", type: "markdown" },
-    { id: "conflict", name: "Конфликт", type: "markdown" },
+    { id: "goal", name: t("Цель"), type: "markdown" },
+    { id: "conflict", name: t("Конфликт"), type: "markdown" },
   ]),
-  card("location", "Локация", "narrative", "MapPin", "4", [summaryField]),
-  card("beat", "Бит / событие", "narrative", "Clapperboard", "3", [
+  card("location", t("Локация"), "narrative", "MapPin", "4", [summaryField]),
+  card("beat", t("Бит / событие"), "narrative", "Clapperboard", "3", [
     summaryField,
-    { id: "date", name: "Дата", type: "date" },
-    { id: "duration", name: "Длительность", type: "duration" },
+    { id: "date", name: t("Дата"), type: "date" },
+    { id: "duration", name: t("Длительность"), type: "duration" },
   ]),
-  card("conflict", "Конфликт", "narrative", "Swords", "1", [summaryField]),
-  card("theme", "Тема", "narrative", "Sparkles", "5", [summaryField]),
-  card("mechanic", "Механика", "game-design", "Gamepad2", "5", [summaryField]),
-  card("quest", "Квест", "game-design", "ScrollText", "3", [
+  card("conflict", t("Конфликт"), "narrative", "Swords", "1", [summaryField]),
+  card("theme", t("Тема"), "narrative", "Sparkles", "5", [summaryField]),
+  card("mechanic", t("Механика"), "game-design", "Gamepad2", "5", [summaryField]),
+  card("quest", t("Квест"), "game-design", "ScrollText", "3", [
     summaryField,
-    { id: "prerequisites", name: "Предусловия", type: "multi-select" },
+    { id: "prerequisites", name: t("Предусловия"), type: "multi-select" },
   ]),
-  card("dialogue", "Диалог", "game-design", "MessagesSquare", "6", [
-    { id: "line", name: "Реплика", type: "markdown", required: true },
-    { id: "terminal", name: "Завершает диалог", type: "checkbox" },
+  card("dialogue", t("Диалог"), "game-design", "MessagesSquare", "6", [
+    { id: "line", name: t("Реплика"), type: "markdown", required: true },
+    { id: "terminal", name: t("Завершает диалог"), type: "checkbox" },
   ]),
-  card("state", "Состояние", "game-design", "Workflow", "2", [
+  card("state", t("Состояние"), "game-design", "Workflow", "2", [
     summaryField,
-    { id: "initial", name: "Начальное", type: "checkbox" },
-    { id: "terminal", name: "Конечное", type: "checkbox" },
+    { id: "initial", name: t("Начальное"), type: "checkbox" },
+    { id: "terminal", name: t("Конечное"), type: "checkbox" },
   ]),
-  card("level", "Уровень", "game-design", "Map", "4", [summaryField]),
-  card("resource", "Ресурс", "game-design", "Gem", "2", [
+  card("level", t("Уровень"), "game-design", "Map", "4", [summaryField]),
+  card("resource", t("Ресурс"), "game-design", "Gem", "2", [
     summaryField,
-    { id: "initialAmount", name: "Стартовое количество", type: "number" },
+    { id: "initialAmount", name: t("Стартовое количество"), type: "number" },
   ]),
 ];
 
 export const builtInCanvasRelationTypes: CanvasRelationType[] = [
-  relation("relates", "Связано с", false, "5"),
-  relation("causes", "Вызывает", true, "3"),
-  relation("contradicts", "Противоречит", false, "1"),
-  relation("depends_on", "Зависит от", true, "2"),
-  relation("blocks", "Блокирует", true, "1"),
-  relation("reveals", "Раскрывает", true, "6"),
-  relation("transitions_to", "Переходит в", true, "5"),
-  relation("contains", "Содержит", true, "4"),
-  relation("consumes", "Потребляет", true, "2"),
-  relation("produces", "Производит", true, "4"),
-  relation("rewards", "Награждает", true, "3"),
+  relation("relates", t("Связано с"), false, "5"),
+  relation("causes", t("Вызывает"), true, "3"),
+  relation("contradicts", t("Противоречит"), false, "1"),
+  relation("depends_on", t("Зависит от"), true, "2"),
+  relation("blocks", t("Блокирует"), true, "1"),
+  relation("reveals", t("Раскрывает"), true, "6"),
+  relation("transitions_to", t("Переходит в"), true, "5"),
+  relation("contains", t("Содержит"), true, "4"),
+  relation("consumes", t("Потребляет"), true, "2"),
+  relation("produces", t("Производит"), true, "4"),
+  relation("rewards", t("Награждает"), true, "3"),
 ];
 
 export const defaultCanvasTypeSchema: CanvasTypeSchema = {
@@ -93,19 +95,27 @@ export function validateCanvasTypedDocument(
     if (!metadata) continue;
     const type = cardTypes.get(metadata.typeId);
     if (!type) {
-      issues.push({ kind: "node", id: node.id, message: `Неизвестный тип ${metadata.typeId}` });
+      issues.push({
+        kind: "node",
+        id: node.id,
+        message: t("Неизвестный тип {0}", metadata.typeId),
+      });
       continue;
     }
     nodeTypes.set(node.id, type.id);
     for (const field of type.fields) {
       const value = metadata.fields[field.id];
       if (field.required && (value === undefined || value === null || value === "")) {
-        issues.push({ kind: "node", id: node.id, message: `Поле «${field.name}» обязательно` });
+        issues.push({
+          kind: "node",
+          id: node.id,
+          message: t("Поле «{0}» обязательно", field.name),
+        });
       } else if (value !== undefined && value !== null && !validFieldValue(field, value)) {
         issues.push({
           kind: "node",
           id: node.id,
-          message: `Поле «${field.name}» имеет неверный формат`,
+          message: t("Поле «{0}» имеет неверный формат", field.name),
         });
       }
     }
@@ -115,16 +125,20 @@ export function validateCanvasTypedDocument(
     if (!metadata) continue;
     const type = relationTypes.get(metadata.typeId);
     if (!type) {
-      issues.push({ kind: "edge", id: edge.id, message: `Неизвестная связь ${metadata.typeId}` });
+      issues.push({
+        kind: "edge",
+        id: edge.id,
+        message: t("Неизвестная связь {0}", metadata.typeId),
+      });
       continue;
     }
     const fromType = nodeTypes.get(edge.fromNode);
     const toType = nodeTypes.get(edge.toNode);
     if (type.fromTypes?.length && (!fromType || !type.fromTypes.includes(fromType))) {
-      issues.push({ kind: "edge", id: edge.id, message: "Недопустимый исходный тип карточки" });
+      issues.push({ kind: "edge", id: edge.id, message: t("Недопустимый исходный тип карточки") });
     }
     if (type.toTypes?.length && (!toType || !type.toTypes.includes(toType))) {
-      issues.push({ kind: "edge", id: edge.id, message: "Недопустимый целевой тип карточки" });
+      issues.push({ kind: "edge", id: edge.id, message: t("Недопустимый целевой тип карточки") });
     }
   }
   return issues;

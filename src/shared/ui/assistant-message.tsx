@@ -1,6 +1,7 @@
 // biome-ignore-all lint/a11y/noNoninteractiveTabindex: overflow JSON regions must be keyboard-scrollable
 import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
+import { t } from "~shared/i18n";
 
 import { cn } from "~shared/lib";
 import { AssistantMarkdown, sanitizeAssistantMarkdown } from "./assistant-markdown";
@@ -99,7 +100,7 @@ export function AssistantMessage({
 
   return (
     <section
-      aria-label="Структурированные данные"
+      aria-label={t("Структурированные данные")}
       className={cn(
         "min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-subtle)]",
         className,
@@ -114,7 +115,7 @@ export function AssistantMessage({
           variant="ghost"
           size="compact"
           className="min-h-7 px-2 text-[10px]"
-          aria-label={copied ? "JSON скопирован" : "Скопировать исходный JSON"}
+          aria-label={copied ? t("JSON скопирован") : t("Скопировать исходный JSON")}
           onClick={() => void copy()}
         >
           {copied ? (
@@ -122,12 +123,12 @@ export function AssistantMessage({
           ) : (
             <Copy className="size-3" aria-hidden="true" />
           )}
-          {copied ? "Скопировано" : "Копировать"}
+          {copied ? t("Скопировано") : t("Копировать")}
         </Button>
       </div>
       <section
         tabIndex={0}
-        aria-label="JSON-сообщение"
+        aria-label={t("JSON-сообщение")}
         className="max-h-80 min-w-0 overflow-auto p-3 font-mono text-[11px] leading-5 whitespace-pre [scrollbar-gutter:stable]"
       >
         <pre>
@@ -146,7 +147,7 @@ export function AssistantMessage({
           ) : (
             <ChevronDown className="size-3.5" aria-hidden="true" />
           )}
-          {expanded ? "Свернуть" : "Показать полностью"}
+          {expanded ? t("Свернуть") : t("Показать полностью")}
         </button>
       ) : null}
     </section>

@@ -31,8 +31,8 @@ import {
   Workflow,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 import { uploadProjectImage } from "~entities/project";
+import { t } from "~shared/i18n";
 import {
   cn,
   type EditorLineHeight,
@@ -145,47 +145,49 @@ export function FormattingToolbar({
 
   const formatButtons = [
     {
-      label: "Курсив",
+      label: t("Курсив"),
       icon: Italic,
       active: editor.isActive("italic"),
       action: () => editor.chain().focus().toggleItalic().run(),
     },
     {
-      label: "Полужирный",
+      label: t("Полужирный"),
       icon: Bold,
       active: editor.isActive("bold"),
       action: () => editor.chain().focus().toggleBold().run(),
     },
     {
-      label: "Подчёркнутый",
+      label: t("Подчёркнутый"),
       icon: UnderlineIcon,
       active: editor.isActive("underline"),
       action: () => editor.chain().focus().toggleUnderline().run(),
     },
     {
-      label: "Зачёркнутый",
+      label: t("Зачёркнутый"),
       icon: Strikethrough,
       active: editor.isActive("strike"),
       action: () => editor.chain().focus().toggleStrike().run(),
     },
     {
-      label: "Строчный код",
+      label: t("Строчный код"),
       icon: Code2,
       active: editor.isActive("code"),
       action: () => editor.chain().focus().toggleCode().run(),
     },
     {
-      label: "Строчная формула",
+      label: t("Строчная формула"),
       icon: Sigma,
       active: editor.isActive("inlineMath"),
       action: () => {
         void requestInput({
-          title: "Вставить строчную формулу",
-          description: "Введите исходник LaTeX без символов $. HTML и сетевые команды отключены.",
-          label: "Исходник LaTeX",
+          title: t("Вставить строчную формулу"),
+          description: t(
+            "Введите исходник LaTeX без символов $. HTML и сетевые команды отключены.",
+          ),
+          label: t("Исходник LaTeX"),
           defaultValue: "x^2 + y^2",
           icon: Sigma,
-          confirmLabel: "Вставить",
+          confirmLabel: t("Вставить"),
         }).then((latex) => {
           if (!latex?.trim()) return;
           editor.commands.insertInlineMath({ latex: latex.trim() });
@@ -193,19 +195,19 @@ export function FormattingToolbar({
       },
     },
     {
-      label: "Цитата",
+      label: t("Цитата"),
       icon: Quote,
       active: editor.isActive("blockquote"),
       action: () => editor.chain().focus().toggleBlockquote().run(),
     },
     {
-      label: "Маркированный список",
+      label: t("Маркированный список"),
       icon: List,
       active: editor.isActive("bulletList"),
       action: () => editor.chain().focus().toggleBulletList().run(),
     },
     {
-      label: "Нумерованный список",
+      label: t("Нумерованный список"),
       icon: ListOrdered,
       active: editor.isActive("orderedList"),
       action: () => editor.chain().focus().toggleOrderedList().run(),
@@ -223,10 +225,10 @@ export function FormattingToolbar({
         integratedWorkspace ? "bg-[var(--surface-panel)]" : "min-h-11 bg-[var(--surface-paper)]",
       )}
       role="toolbar"
-      aria-label="Форматирование текста"
+      aria-label={t("Форматирование текста")}
     >
       <Select
-        aria-label="Стиль абзаца"
+        aria-label={t("Стиль абзаца")}
         className={cn(
           "mr-1 h-9 shrink-0 border-0 bg-transparent text-[13px]",
           presentation === "compact" ? "w-28" : "w-36",
@@ -253,14 +255,14 @@ export function FormattingToolbar({
           }
         }}
       >
-        <option value="paragraph">Обычный текст</option>
-        <option value="h1">Заголовок 1</option>
-        <option value="h2">Заголовок 2</option>
-        <option value="h3">Заголовок 3</option>
+        <option value="paragraph">{t("Обычный текст")}</option>
+        <option value="h1">{t("Заголовок 1")}</option>
+        <option value="h2">{t("Заголовок 2")}</option>
+        <option value="h3">{t("Заголовок 3")}</option>
       </Select>
       <span className="mx-1 h-5 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />
       {formatButtons
-        .filter(({ label }) => presentation !== "expanded" || label !== "Строчная формула")
+        .filter(({ label }) => presentation !== "expanded" || label !== t("Строчная формула"))
         .slice(0, presentation === "expanded" ? formatButtons.length : 2)
         .map(({ label, icon: Icon, active, action }) => (
           <Button
@@ -287,15 +289,15 @@ export function FormattingToolbar({
             variant="ghost"
             size="icon"
             className="size-9 min-h-9 shrink-0"
-            aria-label="Типографика"
-            title="Типографика"
+            aria-label={t("Типографика")}
+            title={t("Типографика")}
           >
             <TextCursorInput className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" aria-label="Типографика" className="w-64 p-3">
+        <DropdownMenuContent align="start" aria-label={t("Типографика")} className="w-64 p-3">
           <label htmlFor="editor-toolbar-line-height" className="grid gap-1.5 text-xs font-medium">
-            Межстрочный интервал
+            {t("Межстрочный интервал")}
             <Select
               id="editor-toolbar-line-height"
               value={preferences.lineHeight}
@@ -303,16 +305,16 @@ export function FormattingToolbar({
                 updatePreferences({ lineHeight: Number(event.target.value) as EditorLineHeight })
               }
             >
-              <option value={1.5}>1,5 — плотный</option>
-              <option value={1.75}>1,75 — обычный</option>
-              <option value={2}>2 — свободный</option>
+              <option value={1.5}>{t("1,5 — плотный")}</option>
+              <option value={1.75}>{t("1,75 — обычный")}</option>
+              <option value={2}>{t("2 — свободный")}</option>
             </Select>
           </label>
           <label
             htmlFor="editor-toolbar-paragraph-spacing"
             className="mt-3 grid gap-1.5 text-xs font-medium"
           >
-            Между абзацами
+            {t("Между абзацами")}
             <Select
               id="editor-toolbar-paragraph-spacing"
               value={preferences.paragraphSpacing}
@@ -331,7 +333,7 @@ export function FormattingToolbar({
             htmlFor="editor-toolbar-list-spacing"
             className="mt-3 grid gap-1.5 text-xs font-medium"
           >
-            Между пунктами списка
+            {t("Между пунктами списка")}
             <Select
               id="editor-toolbar-list-spacing"
               value={preferences.listItemSpacing}
@@ -341,7 +343,7 @@ export function FormattingToolbar({
                 })
               }
             >
-              <option value={0}>Без интервала</option>
+              <option value={0}>{t("Без интервала")}</option>
               <option value={0.25}>0,25 em</option>
               <option value={0.5}>0,5 em</option>
             </Select>
@@ -354,8 +356,8 @@ export function FormattingToolbar({
           variant="ghost"
           size="icon"
           className="size-9 min-h-9 shrink-0"
-          aria-label="Вставить разделитель сцены"
-          title="Вставить разделитель сцены"
+          aria-label={t("Вставить разделитель сцены")}
+          title={t("Вставить разделитель сцены")}
           onClick={() => editor.chain().focus().insertContent({ type: "sceneBreak" }).run()}
         >
           <Minus className="size-4" aria-hidden="true" />
@@ -369,30 +371,30 @@ export function FormattingToolbar({
             variant="ghost"
             size="icon"
             className="size-9 min-h-9 shrink-0"
-            aria-label="Вставить блок"
-            title="Вставить блок"
+            aria-label={t("Вставить блок")}
+            title={t("Вставить блок")}
           >
             <Plus className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" aria-label="Вставить блок">
+        <DropdownMenuContent align="start" aria-label={t("Вставить блок")}>
           <DropdownMenuItem
             onSelect={() =>
               editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
             }
           >
             <Table2 className="size-4" aria-hidden="true" />
-            Таблица 3 × 3
+            {t("Таблица 3 × 3")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
               void requestInput({
-                title: "Вставить формулу",
-                description: "Формула займёт отдельный блок. HTML и сетевые команды отключены.",
-                label: "Исходник LaTeX",
+                title: t("Вставить формулу"),
+                description: t("Формула займёт отдельный блок. HTML и сетевые команды отключены."),
+                label: t("Исходник LaTeX"),
                 defaultValue: "\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
                 icon: Sigma,
-                confirmLabel: "Вставить",
+                confirmLabel: t("Вставить"),
                 multiline: true,
                 rows: 4,
               }).then((latex) => {
@@ -402,17 +404,17 @@ export function FormattingToolbar({
             }}
           >
             <Sigma className="size-4" aria-hidden="true" />
-            Формула
+            {t("Формула")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
               void requestSelect({
-                title: "Вставить блок кода",
-                description: "Язык сохраняется в документе и Markdown-экспорте.",
-                label: "Язык",
+                title: t("Вставить блок кода"),
+                description: t("Язык сохраняется в документе и Markdown-экспорте."),
+                label: t("Язык"),
                 defaultValue: "plain",
                 icon: Code2,
-                confirmLabel: "Вставить",
+                confirmLabel: t("Вставить"),
                 options: codeLanguageOptions.map((option) => ({
                   value: option.value || "plain",
                   label: option.label,
@@ -431,26 +433,28 @@ export function FormattingToolbar({
             }}
           >
             <Code2 className="size-4" aria-hidden="true" />
-            Блок кода
+            {t("Блок кода")}
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={imageUploading}
             onSelect={() => imageInputRef.current?.click()}
           >
             <ImagePlus className="size-4" aria-hidden="true" />
-            {imageUploading ? "Загружаем изображение…" : "Изображение"}
+            {imageUploading ? t("Загружаем изображение…") : t("Изображение")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
               void requestInput({
-                title: "Вставить Mermaid-схему",
-                description:
+                title: t("Вставить Mermaid-схему"),
+                description: t(
                   "Поддерживаются flowchart, sequenceDiagram, stateDiagram, classDiagram и другие виды Mermaid.",
-                label: "Исходный код Mermaid",
-                defaultValue:
+                ),
+                label: t("Исходный код Mermaid"),
+                defaultValue: t(
                   "flowchart TD\n  Start[Начало] --> Choice{Условие}\n  Choice --> Result[Результат]",
+                ),
                 icon: Workflow,
-                confirmLabel: "Вставить",
+                confirmLabel: t("Вставить"),
                 multiline: true,
                 rows: 10,
               }).then((code) => {
@@ -464,7 +468,7 @@ export function FormattingToolbar({
             }}
           >
             <Workflow className="size-4" aria-hidden="true" />
-            Mermaid-схема
+            {t("Mermaid-схема")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -477,7 +481,7 @@ export function FormattingToolbar({
                   content: [
                     {
                       type: "paragraph",
-                      content: [{ type: "text", text: "Важная информация" }],
+                      content: [{ type: "text", text: t("Важная информация") }],
                     },
                   ],
                 })
@@ -485,7 +489,7 @@ export function FormattingToolbar({
             }
           >
             <CircleAlert className="size-4" aria-hidden="true" />
-            Блок «Информация»
+            {t("Блок «Информация»")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -495,13 +499,15 @@ export function FormattingToolbar({
                 .insertContent({
                   type: "callout",
                   attrs: { kind: "idea" },
-                  content: [{ type: "paragraph", content: [{ type: "text", text: "Новая идея" }] }],
+                  content: [
+                    { type: "paragraph", content: [{ type: "text", text: t("Новая идея") }] },
+                  ],
                 })
                 .run()
             }
           >
             <Lightbulb className="size-4" aria-hidden="true" />
-            Блок «Идея»
+            {t("Блок «Идея»")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -514,7 +520,7 @@ export function FormattingToolbar({
                   content: [
                     {
                       type: "paragraph",
-                      content: [{ type: "text", text: "Риск или ограничение" }],
+                      content: [{ type: "text", text: t("Риск или ограничение") }],
                     },
                   ],
                 })
@@ -522,7 +528,7 @@ export function FormattingToolbar({
             }
           >
             <TriangleAlert className="size-4" aria-hidden="true" />
-            Блок «Предупреждение»
+            {t("Блок «Предупреждение»")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() =>
@@ -533,14 +539,17 @@ export function FormattingToolbar({
                   type: "callout",
                   attrs: { kind: "todo" },
                   content: [
-                    { type: "paragraph", content: [{ type: "text", text: "Что нужно сделать" }] },
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: t("Что нужно сделать") }],
+                    },
                   ],
                 })
                 .run()
             }
           >
             <ListTodo className="size-4" aria-hidden="true" />
-            Блок «TODO»
+            {t("Блок «TODO»")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -550,8 +559,8 @@ export function FormattingToolbar({
         size="icon"
         className="size-9 min-h-9 shrink-0"
         disabled={!editor.can().undo()}
-        aria-label="Отменить"
-        title="Отменить"
+        aria-label={t("Отменить")}
+        title={t("Отменить")}
         onClick={() => editor.chain().focus().undo().run()}
       >
         <Undo2 className="size-4" aria-hidden="true" />
@@ -564,8 +573,8 @@ export function FormattingToolbar({
             size="icon"
             className="size-9 min-h-9 shrink-0"
             disabled={!editor.can().redo()}
-            aria-label="Повторить"
-            title="Повторить"
+            aria-label={t("Повторить")}
+            title={t("Повторить")}
             onClick={() => editor.chain().focus().redo().run()}
           >
             <Redo2 className="size-4" aria-hidden="true" />
@@ -575,8 +584,8 @@ export function FormattingToolbar({
             variant="ghost"
             size="icon"
             className="size-9 min-h-9 shrink-0"
-            aria-label="Найти в документе"
-            title="Найти в документе"
+            aria-label={t("Найти в документе")}
+            title={t("Найти в документе")}
             onClick={onFind}
           >
             <Search className="size-4" aria-hidden="true" />
@@ -586,8 +595,8 @@ export function FormattingToolbar({
             variant="ghost"
             size="icon"
             className="size-9 min-h-9 shrink-0"
-            aria-label="Режим фокуса"
-            title="Режим фокуса"
+            aria-label={t("Режим фокуса")}
+            title={t("Режим фокуса")}
             onClick={onFocusMode}
           >
             <Focus className="size-4" aria-hidden="true" />
@@ -602,22 +611,22 @@ export function FormattingToolbar({
             variant="ghost"
             size="icon"
             className="size-9 min-h-9 shrink-0"
-            aria-label="Дополнительное форматирование"
-            title="Дополнительное форматирование"
+            aria-label={t("Дополнительное форматирование")}
+            title={t("Дополнительное форматирование")}
           >
             <MoreHorizontal className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" aria-label="Дополнительное форматирование">
+        <DropdownMenuContent align="end" aria-label={t("Дополнительное форматирование")}>
           {formatButtons
             .filter(({ label }, index) =>
-              presentation === "expanded" ? label === "Строчная формула" : index >= 2,
+              presentation === "expanded" ? label === t("Строчная формула") : index >= 2,
             )
             .map(({ label, icon: Icon, active, action }) => (
               <DropdownMenuItem key={label} onSelect={action}>
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="flex-1">{label}</span>
-                {active ? <Check className="size-3.5" aria-label="Активно" /> : null}
+                {active ? <Check className="size-3.5" aria-label={t("Активно")} /> : null}
               </DropdownMenuItem>
             ))}
           {presentation === "compact" ? (
@@ -626,22 +635,22 @@ export function FormattingToolbar({
                 onSelect={() => editor.chain().focus().insertContent({ type: "sceneBreak" }).run()}
               >
                 <Minus className="size-4" aria-hidden="true" />
-                Вставить разделитель сцены
+                {t("Вставить разделитель сцены")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!editor.can().redo()}
                 onSelect={() => editor.chain().focus().redo().run()}
               >
                 <Redo2 className="size-4" aria-hidden="true" />
-                Повторить
+                {t("Повторить")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onFind}>
                 <Search className="size-4" aria-hidden="true" />
-                Найти в документе
+                {t("Найти в документе")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={onFocusMode}>
                 <Focus className="size-4" aria-hidden="true" />
-                Режим фокуса
+                {t("Режим фокуса")}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -649,13 +658,14 @@ export function FormattingToolbar({
             onSelect={() => {
               const previous = editor.getAttributes("link").href as string | undefined;
               void requestInput({
-                title: "Добавить ссылку",
-                description:
+                title: t("Добавить ссылку"),
+                description: t(
                   "Вставьте полный адрес. Пустое поле удалит ссылку с выделенного текста.",
-                label: "Адрес ссылки",
+                ),
+                label: t("Адрес ссылки"),
                 defaultValue: previous ?? "https://",
                 icon: LinkIcon,
-                confirmLabel: "Применить",
+                confirmLabel: t("Применить"),
               }).then((url) => {
                 if (url === undefined) {
                   return;
@@ -669,29 +679,29 @@ export function FormattingToolbar({
             }}
           >
             <LinkIcon className="size-4" aria-hidden="true" />
-            Добавить ссылку
+            {t("Добавить ссылку")}
           </DropdownMenuItem>
           {editor.isActive("table") ? (
             <>
               <DropdownMenuItem onSelect={() => editor.chain().focus().addRowAfter().run()}>
                 <Rows3 className="size-4" aria-hidden="true" />
-                Добавить строку
+                {t("Добавить строку")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => editor.chain().focus().addColumnAfter().run()}>
                 <Columns3 className="size-4" aria-hidden="true" />
-                Добавить столбец
+                {t("Добавить столбец")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => editor.chain().focus().deleteRow().run()}>
                 <Trash2 className="size-4" aria-hidden="true" />
-                Удалить строку
+                {t("Удалить строку")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => editor.chain().focus().deleteColumn().run()}>
                 <Trash2 className="size-4" aria-hidden="true" />
-                Удалить столбец
+                {t("Удалить столбец")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => editor.chain().focus().deleteTable().run()}>
                 <Trash2 className="size-4" aria-hidden="true" />
-                Удалить таблицу
+                {t("Удалить таблицу")}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -702,14 +712,14 @@ export function FormattingToolbar({
         type="file"
         accept="image/png,image/jpeg,image/gif"
         className="sr-only"
-        aria-label="Выбрать изображение"
+        aria-label={t("Выбрать изображение")}
         onChange={(event) => {
           const input = event.currentTarget;
           const file = input.files?.[0];
           if (!file) return;
           const validation = validateEditorImageFile(file);
           if (!validation.valid) {
-            showToast({ title: "Изображение не добавлено", description: validation.message });
+            showToast({ title: t("Изображение не добавлено"), description: validation.message });
             input.value = "";
             return;
           }
@@ -731,12 +741,12 @@ export function FormattingToolbar({
                   },
                 })
                 .run();
-              showToast({ title: "Изображение добавлено" });
+              showToast({ title: t("Изображение добавлено") });
             })
             .catch((error: unknown) => {
               showToast({
-                title: "Не удалось загрузить изображение",
-                description: error instanceof Error ? error.message : "Повторите попытку",
+                title: t("Не удалось загрузить изображение"),
+                description: error instanceof Error ? error.message : t("Повторите попытку"),
               });
             })
             .finally(() => {
